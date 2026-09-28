@@ -34,10 +34,19 @@ import {
 import type { CensusStore } from './store.js';
 
 /** Job state (known.json). Addresses only — public chain facts, no balances. */
+/**
+ * History that still has to be scanned BEFORE the forward cursor. Exists because a `--since-blocks` run (or a
+ * state made by one) only covers recent blocks: the forward cursor alone can't tell "all history" from "recent only".
+ *  - done: every block since the venue launched has been covered
+ *  - chain: [next, end] still to scan on-chain
+ *  - seed (Tydro only): explorer holder lists still to read (token indexes); `stalls` = runs in a row with no progress
+ */
+export type History = { done: true } | { done: false; next: number; end: number; seedTokens?: number[]; stalls?: number };
+
 export interface CensusState {
   v: 1;
-  tydro: { scannedTo: number; users: Record<string, number[]>; seededFromExplorerAt?: number };
-  nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[] };
+  tydro: { scannedTo: number; users: Record<string, number[]>; seededFromExplorerAt?: number; history?: History };
+  nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[]; history?: History };
   lastFullBlock: number;
   lastFullAt: string | null;
   /** last full sweep's coverage vs protocol totals — shares only, no dollar figures (this file is public too) */
@@ -61,8 +70,10 @@ export interface RunOpts {
   scanBackoffMs?: number;
   /** pause between getLogs requests (be gentle with free RPCs). Default 60 ms; tests use 0. */
   scanPaceMs?: number;
+  /** share of the budget that history backfill (explorer seed + old-block scans) may use; reads get the rest. Default 0.6 */
+  backfillShare?: number;
   /** one-time Tydro seed from the explorer's holder lists (false = always scan the chain) */
-  explorer?: false | { fetch?: FetchLike; base?: string; pageDelayMs?: number };
+  explorer?: false | { fetch?: FetchLike; base?: string; pageDelayMs?: number; backoffBaseMs?: number };
   log?: (msg: string) => void;
 }
 
@@ -121,52 +132,42 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   /* ── 1. discovery ─────────────────────────────────────────── */
   const touched = new Set<string>();
 
-  // Tydro, first run: seed from the explorer's holder lists (addresses only; every read below is on-chain)
-  if (state.tydro.scannedTo === 0 && !o.sinceBlocks && o.explorer !== false) {
-    log('tydro: one-time seed from the Ink explorer holder lists (addresses only — every balance is still read on-chain)…');
-    const ex = o.explorer || {};
-    const seed = await seedTydroHolders({
-      fetch: ex.fetch,
-      base: ex.base,
-      pageDelayMs: ex.pageDelayMs,
-      deadline,
-      onRetry: (m) => log(`tydro seed: ${m}`),
-      onToken: (ti, holders, pages) => holders && log(`tydro seed: token ${ti + 1}/28 · ${holders} holders · ${pages} pages`),
-    });
-    if (seed.failedTokens.length === 0) {
-      for (const [addr, idxs] of seed.users) state.tydro.users[addr] = [...idxs].sort((a, b) => a - b);
-      // the explorer indexes a little behind the chain: re-scan the last ~10 minutes of blocks on-chain
-      state.tydro.scannedTo = head - 600;
-      state.tydro.seededFromExplorerAt = head;
-      log(`tydro seed complete: ${seed.users.size} wallets from ${seed.pages} pages`);
+  const backfillDeadline = t0 + Math.round((o.budgetMs ?? 40 * 60_000) * (o.backfillShare ?? 0.6));
+  const ALL_TOKENS = Array.from({ length: 28 }, (_, i) => i);
+  const scanOpts = { onLimit: (n: number) => log(`RPC allows ${n} blocks per history request — using exactly that from now on`), backoffBaseMs: o.scanBackoffMs, paceMs: o.scanPaceMs };
+
+  /* ── history bookkeeping ──
+     A fresh state that scans from launch needs no backfill. A `--since-blocks` run records what it skipped.
+     A state from before this bookkeeping existed can't prove it saw all history, so it gets re-checked once. */
+  const freshTydro = state.tydro.scannedTo === 0;
+  const freshNado = state.nado.accountsScannedTo === 0;
+  if (!state.tydro.history) {
+    if (freshTydro) {
+      state.tydro.history = floor > TYDRO_START_BLOCK
+        ? { done: false, next: TYDRO_START_BLOCK, end: floor - 1, ...(o.explorer !== false ? { seedTokens: ALL_TOKENS } : {}) }
+        : o.explorer !== false ? { done: false, next: 0, end: -1, seedTokens: ALL_TOKENS } : { done: true };
+    } else if (state.tydro.seededFromExplorerAt) {
+      state.tydro.history = { done: true };
     } else {
-      log(`tydro seed incomplete (${seed.failedTokens.length} token lists failed) — falling back to a full chain scan`);
+      log('tydro: this census state cannot prove it covered all history (made by a quick --since-blocks run?) — backfilling once');
+      state.tydro.history = { done: false, next: TYDRO_START_BLOCK, end: state.tydro.scannedTo, ...(o.explorer !== false ? { seedTokens: ALL_TOKENS } : {}) };
     }
-    await o.store.put('known.json', state);
   }
-
-  // Tydro: every aToken/vToken Transfer since launch (or since the seed), resumable
-  const tFrom = Math.max(state.tydro.scannedTo + 1, TYDRO_START_BLOCK, floor);
-  if (tFrom <= head) {
-    const r = await scanTydro(client, tFrom, head, {
-      deadline,
-      onProgress: progress(log, 'tydro discovery', tFrom, head),
-      onRetry: retryLog(log, 'tydro discovery'),
-      onLimit: (n) => log(`RPC allows ${n} blocks per history request — using exactly that from now on`),
-      backoffBaseMs: o.scanBackoffMs,
-      paceMs: o.scanPaceMs,
-    });
-    for (const [addr, idxs] of decodeTydroTransfers(r.logs)) {
-      const cur = new Set(state.tydro.users[addr] ?? []);
-      idxs.forEach((i) => cur.add(i));
-      state.tydro.users[addr] = [...cur].sort((a, b) => a - b);
-      if (state.tydro.scannedTo > 0) touched.add(addr);
+  if (!state.nado.history) {
+    if (freshNado) state.nado.history = floor > NADO_START_BLOCK ? { done: false, next: NADO_START_BLOCK, end: floor - 1 } : { done: true };
+    else {
+      log('nado: this census state cannot prove it covered all history — backfilling once');
+      state.nado.history = { done: false, next: NADO_START_BLOCK, end: state.nado.accountsScannedTo };
     }
-    state.tydro.scannedTo = r.scannedTo;
-    await o.store.put('known.json', state);
-    log(`tydro discovery → ${r.scannedTo}${r.complete ? '' : ` — PAUSED (${r.stoppedBecause}); progress saved, resumes next run`} · ${r.logs.length} logs · ${r.errors} retries`);
   }
+  const historyWasDone = state.tydro.history.done && state.nado.history.done;
 
+  const addTydro = (addr: string, idxs: Iterable<number>, markTouched: boolean) => {
+    const cur = new Set(state.tydro.users[addr] ?? []);
+    for (const i of idxs) cur.add(i);
+    state.tydro.users[addr] = [...cur].sort((a, b) => a - b);
+    if (markTouched) touched.add(addr);
+  };
   const addSub = (sub: string) => {
     const owner = subaccountOwner(sub);
     const list = state.nado.subs[owner] ?? [];
@@ -175,17 +176,28 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     return owner;
   };
 
-  // Nado accounts: deposits/withdrawals + liquidations since launch (low volume, resumable)
+  // Tydro, first run with the explorer: seed from holder lists BEFORE the forward scan, so the forward scan
+  // only has to cover the last few minutes (the explorer indexes slightly behind the chain)
+  let seededThisRun = false;
+  if (freshTydro && !o.sinceBlocks && state.tydro.history.done === false && state.tydro.history.seedTokens) {
+    await seedTydro(true);
+    seededThisRun = true;
+  }
+
+  // Tydro: every aToken/vToken Transfer since the forward cursor, resumable
+  const tFrom = Math.max(state.tydro.scannedTo + 1, TYDRO_START_BLOCK, floor);
+  if (tFrom <= head) {
+    const r = await scanTydro(client, tFrom, head, { deadline, onProgress: progress(log, 'tydro discovery', tFrom, head), onRetry: retryLog(log, 'tydro discovery'), ...scanOpts });
+    for (const [addr, idxs] of decodeTydroTransfers(r.logs)) addTydro(addr, idxs, state.tydro.scannedTo > 0);
+    state.tydro.scannedTo = r.scannedTo;
+    await o.store.put('known.json', state);
+    log(`tydro discovery → ${r.scannedTo}${r.complete ? '' : ` — PAUSED (${r.stoppedBecause}); progress saved, resumes next run`} · ${r.logs.length} logs · ${r.errors} retries`);
+  }
+
+  // Nado accounts: deposits/withdrawals + liquidations since the forward cursor (low volume, resumable)
   const nFrom = Math.max(state.nado.accountsScannedTo + 1, NADO_START_BLOCK, floor);
   if (nFrom <= head && Date.now() < deadline) {
-    const r = await scanNadoAccounts(client, nFrom, head, {
-      deadline,
-      onProgress: progress(log, 'nado account discovery', nFrom, head),
-      onRetry: retryLog(log, 'nado account discovery'),
-      onLimit: (n) => log(`RPC allows ${n} blocks per history request — using exactly that from now on`),
-      backoffBaseMs: o.scanBackoffMs,
-      paceMs: o.scanPaceMs,
-    });
+    const r = await scanNadoAccounts(client, nFrom, head, { deadline, onProgress: progress(log, 'nado account discovery', nFrom, head), onRetry: retryLog(log, 'nado account discovery'), ...scanOpts });
     for (const sub of decodeNadoSubaccounts(r.logs)) {
       const owner = addSub(sub);
       if (state.nado.accountsScannedTo > 0) touched.add(owner);
@@ -206,6 +218,71 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     log(`nado activity ${aFrom}→${r.scannedTo} · ${r.logs.length} logs · ${subs.size} subaccounts touched`);
   }
 
+  /* ── history backfill (never in a --since-blocks run; capped so the hourly reads still happen) ── */
+  if (!o.sinceBlocks) {
+    // Tydro: explorer holder lists first (minutes), the chain range only if the explorer keeps failing
+    if (!seededThisRun && state.tydro.history.done === false && state.tydro.history.seedTokens && Date.now() < backfillDeadline) await seedTydro(false);
+    const th = state.tydro.history;
+    if (th.done === false && !th.seedTokens && Date.now() < backfillDeadline) {
+      const r = await scanTydro(client, th.next, th.end, { deadline: backfillDeadline, onProgress: progress(log, 'tydro history', th.next, th.end), onRetry: retryLog(log, 'tydro history'), ...scanOpts });
+      for (const [addr, idxs] of decodeTydroTransfers(r.logs)) addTydro(addr, idxs, false);
+      state.tydro.history = r.scannedTo >= th.end ? { done: true } : { ...th, next: r.scannedTo + 1 };
+      await o.store.put('known.json', state);
+      log(`tydro history → ${r.scannedTo} of ${th.end}${state.tydro.history.done ? ' — COMPLETE' : ' — continues next run'} · ${r.logs.length} logs`);
+    }
+    const nh = state.nado.history;
+    if (nh.done === false && Date.now() < backfillDeadline) {
+      const r = await scanNadoAccounts(client, nh.next, nh.end, { deadline: backfillDeadline, onProgress: progress(log, 'nado history', nh.next, nh.end), onRetry: retryLog(log, 'nado history'), ...scanOpts });
+      const before = Object.keys(state.nado.subs).length;
+      for (const sub of decodeNadoSubaccounts(r.logs)) addSub(sub);
+      state.nado.history = r.scannedTo >= nh.end ? { done: true } : { ...nh, next: r.scannedTo + 1 };
+      await o.store.put('known.json', state);
+      log(`nado history → ${r.scannedTo} of ${nh.end}${state.nado.history.done ? ' — COMPLETE' : ' — continues next run'} · ${r.logs.length} logs · +${Object.keys(state.nado.subs).length - before} owners`);
+    }
+  }
+  const historyJustDone = !historyWasDone && state.tydro.history.done && state.nado.history.done;
+  if (historyJustDone) log('history backfill complete — this run re-reads everyone and measures coverage');
+
+  async function seedTydro(first: boolean) {
+    let h = state.tydro.history as Extract<History, { done: false }>;
+    if (first) {
+      // holder lists are "now": the forward scan only needs the last ~10 minutes (the explorer lags a little),
+      // and if the explorer ever gives up, the on-chain fallback covers launch → here
+      state.tydro.scannedTo = head - 600;
+      h = state.tydro.history = { ...h, next: TYDRO_START_BLOCK, end: head - 600 };
+    }
+    const todo = h.seedTokens ?? ALL_TOKENS;
+    log(`tydro: ${first ? 'one-time seed' : 'backfill'} from the Ink explorer holder lists — ${todo.length} of 28 token lists to read (addresses only; every balance is still read on-chain)…`);
+    const ex = o.explorer || {};
+    const seed = await seedTydroHolders({
+      fetch: ex.fetch,
+      base: ex.base,
+      pageDelayMs: ex.pageDelayMs,
+      backoffBaseMs: ex.backoffBaseMs,
+      deadline: backfillDeadline,
+      tokens: todo,
+      onRetry: (m) => log(`tydro seed: ${m}`),
+      onToken: (ti, holders, pages) => log(`tydro seed: token ${ti + 1}/28 · ${holders} holders · ${pages} pages`),
+    });
+    const before = Object.keys(state.tydro.users).length;
+    for (const [addr, idxs] of seed.users) addTydro(addr, idxs, false);
+    const left = todo.filter((t) => !seed.done.includes(t));
+    const stalls = seed.done.length === 0 ? (h.stalls ?? 0) + 1 : 0;
+    if (left.length === 0) {
+      state.tydro.history = { done: true };
+      state.tydro.seededFromExplorerAt = head;
+      log(`tydro seed complete: +${Object.keys(state.tydro.users).length - before} wallets (${Object.keys(state.tydro.users).length} known) from ${seed.pages} pages`);
+    } else if (stalls >= 3) {
+      // the explorer keeps failing: fall back to scanning the history on-chain (slow, but needs nothing but the RPC)
+      state.tydro.history = { done: false, next: TYDRO_START_BLOCK, end: h.end };
+      log('tydro seed: explorer failed 3 runs in a row — switching to an on-chain history scan');
+    } else {
+      state.tydro.history = { ...h, seedTokens: left, stalls };
+      log(`tydro seed: ${seed.done.length} token lists done this run, ${left.length} left — continues next run (+${Object.keys(state.tydro.users).length - before} wallets so far)`);
+    }
+    await o.store.put('known.json', state);
+  }
+
   // save discovery progress now, so a crash or Ctrl+C during reads doesn't lose the scan
   await o.store.put('known.json', state);
 
@@ -214,7 +291,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const activeSet = new Set(state.nado.active);
   const hasActiveNado = (a: string) => (state.nado.subs[a] ?? [nadoSubaccount(a)]).some((s) => activeSet.has(s)) || activeSet.has(nadoSubaccount(a));
   const stale = o.fullIfOlderThanMs !== undefined && (!state.lastFullAt || Date.now() - Date.parse(state.lastFullAt) > o.fullIfOlderThanMs);
-  const full = o.full || prevShips.size === 0 || stale;
+  const full = o.full || prevShips.size === 0 || stale || historyJustDone;
   const toRead: string[] = [];
   let carried = 0;
   for (const a of owners) {
@@ -324,7 +401,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       tydroScannedTo: state.tydro.scannedTo,
       nadoScannedTo: state.nado.accountsScannedTo,
       head,
-      backfillComplete: state.tydro.scannedTo >= head && state.nado.accountsScannedTo >= head && !o.sinceBlocks,
+      backfillComplete: state.tydro.scannedTo >= head && state.nado.accountsScannedTo >= head && state.tydro.history.done && state.nado.history.done && !o.sinceBlocks,
     },
     sweep: { kind: full ? 'full' : 'incremental', reread, carried, ms: Date.now() - t0 },
     counts,

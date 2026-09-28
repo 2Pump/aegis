@@ -68,6 +68,21 @@ pnpm dev                            # the dev build shows the well as a PREVIEW
 
 A local run writes to `apps/web/public/census/`, which is git-ignored, so the dev server serves it at `/census/census.json`.
 
+## History backfill (why the first coverage check said ~10%)
+
+The first full sweep (2026-09-28) measured **~10%** of Tydro and Nado totals. The cause was the bootstrap:
+- The census we uploaded from the local machine had been built with `--since-blocks`, a quick test mode that only scans recent blocks.
+- The job's forward cursor then sat at the chain head, so nothing ever went back for older history.
+- The site said "history complete", and that was wrong.
+
+Fix (census v1.1):
+- `known.json` now records, per venue, whether **all history since launch** has been covered, and what's left.
+- A state that can't prove it covered history (like the uploaded one) is re-checked once.
+  - **Tydro:** the explorer's holder lists (resumable across runs). After 3 runs without progress, it falls back to an on-chain scan.
+  - **Nado:** an on-chain scan of the Clearinghouse events since launch, resumable across runs.
+- Backfill uses at most 60% of each run's budget, so the hourly reads still happen. While it runs, the site shows **"history backfill in progress"**.
+- When the backfill finishes, that run automatically re-reads every wallet and measures coverage again.
+
 ## Coverage check (is anyone missing?)
 
 On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:

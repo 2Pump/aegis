@@ -19,8 +19,10 @@ export interface SeedResult {
   /** holder → token indexes (into TYDRO_TOKENS) */
   users: Map<string, Set<number>>;
   pages: number;
-  /** tokens whose holder list could not be fully read (caller must fall back to a chain scan) */
+  /** tokens whose holder list could not be fully read this time (failed, or the deadline came first) */
   failedTokens: number[];
+  /** tokens whose holder list WAS fully read — lets the caller resume with the rest next run */
+  done: number[];
 }
 
 export async function seedTydroHolders(o: {
@@ -29,15 +31,18 @@ export async function seedTydroHolders(o: {
   pageDelayMs?: number;
   backoffBaseMs?: number;
   deadline?: number;
+  /** only these token indexes (default: all 28) — used to resume a seed that ran out of time */
+  tokens?: readonly number[];
   onToken?: (tokenIndex: number, holders: number, pages: number) => void;
   onRetry?: (msg: string) => void;
 } = {}): Promise<SeedResult> {
   const base = o.base ?? INK_EXPLORER_API;
   const users = new Map<string, Set<number>>();
   const failedTokens: number[] = [];
+  const done: number[] = [];
   let pages = 0;
 
-  for (let ti = 0; ti < TYDRO_TOKENS.length; ti++) {
+  for (const ti of o.tokens ?? TYDRO_TOKENS.map((_, i) => i)) {
     const token = TYDRO_TOKENS[ti]!;
     let params: Record<string, string | number> | null = {};
     let holders = 0;
@@ -53,7 +58,7 @@ export async function seedTydroHolders(o: {
       let r = await getJson(url, undefined, { fetch: o.fetch, timeoutMs: 20_000 });
       for (let attempt = 1; !r.ok && attempt <= 6; attempt++) {
         const wait = r.error.retryAfterS ? r.error.retryAfterS * 1000 : backoffMs(attempt, o.backoffBaseMs);
-        o.onRetry?.(`explorer ${r.error.code} on token ${ti} page ${tokenPages + 1} — waiting ${Math.round(wait / 1000)}s (${r.error.message})`);
+        o.onRetry?.(`explorer ${r.error.code} on token ${ti + 1}/28 page ${tokenPages + 1} — waiting ${Math.round(wait / 1000)}s (${r.error.message})`);
         await sleep(wait);
         r = await getJson(url, undefined, { fetch: o.fetch, timeoutMs: 20_000 });
       }
@@ -76,7 +81,8 @@ export async function seedTydroHolders(o: {
       if (params && (o.pageDelayMs ?? 120) > 0) await sleep(o.pageDelayMs ?? 120);
     }
     if (!ok) failedTokens.push(ti);
-    o.onToken?.(ti, holders, tokenPages);
+    else done.push(ti);
+    if (ok || tokenPages > 0) o.onToken?.(ti, holders, tokenPages);
   }
-  return { users, pages, failedTokens };
+  return { users, pages, failedTokens, done };
 }

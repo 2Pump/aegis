@@ -180,7 +180,7 @@ describe('explorer seed (first run)', () => {
     const logs: string[] = [];
     const snap = await runCensus({ scanPaceMs: 0, client, store: fileStore(dir), explorer: { fetch: fakeFetch, pageDelayMs: 0 }, log: (m) => logs.push(m) });
     expect(requested.some((u) => u.includes('address_hash=0xabc'))).toBe(true); // followed next_page_params
-    expect(logs.some((l) => l.startsWith('tydro seed complete: 1 wallets'))).toBe(true); // zero-balance holder skipped
+    expect(logs.some((l) => l.startsWith('tydro seed complete: +1 wallets (1 known)'))).toBe(true); // zero-balance holder skipped
     const known = JSON.parse(readFileSync(join(dir, 'known.json'), 'utf8'));
     expect(known.tydro.users[U.borrower]).toEqual([2, 11]);
     expect(known.tydro.seededFromExplorerAt).toBe(HEAD - 2);
@@ -255,4 +255,72 @@ describe('coverage vs protocol totals', () => {
     expect(second.sweep.kind).toBe('incremental');
     expect(second.coverage).toEqual(first.coverage);
   });
+});
+
+describe('history backfill (the 10% coverage found on 2026-09-28)', () => {
+  it('a --since-blocks run records the history it skipped; the next normal run backfills it and then sweeps everyone', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-hist-'));
+    // quick run: only the last ~100k blocks → finds only the recent Nado trade, none of the older wallets
+    const quick = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store: fileStore(dir), sinceBlocks: 100_000 });
+    expect(quick.discovery.backfillComplete).toBe(false);
+    expect(decodeSnapshot(quick).ships.find((s) => s.address === U.borrower)).toBeUndefined();
+
+    const logs: string[] = [];
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 100 }).client, store: fileStore(dir), log: (m) => logs.push(m) });
+    expect(logs.some((l) => /^tydro history → .* — COMPLETE/.test(l))).toBe(true);
+    expect(logs.some((l) => /^nado history → .* — COMPLETE/.test(l))).toBe(true);
+    expect(snap.discovery.backfillComplete).toBe(true);
+    expect(snap.sweep.kind).toBe('full'); // finishing history triggers a full sweep + coverage
+    expect(snap.coverage).toBeDefined();
+    const ships = decodeSnapshot(snap).ships;
+    expect(ships.find((s) => s.address === U.borrower)?.primary).toBe('KBTC-CORE'); // 2025 wallet found
+    expect(ships.find((s) => s.address === U.saver)?.primary).toBe('LOCKED');
+  });
+
+  it('a state from before this bookkeeping (no history fields) is re-checked once, not trusted', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-legacy-'));
+    const store = fileStore(dir);
+    // what the uploaded local census looked like: cursors at head, only recent wallets
+    await store.put('known.json', {
+      v: 1,
+      tydro: { scannedTo: HEAD - 2, users: {} },
+      nado: { accountsScannedTo: HEAD - 2, activityScannedTo: HEAD - 2, subs: {}, active: [] },
+      lastFullBlock: 0,
+      lastFullAt: null,
+    });
+    const logs: string[] = [];
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store, log: (m) => logs.push(m) });
+    expect(logs.some((l) => l.includes('cannot prove it covered all history'))).toBe(true);
+    expect(snap.counts.known).toBe(5); // every fake wallet, found by the backfill
+    expect(snap.discovery.backfillComplete).toBe(true);
+  });
+
+  it('the explorer seed resumes where it stopped, and falls back to the chain after 3 runs without progress', async () => {
+    const { TYDRO_TOKENS } = await import('@aegis/ink-io');
+    const broken = TYDRO_TOKENS[5]!.toLowerCase();
+    const requested: string[] = [];
+    const fakeFetch = async (url: string) => {
+      requested.push(url);
+      const token = url.split('/tokens/')[1]!.split('/')[0]!.toLowerCase();
+      if (token === broken) return new Response('boom', { status: 500 });
+      return new Response(JSON.stringify({ items: [], next_page_params: null }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-seed-'));
+    const run = async (logs: string[]) =>
+      runCensus({ scanPaceMs: 0, client: fakeChain({ head: HEAD }).client, store: fileStore(dir), explorer: { fetch: fakeFetch, pageDelayMs: 0, backoffBaseMs: 1 }, log: (m) => logs.push(m) });
+    const l1: string[] = [];
+    await run(l1);
+    expect(l1.some((l) => l.includes('27 token lists done this run, 1 left'))).toBe(true);
+    requested.length = 0;
+    const l2: string[] = [];
+    await run(l2);
+    expect(new Set(requested.map((u) => u.split('/tokens/')[1]!.split('/')[0]!.toLowerCase()))).toEqual(new Set([broken])); // only the unfinished list
+    const l3: string[] = [], l4: string[] = [], l5: string[] = [];
+    await run(l3);
+    await run(l4);
+    expect(l4.some((l) => l.includes('switching to an on-chain history scan'))).toBe(true);
+    const snap = await run(l5);
+    expect(l4.some((l) => /^tydro history → .* — COMPLETE/.test(l))).toBe(true); // same run: the chain scan picks up at once
+    expect(decodeSnapshot(snap).ships.find((s) => s.address === U.borrower)?.primary).toBe('KBTC-CORE');
+  }, 60_000);
 });
