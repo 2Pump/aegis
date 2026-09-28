@@ -23,13 +23,20 @@ describe('snapshot codec', () => {
       venues: { tydro: false, nado: true },
       readBlock: 123,
       woundedSince: 120,
+      wound: { tydro: false, nado: true },
       extraSubs: [],
     };
     const back = decodeShip(encodeShip(s));
     expect(back.primary).toBe('CARRY');
     expect(back.tags[0]).toBe('CARRY');
     expect(new Set(back.tags)).toEqual(new Set(s.tags));
-    expect(back).toMatchObject({ hullTemp: 'CRITICAL', band: '10–100k', watch: true, readBlock: 123, woundedSince: 120, venues: { nado: true, tydro: false } });
+    expect(back).toMatchObject({ hullTemp: 'CRITICAL', band: '10–100k', watch: true, readBlock: 123, woundedSince: 120, venues: { nado: true, tydro: false }, wound: { tydro: false, nado: true } });
+  });
+
+  it('reads rows written before wound bits existed as "source unknown", not as a wrong venue', () => {
+    const old = decodeShip([U.carry, 0, 1, 0, 0, 1 | 4, 5, 3]);
+    expect(old.wound).toEqual({ tydro: false, nado: false });
+    expect(old.woundedSince).toBe(3);
   });
 });
 

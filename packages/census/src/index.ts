@@ -6,7 +6,7 @@
  * never liquidation prices. Exact figures exist only on a hull page someone chose to open.
  */
 import { shipSizeUsd, sizeBand, type SizeBand } from '@aegis/glyphs';
-import { TAGS, type Book, type HullTemp, type Pose, type Tag } from '@aegis/pose';
+import { RULES, TAGS, type Book, type HullTemp, type Pose, type Tag } from '@aegis/pose';
 
 export const CENSUS_VERSION = 1 as const;
 
@@ -31,6 +31,8 @@ export interface CensusShip {
   readBlock: number;
   /** block at which it was first seen WOUNDED in the current wounded streak (null if not wounded) */
   woundedSince: number | null;
+  /** which venue tripped the WOUNDED rule (a rule name, never a number). Both false when not wounded. */
+  wound: { tydro: boolean; nado: boolean };
   /** non-default Nado subaccounts (bytes32) — lets the live layer read isolated positions too */
   extraSubs: string[];
 }
@@ -53,7 +55,7 @@ export interface CensusSnapshot {
 
 export function encodeShip(s: CensusShip): ShipRow {
   const mask = s.tags.reduce((m, t) => m | (1 << TAGS.indexOf(t)), 0);
-  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0);
+  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0) | (s.wound.tydro ? 8 : 0) | (s.wound.nado ? 16 : 0);
   const row: ShipRow = [
     s.address.toLowerCase(),
     s.primary ? TAGS.indexOf(s.primary) : -1,
@@ -86,6 +88,7 @@ export function decodeShip(r: ShipRow): CensusShip {
     venues: { tydro: (r[5] & 2) === 2, nado: (r[5] & 4) === 4 },
     readBlock: r[6],
     woundedSince: r[7] > 0 ? r[7] : null,
+    wound: { tydro: (r[5] & 8) === 8, nado: (r[5] & 16) === 16 },
     extraSubs: r[8] ?? [],
   };
 }
@@ -98,6 +101,17 @@ export function isWatch(book: Book, pose: Pose): boolean {
   const b = pose.metrics.nadoBuffer;
   if (b !== null && b < WATCH.NADO_BUFFER) return true;
   return false;
+}
+
+/** Which venue's number tripped the WOUNDED overlay (same thresholds as the rule in @aegis/pose). */
+export function woundSource(pose: Pose): { tydro: boolean; nado: boolean } {
+  if (!pose.tags.includes('WOUNDED')) return { tydro: false, nado: false };
+  const hf = pose.metrics.hf;
+  const b = pose.metrics.nadoBuffer;
+  return {
+    tydro: hf !== null && (hf < RULES.WOUNDED_HF || 1 - 1 / hf < RULES.LIQ_DISTANCE_CRIT),
+    nado: b !== null && b < RULES.NADO_BUFFER_CRIT,
+  };
 }
 
 export function shipFromRead(book: Book, pose: Pose, prev: CensusShip | undefined, extraSubs: string[]): CensusShip {
@@ -114,6 +128,7 @@ export function shipFromRead(book: Book, pose: Pose, prev: CensusShip | undefine
     venues: { tydro: hasTydro, nado: hasNado },
     readBlock: book.asOfBlock ?? 0,
     woundedSince: wounded ? (prev?.woundedSince ?? book.asOfBlock ?? 0) : null,
+    wound: woundSource(pose),
     extraSubs,
   };
 }

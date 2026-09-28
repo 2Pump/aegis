@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { CensusShip, CensusSnapshot, LiveChange, LiveStats } from '@aegis/census';
 import { COPY, tagColor } from '@aegis/glyphs';
-import type { Tag } from '@aegis/pose';
+import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
 import { TagChip } from './bits';
 import { SensorLog } from './SensorLog';
@@ -83,25 +83,44 @@ export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: C
   );
 }
 
+/** Which rule tripped — thresholds only, never the wallet's actual number (no liquidation math on the tape). */
+export function woundText(s: CensusShip): string {
+  const t = `Tydro HF < ${RULES.WOUNDED_HF}`;
+  const n = `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
+  if (s.wound.tydro && s.wound.nado) return `${t} + ${n}`;
+  if (s.wound.tydro) return t;
+  if (s.wound.nado) return n;
+  return 'venue shown after next hourly run';
+}
+
 export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; head: number | null }) {
   // ordered by when they were first seen wounded — never by how close to liquidation
-  const wounded = ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0)).slice(0, 8);
+  const all = ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0));
+  const asMain = all.filter((s) => s.primary === 'WOUNDED').length;
+  const wounded = all.slice(0, 8);
   return (
     <div data-testid="wounded-tape">
       <div className="panel-title" style={{ marginBottom: 6 }}>{COPY.woundedTape}</div>
       {wounded.length === 0 ? (
         <div className="dim">No wounded books right now.</div>
       ) : (
-        <ul className="tape">
-          {wounded.map((s) => (
-            <li key={s.address}>
-              <span className="when">{sinceText(s.woundedSince!, head)}</span>
-              <Link className="mono" to={`/hull/${s.address}`}>{s.address.slice(0, 6)}…{s.address.slice(-4)}</Link>
-              <TagChip tag={s.primary} />
-              <span className="faint">band {s.band}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="faint" style={{ fontSize: 12, marginBottom: 8 }} data-testid="wounded-explain">
+            {all.length} books tripped the WOUNDED rule · {asMain} have it as their main pose (the mix bar counts only those). Badge = main pose. Newest first
+            {all.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
+          </div>
+          <ul className="tape">
+            {wounded.map((s) => (
+              <li key={s.address}>
+                <span className="when">{sinceText(s.woundedSince!, head)}</span>
+                <Link className="mono" to={`/hull/${s.address}`}>{s.address.slice(0, 6)}…{s.address.slice(-4)}</Link>
+                <TagChip tag={s.primary} />
+                <span className="faint">{woundText(s)}</span>
+                <span className="faint">band {s.band}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

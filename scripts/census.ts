@@ -5,7 +5,8 @@
  *   pnpm census --since-blocks 200000        # quick local test: only wallets active in the last ~2.3 days
  *   pnpm census --full                       # re-read everyone (weekly happens automatically)
  *   pnpm census --store blob                 # GitHub Action: publish to Vercel Blob (needs BLOB_READ_WRITE_TOKEN)
- *   pnpm census --rpc https://…              # custom Ink RPC (or env INK_RPC)
+ *   pnpm census --rpc https://…              # custom Ink RPC (or env INK_RPC); several = comma-separated, rotated
+ *                                            # default: all of Ink's public RPCs, rotated (a throttled one is rested)
  *   pnpm census --budget-min 40              # save progress and stop after N minutes (resumes next run)
  *
  * Read-only. No keys that can move funds. Every row in the output came from a real chain read.
@@ -14,8 +15,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   INK_DEFAULT_RPC,
+  INK_PUBLIC_RPCS,
   NADO_CONTRACTS,
+  checkInkEndpoints,
   makeInkClient,
+  maskRpc,
+  splitRpcList,
+  type RotateStats,
   nadoSubaccount,
   parseAddress,
   readBooksMany,
@@ -74,30 +80,39 @@ async function main() {
     await probe(rpc0, flag('--probe')!);
     return;
   }
-  const rpc = flag('--rpc') || process.env.INK_RPC || process.env.VITE_INK_RPC || INK_DEFAULT_RPC;
+  const given = splitRpcList(flag('--rpc') || process.env.INK_RPC || process.env.VITE_INK_RPC);
+  const candidates = given.length ? given : [...INK_PUBLIC_RPCS];
   const storeKind = flag('--store') ?? 'file';
   const store = storeKind === 'blob' ? await blobStore() : fileStore(flag('--dir') ?? join(root, 'apps/web/public/census'));
   const started = Date.now();
   const log = (m: string) => console.log(`[census +${Math.round((Date.now() - started) / 1000)}s] ${m}`);
-  const shown = (() => {
-    try {
-      const u = new URL(rpc);
-      return `${u.origin}${u.pathname.length > 1 ? '/…(key hidden)' : ''}`;
-    } catch {
-      return 'custom rpc';
-    }
-  })();
-  log(`rpc ${shown} · store ${store.describe}`);
+
+  // keep only endpoints that answer AND report chain 57073 — never mix chains
+  let rpcs = candidates;
+  if (candidates.length > 1) {
+    const checks = await checkInkEndpoints(candidates);
+    // a node far behind the others could silently return too few history logs — leave it out
+    const top = Math.max(0, ...checks.map((c) => c.head ?? 0));
+    for (const c of checks) if (c.ok && c.head !== null && top - c.head > 30) Object.assign(c, { ok: false, why: `${top - c.head} blocks behind the others` });
+    for (const c of checks) log(`rpc ${maskRpc(c.url)} · ${c.ok ? 'ok' : 'SKIPPED'} (${c.why})`);
+    rpcs = checks.filter((c) => c.ok).map((c) => c.url);
+    if (!rpcs.length) throw new Error('none of the Ink RPC endpoints answered as chain 57073');
+  }
+  const stats: RotateStats = { ok: [], skipped: [] };
+  log(`rpc ${rpcs.length > 1 ? `${rpcs.length} endpoints, rotating` : maskRpc(rpcs[0]!)} · store ${store.describe}`);
   const snap = await runCensus({
-    client: makeInkClient(rpc),
+    client: makeInkClient(rpcs, { stats }),
     store,
     full: has('--full'),
     fullIfOlderThanMs: 7 * 24 * 3600_000,
     budgetMs: Number(flag('--budget-min') ?? 40) * 60_000,
     sinceBlocks: flag('--since-blocks') ? Number(flag('--since-blocks')) : undefined,
+    // several nodes can be a few blocks apart: stay a little further behind the tip so every node has every block we scan
+    confirmations: rpcs.length > 1 ? 12 : 2,
     log,
   });
   log(`mix ${Object.entries(snap.mix).map(([k, v]) => `${k}:${v}`).join(' ')}`);
+  if (rpcs.length > 1) log(`rpc use: ${rpcs.map((u, i) => `${new URL(u).hostname} ${stats.ok[i] ?? 0} ok / ${stats.skipped[i] ?? 0} throttled`).join(' · ')}`);
   if (!snap.discovery.backfillComplete) log('NOTE: discovery backfill not complete yet — run again to continue');
 }
 

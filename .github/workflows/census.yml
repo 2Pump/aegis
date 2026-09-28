@@ -6,7 +6,8 @@
 # Setup (once):
 #   1. Vercel → Storage → Create → Blob → connect to aegis-web. Copy BLOB_READ_WRITE_TOKEN.
 #   2. GitHub repo → Settings → Secrets and variables → Actions → New secret: BLOB_READ_WRITE_TOKEN
-#   3. (optional) secret INK_RPC with a private Ink RPC URL — faster and less likely to be throttled.
+#   3. (optional) secret INK_RPC with a private Ink RPC URL (or several, comma-separated). Without it the job rotates
+#      over Ink's four public RPCs (docs.inkonchain.com/tools/rpc) and rests any that throttle it.
 #   4. Actions tab → "census" → Run workflow (the first run backfills history; it may take 2–3 runs).
 
 name: census
@@ -30,19 +31,24 @@ permissions:
 
 jobs:
   census:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: pnpm
+          package-manager-cache: false
+
+      # pnpm at the exact version pinned in package.json ("packageManager"), via Node's corepack
+      - run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
       - run: pnpm install --frozen-lockfile
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
       - name: Run census
         run: pnpm census --store blob --budget-min 40 ${{ inputs.full && '--full' || '' }}

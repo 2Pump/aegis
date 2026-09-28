@@ -19,6 +19,7 @@ Fetched **2026-09-28** unless noted.
 | Chain | Ink, OP-Stack L2 | PROVEN | viem `chains/definitions/ink.ts` (viem 2.56.9) |
 | Chain ID | 57073 | PROVEN | viem ink chain; aave-address-book `CHAIN_ID = 57073` |
 | RPC (default) | https://rpc-gel.inkonchain.com | PROVEN (listed) | viem ink chain `rpcUrls.default` |
+| RPC (census rotation) | https://rpc-qnd.inkonchain.com · https://rpc-ten.inkonchain.com · https://ink.drpc.org | LISTED (docs.inkonchain.com/tools/rpc, 2026-09-28) | each run checks eth_chainId = 57073 and head lag before use; a failing one is skipped |
 | Explorer | https://explorer.inkonchain.com | PROVEN (listed) | aave-address-book links |
 | Multicall3 | 0xcA11bde05977b3631167028862bE2a173976CA11 | PROVEN (listed) | viem ink chain `contracts.multicall3` |
 

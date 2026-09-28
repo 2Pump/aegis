@@ -29,6 +29,7 @@ describe('live layer', () => {
     expect(borrower.tags).toContain('WOUNDED');
     expect(borrower.hullTemp).toBe('CRITICAL');
     expect(borrower.woundedSince).toBe(HEAD + 10);
+    expect(borrower.wound).toEqual({ tydro: true, nado: false }); // Tydro HF tripped it, Nado did not
     expect(engine.changes.find((c) => c.address === U.borrower)?.kind).toBe('wounded');
     // unchanged wallets produce no change records
     expect(engine.changes.find((c) => c.address === U.carry)).toBeUndefined();

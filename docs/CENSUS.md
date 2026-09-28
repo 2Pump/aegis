@@ -41,9 +41,22 @@
 1. **Create the Blob store.** Vercel → your `aegis-web` project → **Storage** → **Create** → **Blob** → name it `aegis-census` → **Connect** to the project.
 2. **Copy the token.** In the Blob store, open the `.env.local` tab and copy `BLOB_READ_WRITE_TOKEN`.
 3. **Add the GitHub secret.** github.com/2Pump/aegis → **Settings → Secrets and variables → Actions → New repository secret**: name `BLOB_READ_WRITE_TOKEN`, then paste the value.
-4. **Optional: private RPC.** Add a second secret, `INK_RPC`, with a private Ink RPC URL. Faster, and less likely to be throttled.
+4. **Optional: private RPC.** Add a second secret, `INK_RPC`, with a private Ink RPC URL, or several separated by commas. Without it, the job rotates over Ink's four public RPCs (Gelato, QuickNode, Tenderly, dRPC). Before using any of them it checks that each one is chain 57073 and not lagging, and it rests an endpoint for 20 s when that endpoint throttles. The end of the log shows how many requests each endpoint answered.
 5. **First run.** In GitHub **Actions** → **census** → **Run workflow**. The log shows discovery progress, then "published N ships … → https://….public.blob.vercel-storage.com/census/census.json". **Copy that URL.**
 6. **Point the site at it.** Vercel → project → **Settings → Environment Variables**: `VITE_CENSUS_URL` = that URL. Then redeploy.
+   Use the **Config** type, not Secret. `VITE_` values are built into the public site anyway.
+
+### Bootstrap from a local census (what we actually did, 2026-09-28)
+
+The first Action run from zero is slow. The explorer holder-list seed took about 20 minutes, and then the public RPC throttled GitHub's shared IPs. It's faster to build the census on your own computer (`pnpm census`) and upload that state:
+
+```powershell
+# cancel any census run that's in progress first, or its result overwrites yours
+$env:BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_..."   # Vercel → Storage → aegis-census → .env.local tab
+node packages/census/scripts/push-local.mjs          # uploads census/known.json + census/census.json
+```
+
+After that, each hourly run only covers the last hour of blocks, taking about a minute.
 
 ### Local run (no Blob needed)
 
