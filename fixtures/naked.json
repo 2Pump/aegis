@@ -1,0 +1,80 @@
+{
+  "address": "0x0000000000000000000000000000000000ae6002",
+  "source": "FIXTURE",
+  "label": "EX2 NAKED",
+  "tydro": {
+    "status": "OK",
+    "data": {
+      "hf": null,
+      "supplies": [],
+      "debts": [],
+      "totalCollateralUsd": 0,
+      "totalDebtUsd": 0,
+      "usdNet": 0,
+      "liquidationThreshold": null,
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "nado": {
+    "status": "OK",
+    "data": {
+      "subaccounts": [
+        "0x0000000000000000000000000000000000ae600264656661756c740000000000"
+      ],
+      "equityUsd": 3000,
+      "spots": [
+        {
+          "symbol": "USDT0",
+          "family": "USD",
+          "assetClass": "STABLE",
+          "amount": 3000,
+          "usd": 3000,
+          "priceUsd": 1,
+          "priceSource": "FIXTURE",
+          "productId": 0,
+          "subaccount": "0x0000000000000000000000000000000000ae600264656661756c740000000000"
+        }
+      ],
+      "perps": [
+        {
+          "productId": 2,
+          "subaccount": "0x0000000000000000000000000000000000ae600264656661756c740000000000",
+          "symbol": "BTC-PERP",
+          "family": "BTC",
+          "assetClass": "CRYPTO",
+          "sizeBase": 0.1,
+          "notionalUsd": 10000,
+          "priceUsd": 100000,
+          "priceSource": "FIXTURE",
+          "vQuoteUsd": -10000,
+          "unsettledUsd": 0
+        }
+      ],
+      "maintenance": {
+        "assetsUsd": 3000,
+        "liabilitiesUsd": 100,
+        "healthUsd": 2900
+      },
+      "initial": null,
+      "unweighted": {
+        "assetsUsd": 3000,
+        "liabilitiesUsd": 0,
+        "healthUsd": 3000
+      },
+      "funding": [
+        {
+          "symbol": "BTC-PERP",
+          "side": "LONG",
+          "rateHourly": null
+        }
+      ],
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "asOfBlock": null,
+  "asOfTime": 1790553600000
+}

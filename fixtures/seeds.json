@@ -1,0 +1,10 @@
+{
+  "_howto": [
+    "Curated seed list for the public well (Phase 2). Intentionally EMPTY.",
+    "Add an address only if (a) its owner asked to be shown, or (b) it is a protocol/vault/treasury address that is publicly labeled as such.",
+    "Never add random wallets scraped from liquidation logs. The well is a map, not a hall of shame.",
+    "Format: { \"address\": \"0x…\" (lowercase), \"label\": \"short public label\", \"addedBy\": \"who\", \"reason\": \"why it is fair to show\" }",
+    "Cap: 250 ships on canvas. Pagination after that."
+  ],
+  "seeds": []
+}

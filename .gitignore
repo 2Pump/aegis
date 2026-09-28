@@ -1,0 +1,12 @@
+node_modules
+dist
+.env.local
+.env*.local
+test-results
+playwright-report
+*.log
+.DS_Store
+
+# proof runs hold full addresses — keep local
+verification/*.json
+!verification/status.json

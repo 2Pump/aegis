@@ -1,0 +1,31 @@
+{
+  "name": "aegis",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AEGIS \u2014 THE WELL MAP. A camera on how Ink books are aimed.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @aegis/web dev",
+    "build": "node scripts/audit-writes.mjs && pnpm -r typecheck && pnpm --filter @aegis/web build",
+    "preview": "pnpm --filter @aegis/web preview",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "e2e": "pnpm --filter @aegis/web e2e",
+    "audit:writes": "node scripts/audit-writes.mjs",
+    "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && pnpm -r test",
+    "fixtures": "node scripts/make-fixtures.mjs",
+    "sync:tydro": "node scripts/sync-tydro-registry.mjs",
+    "prove": "tsx scripts/prove.ts"
+  },
+  "devDependencies": {
+    "@aegis/ink-io": "workspace:*",
+    "@aegis/pose": "workspace:*",
+    "@types/node": "^22.20.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "viem": "2.56.9"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "verified": false,
+  "note": "Flipped to true ONLY by `pnpm prove <address>` when every machine check passes AND a human matched every field against app.tydro.com / app.nado.xyz. Do not hand-edit.",
+  "proofs": []
+}

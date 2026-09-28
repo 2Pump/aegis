@@ -1,0 +1,48 @@
+{
+  "address": "0x0000000000000000000000000000000000ae6005",
+  "source": "FIXTURE",
+  "label": "EX5 DARK",
+  "tydro": {
+    "status": "OK",
+    "data": {
+      "hf": 2.1,
+      "supplies": [
+        {
+          "symbol": "WETH",
+          "family": "ETH",
+          "assetClass": "CRYPTO",
+          "amount": 0.75,
+          "usd": 3000,
+          "priceUsd": 4000,
+          "priceSource": "FIXTURE"
+        }
+      ],
+      "debts": [
+        {
+          "symbol": "USDC",
+          "family": "USD",
+          "assetClass": "STABLE",
+          "amount": 1000,
+          "usd": 1000,
+          "priceUsd": 1,
+          "priceSource": "FIXTURE"
+        }
+      ],
+      "totalCollateralUsd": 3000,
+      "totalDebtUsd": 1000,
+      "usdNet": 2000,
+      "liquidationThreshold": 0.7,
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "nado": {
+    "status": "DARK",
+    "code": "VENUE_TIMEOUT",
+    "message": "Nado gateway did not answer within 8s (fixture)",
+    "asOfTime": 1790553600000
+  },
+  "asOfBlock": null,
+  "asOfTime": 1790553600000
+}

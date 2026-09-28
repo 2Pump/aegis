@@ -1,0 +1,30 @@
+{
+  "_source": "https://docs.nado.xyz/developer-resources/api/gateway/queries/subaccount-info (example response, fetched 2026-09-28). Product objects trimmed to id+price; spot_products entry for product 1 ADDED because the docs example omits it.",
+  "status": "success",
+  "data": {
+    "subaccount": "0x8d7d64d6cf1d4f018dd101482ac71ad49e30c56064656661756c740000000000",
+    "exists": true,
+    "healths": [
+      { "assets": "456895621098158389211471", "liabilities": "76286259844766495292488", "health": "380609361253391893918983" },
+      { "assets": "456895621098158389211471", "liabilities": "72818702579095290924243", "health": "384076918519063098287228" },
+      { "assets": "456895621098158389211471", "liabilities": "69351145313424086671554", "health": "387544475784734302539917" }
+    ],
+    "spot_count": 2,
+    "perp_count": 1,
+    "spot_balances": [
+      { "product_id": 0, "balance": { "amount": "456895621098158389211471" } },
+      { "product_id": 1, "balance": { "amount": "-600152323366021154" } }
+    ],
+    "perp_balances": [
+      { "product_id": 2, "balance": { "amount": "0", "v_quote_balance": "0", "last_cumulative_funding_x18": "-394223711772447555304" } }
+    ],
+    "spot_products": [
+      { "product_id": 0, "oracle_price_x18": "1000000000000000000" },
+      { "product_id": 1, "oracle_price_x18": "115596528090565357611177" }
+    ],
+    "perp_products": [
+      { "product_id": 2, "oracle_price_x18": "115596528090565357611177" }
+    ]
+  },
+  "request_type": "query_subaccount_info"
+}

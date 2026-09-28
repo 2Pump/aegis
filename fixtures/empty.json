@@ -1,0 +1,38 @@
+{
+  "address": "0x0000000000000000000000000000000000ae6006",
+  "source": "FIXTURE",
+  "label": "EX6 EMPTY",
+  "tydro": {
+    "status": "OK",
+    "data": {
+      "hf": null,
+      "supplies": [],
+      "debts": [],
+      "totalCollateralUsd": 0,
+      "totalDebtUsd": 0,
+      "usdNet": 0,
+      "liquidationThreshold": null,
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "nado": {
+    "status": "OK",
+    "data": {
+      "subaccounts": [],
+      "equityUsd": 0,
+      "spots": [],
+      "perps": [],
+      "maintenance": null,
+      "initial": null,
+      "unweighted": null,
+      "funding": [],
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "asOfBlock": null,
+  "asOfTime": 1790553600000
+}

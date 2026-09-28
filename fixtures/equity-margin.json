@@ -1,0 +1,80 @@
+{
+  "address": "0x0000000000000000000000000000000000ae6003",
+  "source": "FIXTURE",
+  "label": "EX3 EQUITY-MARGIN",
+  "tydro": {
+    "status": "OK",
+    "data": {
+      "hf": null,
+      "supplies": [],
+      "debts": [],
+      "totalCollateralUsd": 0,
+      "totalDebtUsd": 0,
+      "usdNet": 0,
+      "liquidationThreshold": null,
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "nado": {
+    "status": "OK",
+    "data": {
+      "subaccounts": [
+        "0x0000000000000000000000000000000000ae600364656661756c740000000000"
+      ],
+      "equityUsd": 8000,
+      "spots": [
+        {
+          "symbol": "wSPYx",
+          "family": "SPY",
+          "assetClass": "XSTOCK",
+          "amount": 10,
+          "usd": 8000,
+          "priceUsd": 800,
+          "priceSource": "FIXTURE",
+          "productId": 117,
+          "subaccount": "0x0000000000000000000000000000000000ae600364656661756c740000000000"
+        }
+      ],
+      "perps": [
+        {
+          "productId": 4,
+          "subaccount": "0x0000000000000000000000000000000000ae600364656661756c740000000000",
+          "symbol": "ETH-PERP",
+          "family": "ETH",
+          "assetClass": "CRYPTO",
+          "sizeBase": 1.25,
+          "notionalUsd": 5000,
+          "priceUsd": 4000,
+          "priceSource": "FIXTURE",
+          "vQuoteUsd": -5000,
+          "unsettledUsd": 0
+        }
+      ],
+      "maintenance": {
+        "assetsUsd": 7200,
+        "liabilitiesUsd": 50,
+        "healthUsd": 7150
+      },
+      "initial": null,
+      "unweighted": {
+        "assetsUsd": 8000,
+        "liabilitiesUsd": 0,
+        "healthUsd": 8000
+      },
+      "funding": [
+        {
+          "symbol": "ETH-PERP",
+          "side": "LONG",
+          "rateHourly": null
+        }
+      ],
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "asOfBlock": null,
+  "asOfTime": 1790553600000
+}

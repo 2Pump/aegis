@@ -1,0 +1,100 @@
+{
+  "address": "0x0000000000000000000000000000000000ae6001",
+  "source": "FIXTURE",
+  "label": "EX1 CARRY",
+  "tydro": {
+    "status": "OK",
+    "data": {
+      "hf": 2.1,
+      "supplies": [
+        {
+          "symbol": "WETH",
+          "family": "ETH",
+          "assetClass": "CRYPTO",
+          "amount": 0.75,
+          "usd": 3000,
+          "priceUsd": 4000,
+          "priceSource": "FIXTURE"
+        }
+      ],
+      "debts": [
+        {
+          "symbol": "USDC",
+          "family": "USD",
+          "assetClass": "STABLE",
+          "amount": 1000,
+          "usd": 1000,
+          "priceUsd": 1,
+          "priceSource": "FIXTURE"
+        }
+      ],
+      "totalCollateralUsd": 3000,
+      "totalDebtUsd": 1000,
+      "usdNet": 2000,
+      "liquidationThreshold": 0.7,
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "nado": {
+    "status": "OK",
+    "data": {
+      "subaccounts": [
+        "0x0000000000000000000000000000000000ae600164656661756c740000000000"
+      ],
+      "equityUsd": 10000,
+      "spots": [
+        {
+          "symbol": "KBTC",
+          "family": "BTC",
+          "assetClass": "CRYPTO",
+          "amount": 0.1,
+          "usd": 10000,
+          "priceUsd": 100000,
+          "priceSource": "FIXTURE",
+          "productId": 1,
+          "subaccount": "0x0000000000000000000000000000000000ae600164656661756c740000000000"
+        }
+      ],
+      "perps": [
+        {
+          "productId": 2,
+          "subaccount": "0x0000000000000000000000000000000000ae600164656661756c740000000000",
+          "symbol": "BTC-PERP",
+          "family": "BTC",
+          "assetClass": "CRYPTO",
+          "sizeBase": -0.1,
+          "notionalUsd": -10000,
+          "priceUsd": 100000,
+          "priceSource": "FIXTURE",
+          "vQuoteUsd": 10000,
+          "unsettledUsd": 0
+        }
+      ],
+      "maintenance": {
+        "assetsUsd": 9700,
+        "liabilitiesUsd": 300,
+        "healthUsd": 9400
+      },
+      "initial": null,
+      "unweighted": {
+        "assetsUsd": 10000,
+        "liabilitiesUsd": 0,
+        "healthUsd": 10000
+      },
+      "funding": [
+        {
+          "symbol": "BTC-PERP",
+          "side": "SHORT",
+          "rateHourly": null
+        }
+      ],
+      "notes": []
+    },
+    "asOfTime": 1790553600000,
+    "asOfBlock": null
+  },
+  "asOfBlock": null,
+  "asOfTime": 1790553600000
+}
