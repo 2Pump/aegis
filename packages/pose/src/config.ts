@@ -4,7 +4,7 @@
  * packages/pose/test/rules-doc.test.ts. Change a number here → update RULES.md or the test fails.
  */
 export const RULES = {
-  RULES_VERSION: 'v1.0.0',
+  RULES_VERSION: 'v1.1.0',
 
   /** EMPTY: gross |USD| across every leg below this */
   DUST_USD: 10,
@@ -15,9 +15,13 @@ export const RULES = {
   NADO_BUFFER_CRIT: 0.1,
   /** WOUNDED: Tydro liquidation distance (1 − 1/hf) below this */
   LIQ_DISTANCE_CRIT: 0.08,
+  /** WOUNDED for a same-family Tydro loop (only a depeg liquidates it): HF below this. Replaces the two lines above for such loops. */
+  WOUNDED_HF_CORRELATED: 1.03,
 
   /** ELEVATED hull: Tydro HF below this */
   ELEVATED_HF: 1.5,
+  /** ELEVATED hull for a same-family Tydro loop: HF below this */
+  ELEVATED_HF_CORRELATED: 1.08,
   /** ELEVATED hull: Nado maintenance buffer below this */
   NADO_BUFFER_WARN: 0.25,
 
@@ -49,6 +53,9 @@ export const RULES = {
 
   /** LEVERED: grossPerp / max(E, 1) ≥ this */
   LEVERED_RATIO: 3,
+
+  /** HOLD: non-stable assets held outright ≥ this (and no perps, no debt ≥ DUST_USD) */
+  HOLD_MIN_USD: 10,
 } as const;
 
 export type RulesConfig = typeof RULES;
@@ -62,6 +69,7 @@ export const PRIMARY_PRIORITY = [
   'LOCKED',
   'STABLE-BALLAST',
   'LEVERED',
+  'HOLD',
 ] as const;
 
 /** Tag colors — the well and the plates use these. */
@@ -76,4 +84,5 @@ export const TAG_COLORS: Record<string, string> = {
   EMPTY: '#374151',
   'STABLE-BALLAST': '#7DD3FC',
   LEVERED: '#FB923C',
+  HOLD: '#86EFAC',
 };

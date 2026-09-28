@@ -90,8 +90,15 @@ export function fakeChain(o: FakeOpts) {
       perpCount: 1,
       spotBalances: [{ productId: 1, balance: { amount: e18 / 10n } }],
       perpBalances: [{ productId: 2, balance: { amount: -(e18 / 10n), vQuoteBalance: 10_000n * e18, lastCumulativeFundingX18: 0n } }],
-      spotProducts: [{ productId: 1, oraclePriceX18: 100_000n * e18 }],
-      perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18 }],
+      // protocol-wide state: 0.2 KBTC deposited in total (we know 0.1), perp OI 0.1 BTC
+      spotProducts: [
+        {
+          productId: 1,
+          oraclePriceX18: 100_000n * e18,
+          state: { cumulativeDepositsMultiplierX18: e18, cumulativeBorrowsMultiplierX18: e18, totalDepositsNormalized: e18 / 5n, totalBorrowsNormalized: 0n },
+        },
+      ],
+      perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
     };
   };
 
@@ -105,6 +112,14 @@ export function fakeChain(o: FakeOpts) {
         return health(c.args![0] as string, Number(c.args![1]));
       case 'getSubaccountInfo':
         return subInfo(c.args![0] as string);
+      case 'totalSupply': {
+        // all of Tydro: 1.25 kBTC supplied (we know 1), 1,000 USDG (all known), 60k USDC borrowed (all known)
+        const t = c.address.toLowerCase();
+        if (t === TYDRO_TOKENS[kbtc * 2]!.toLowerCase()) return 125n * 10n ** 6n;
+        if (t === TYDRO_TOKENS[usdg * 2]!.toLowerCase()) return 1_000n * 10n ** 6n;
+        if (t === TYDRO_TOKENS[usdc * 2 + 1]!.toLowerCase()) return 60_000n * 10n ** 6n;
+        return 0n;
+      }
       case 'BASE_CURRENCY_UNIT':
         return 10n ** 8n;
       case 'getAssetsPrices':

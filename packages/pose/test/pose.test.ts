@@ -118,3 +118,107 @@ describe('plate readability', () => {
     expect(p.reasons[1]).toMatch(/^NAKED ·/);
   });
 });
+
+/* ── v1.1: same-family loops and HOLD ─────────────────────────────────────────── */
+import emptyFx from '../../../fixtures/empty.json';
+import type { Leg, NadoSpot } from '../src/index.js';
+
+const leg = (symbol: string, family: string, assetClass: Leg['assetClass'], usd: number): Leg => ({
+  symbol, family, assetClass, amount: usd, usd, priceUsd: 1, priceSource: 'TYDRO_ORACLE',
+});
+function tydroBook(supplies: Leg[], debts: Leg[], hf: number | null): Book {
+  const x = structuredClone(b(emptyFx));
+  if (x.tydro.status === 'OK') {
+    x.tydro.data.supplies = supplies;
+    x.tydro.data.debts = debts;
+    x.tydro.data.hf = hf;
+    x.tydro.data.totalCollateralUsd = supplies.reduce((s, l) => s + l.usd, 0);
+    x.tydro.data.totalDebtUsd = debts.reduce((s, l) => s + l.usd, 0);
+  }
+  return x;
+}
+
+describe('v1.1 same-family Tydro loops', () => {
+  const sUSDe = leg('sUSDe', 'USD', 'STABLE', 10_000);
+  const usdt = leg('USDT0', 'USD', 'STABLE', 9_400);
+
+  it('a sUSDe → USDT loop at HF 1.06 is NOT wounded (only a depeg can liquidate it) and sits in the warn band', () => {
+    const p = classify(tydroBook([sUSDe], [usdt], 1.06));
+    expect(p.metrics.correlatedFamily).toBe('USD');
+    expect(p.tags).not.toContain('WOUNDED');
+    expect(p.hullTemp).toBe('ELEVATED'); // 1.06 < 1.08
+    expect(p.reasons.some((r) => r.startsWith('NOTE · same-family USD loop'))).toBe(true);
+  });
+
+  it('the same loop at HF 1.02 IS wounded, and says it is ~2% depeg from liquidation', () => {
+    const p = classify(tydroBook([sUSDe], [usdt], 1.02));
+    expect(p.tags).toContain('WOUNDED');
+    expect(p.hullTemp).toBe('CRITICAL');
+    expect(p.metrics.wound).toEqual({ tydro: true, nado: false });
+    expect(p.reasons.find((r) => r.startsWith('WOUNDED ·'))).toMatch(/same-family USD loop.*2\.0% depeg/);
+  });
+
+  it('an ETH loop (weETH → WETH) is a loop too; HF 1.12 is nominal-warn, not wounded', () => {
+    const p = classify(tydroBook([leg('weETH', 'ETH', 'CRYPTO', 5_000)], [leg('WETH', 'ETH', 'CRYPTO', 4_400)], 1.12));
+    expect(p.metrics.correlatedFamily).toBe('ETH');
+    expect(p.tags).not.toContain('WOUNDED');
+    expect(p.hullTemp).toBe('NOMINAL'); // 1.12 ≥ 1.08
+  });
+
+  it('mixed families (WETH collateral, USDC debt) keep the normal 1.25 line', () => {
+    const p = classify(tydroBook([leg('WETH', 'ETH', 'CRYPTO', 5_000)], [leg('USDC', 'USD', 'STABLE', 3_500)], 1.2));
+    expect(p.metrics.correlatedFamily).toBeNull();
+    expect(p.tags).toContain('WOUNDED');
+    expect(p.metrics.wound.tydro).toBe(true);
+  });
+
+  it('dust in another family does not break the loop; a real second family does', () => {
+    const dust = leg('WETH', 'ETH', 'CRYPTO', 4);
+    expect(classify(tydroBook([sUSDe, dust], [usdt], 1.06)).metrics.correlatedFamily).toBe('USD');
+    const real = leg('WETH', 'ETH', 'CRYPTO', 400);
+    expect(classify(tydroBook([sUSDe, real], [usdt], 1.06)).metrics.correlatedFamily).toBeNull();
+  });
+
+  it('no debt → not a loop', () => {
+    expect(classify(tydroBook([sUSDe], [], null)).metrics.correlatedFamily).toBeNull();
+  });
+});
+
+describe('v1.1 HOLD', () => {
+  function nadoSpotBook(spots: Array<[string, string, Leg['assetClass'], number]>): Book {
+    const x = structuredClone(b(emptyFx));
+    if (x.nado.status === 'OK') {
+      x.nado.data.spots = spots.map(([symbol, family, assetClass, usd], i): NadoSpot => ({
+        ...leg(symbol, family, assetClass, usd), priceSource: 'NADO_ONCHAIN', productId: i + 1, subaccount: '0xsub',
+      }));
+      x.nado.data.equityUsd = spots.reduce((s, r) => s + r[3], 0);
+    }
+    return x;
+  }
+
+  it('someone who just holds ETH on Nado (no perps, no debt) is HOLD, not NO RULE', () => {
+    const p = classify(nadoSpotBook([['WETH', 'ETH', 'CRYPTO', 1_500]]));
+    expect(p.primary).toBe('HOLD');
+    expect(p.reasons[0]).toMatch(/^HOLD · non-stable assets \$1,500 held outright/);
+  });
+
+  it('a small non-stable Tydro supply below the LOCKED line is HOLD', () => {
+    expect(classify(tydroBook([leg('WETH', 'ETH', 'CRYPTO', 30)], [], null)).primary).toBe('HOLD');
+  });
+
+  it('HOLD never outranks another pose: a bigger Tydro supply stays LOCKED, kBTC-heavy stays KBTC-CORE', () => {
+    expect(classify(tydroBook([leg('WETH', 'ETH', 'CRYPTO', 3_000)], [], null)).primary).toBe('LOCKED');
+    const p = classify(nadoSpotBook([['KBTC', 'BTC', 'CRYPTO', 5_000]]));
+    expect(p.primary).toBe('KBTC-CORE');
+    expect(p.tags).toContain('HOLD');
+  });
+
+  it('any debt or any perp rules HOLD out', () => {
+    expect(classify(tydroBook([leg('WETH', 'ETH', 'CRYPTO', 30)], [leg('USDC', 'USD', 'STABLE', 15)], 1.6)).tags).not.toContain('HOLD');
+    expect(classify(nadoSpotBook([['WETH', 'ETH', 'CRYPTO', 1_500], ['USDT0', 'USD', 'STABLE', -50]])).tags).not.toContain('HOLD');
+  });
+
+  it('mostly stables is still STABLE-BALLAST, not HOLD', () => {
+    expect(classify(nadoSpotBook([['USDT0', 'USD', 'STABLE', 5_000], ['WETH', 'ETH', 'CRYPTO', 200]])).primary).toBe('STABLE-BALLAST');
+  });
+});

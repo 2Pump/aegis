@@ -44,6 +44,19 @@ export function tydroLiqDistance(hf: number | null): number | null {
   return 1 - 1 / hf;
 }
 
+/**
+ * Same-family Tydro loop: has debt, and every supply and every debt (≥ dust) sits in ONE asset family.
+ * Price moves hit both sides alike; only a depeg between them can push HF to 1. Returns that family, or null.
+ */
+export function correlatedLoopFamily(t: TydroBook | null, dustUsd: number = RULES.DUST_USD): string | null {
+  if (!t) return null;
+  const debts = t.debts.filter((d) => Math.abs(d.usd) >= dustUsd);
+  if (debts.length === 0) return null;
+  const legs = [...t.supplies.filter((s) => Math.abs(s.usd) >= dustUsd), ...debts];
+  const fams = new Set(legs.map((l) => l.family));
+  return fams.size === 1 ? [...fams][0]! : null;
+}
+
 /* ────────────────────────────── family table ────────────────────────────── */
 
 interface Acc {
@@ -94,12 +107,30 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
   const liq = tydroLiqDistance(hf);
 
   /* WOUNDED — evaluated on whatever sensors ARE readable. A wound seen on one venue is real. */
+  const corr = correlatedLoopFamily(t, cfg.DUST_USD);
   const woundReasons: string[] = [];
-  if (hf !== null && hf < cfg.WOUNDED_HF) woundReasons.push(`WOUNDED · Tydro HF ${num(hf)} < ${cfg.WOUNDED_HF}`);
-  if (buf !== null && buf < cfg.NADO_BUFFER_CRIT)
+  let woundTydro = false;
+  let woundNado = false;
+  if (corr !== null) {
+    // same-family loop: only a depeg liquidates it, so the collateral-drop lines don't apply
+    if (hf !== null && hf < cfg.WOUNDED_HF_CORRELATED) {
+      woundTydro = true;
+      woundReasons.push(`WOUNDED · Tydro HF ${num(hf, 3)} < ${cfg.WOUNDED_HF_CORRELATED} on a same-family ${corr} loop (≈ ${pct(1 - 1 / hf)} depeg from liquidation)`);
+    }
+  } else {
+    if (hf !== null && hf < cfg.WOUNDED_HF) {
+      woundTydro = true;
+      woundReasons.push(`WOUNDED · Tydro HF ${num(hf)} < ${cfg.WOUNDED_HF}`);
+    }
+    if (liq !== null && liq < cfg.LIQ_DISTANCE_CRIT) {
+      woundTydro = true;
+      woundReasons.push(`WOUNDED · Tydro liquidation distance ${pct(liq)} < ${pct(cfg.LIQ_DISTANCE_CRIT, 0)}`);
+    }
+  }
+  if (buf !== null && buf < cfg.NADO_BUFFER_CRIT) {
+    woundNado = true;
     woundReasons.push(`WOUNDED · Nado maintenance buffer ${pct(buf)} < ${pct(cfg.NADO_BUFFER_CRIT, 0)}`);
-  if (liq !== null && liq < cfg.LIQ_DISTANCE_CRIT)
-    woundReasons.push(`WOUNDED · Tydro liquidation distance ${pct(liq)} < ${pct(cfg.LIQ_DISTANCE_CRIT, 0)}`);
+  }
   const wounded = woundReasons.length > 0;
 
   /* metrics */
@@ -140,6 +171,8 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
 
   const metrics: PoseMetrics = {
     S, P, L, E, hf, nadoBuffer: buf, eq, kb, st, totalMarginUsd, nadoCollateralUsd, grossPerpUsd, grossUsd, families,
+    correlatedFamily: corr,
+    wound: { tydro: woundTydro, nado: woundNado },
   };
   const liqDistanceBps = liq === null ? null : Math.round(liq * 10_000);
   const base = { metrics, liqDistanceBps, rulesVersion: cfg.RULES_VERSION, darkReasons };
@@ -213,7 +246,16 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
     }
   }
 
+  // HOLD — owns non-stable assets outright; only matters when nothing above fired (it is last in priority)
+  const nonStableHeld = sum([...nadoPos, ...tSup].filter((s) => s.assetClass !== 'STABLE').map((s) => s.usd));
+  const anyDebt = (t ? t.debts.some((d) => Math.abs(d.usd) >= cfg.DUST_USD) : false) || (n ? n.spots.some((s) => s.usd <= -cfg.DUST_USD) : false);
+  if (nonStableHeld >= cfg.HOLD_MIN_USD && nadoPerps.length === 0 && !anyDebt) {
+    fired.add('HOLD');
+    reasons.push(`HOLD · non-stable assets ${usd(nonStableHeld)} held outright (≥ ${usd(cfg.HOLD_MIN_USD)}), no perps, no debt`);
+  }
+
   reasons.push(...woundReasons);
+  if (corr !== null) reasons.push(`NOTE · same-family ${corr} loop on Tydro — judged by the depeg line HF ${cfg.WOUNDED_HF_CORRELATED} (warn ${cfg.ELEVATED_HF_CORRELATED}), not ${cfg.WOUNDED_HF}`);
 
   const primary: Tag | null = PRIMARY_PRIORITY.find((tag) => fired.has(tag)) ?? (wounded ? 'WOUNDED' : null);
   const tags: Tag[] = [];
@@ -224,7 +266,7 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
 
   let hullTemp: HullTemp = 'NOMINAL';
   if (wounded) hullTemp = 'CRITICAL';
-  else if ((hf !== null && hf < cfg.ELEVATED_HF) || (buf !== null && buf < cfg.NADO_BUFFER_WARN)) hullTemp = 'ELEVATED';
+  else if ((hf !== null && hf < (corr !== null ? cfg.ELEVATED_HF_CORRELATED : cfg.ELEVATED_HF)) || (buf !== null && buf < cfg.NADO_BUFFER_WARN)) hullTemp = 'ELEVATED';
 
   const residualDeltaUsd = sum(families.map((f) => f.residualUsd));
   const exposure = sum(families.map((f) => Math.abs(f.S) + f.L + f.P));

@@ -5,6 +5,7 @@ import {
   decodeTydroTransfers,
   nadoSubaccount,
   readBooksMany,
+  readProtocolTotals,
   readTydroPrices,
   scanNadoAccounts,
   scanNadoActivity,
@@ -17,6 +18,12 @@ import { RULES, classify } from '@aegis/pose';
 import type { PublicClient } from 'viem';
 import {
   CENSUS_VERSION,
+  CoverageAcc,
+  buildCoverage,
+  coveragePct,
+  coverageSummary,
+  publicCoverage,
+  type CoveragePublic,
   decodeSnapshot,
   encodeShip,
   shipFromRead,
@@ -33,6 +40,8 @@ export interface CensusState {
   nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[] };
   lastFullBlock: number;
   lastFullAt: string | null;
+  /** last full sweep's coverage vs protocol totals — shares only, no dollar figures (this file is public too) */
+  coverage?: CoveragePublic;
 }
 
 export interface RunOpts {
@@ -242,6 +251,8 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     const k = `${sensor}: ${msg.replace(/0x[0-9a-f]{8,}/gi, '0x…').replace(/\d{5,}/g, 'N').slice(0, 220)}`;
     darkWhy.set(k, (darkWhy.get(k) ?? 0) + 1);
   };
+  // coverage is only meaningful when every known wallet is read in the same sweep
+  const cov = full ? new CoverageAcc() : null;
   const SLICE = 1500;
   for (let i = 0; i < toRead.length; i += SLICE) {
     if (Date.now() > deadline) {
@@ -261,6 +272,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     for (const s of res.emptySubs) nextActive.delete(s);
     for (const s of res.activeSubs) nextActive.add(s);
     for (const [a, book] of res.books) {
+      cov?.add(book);
       if (book.tydro.status === 'DARK') noteDark('TYDRO', book.tydro.message);
       if (book.nado.status === 'DARK') noteDark('NADO', book.nado.message);
       const pose = classify(book);
@@ -276,9 +288,27 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     log(`read ${Math.min(i + SLICE, toRead.length)}/${toRead.length}`);
   }
   state.nado.active = [...nextActive];
+  const sweptAll = full && reread + darkNow === toRead.length;
   if (full && reread === toRead.length) {
     state.lastFullBlock = head;
     state.lastFullAt = new Date().toISOString();
+  }
+
+  /* ── 3b. coverage: known wallets vs the protocols' own on-chain totals ── */
+  if (cov && sweptAll) {
+    const nadoSub = (state.nado.active[0] ?? nadoSubaccount('0x0000000000000000000000000000000000000000')) as `0x${string}`;
+    const totals = await readProtocolTotals(client, readBlock, { tydroPrices: prices.value, nadoSub });
+    if (totals.ok) {
+      const full = buildCoverage(cov, totals.value);
+      state.coverage = publicCoverage(full);
+      // dollar totals and per-asset gaps: job log only (private repo), never the public files
+      log(`coverage: ${coverageSummary(full)}${cov.dark ? ` · ${cov.dark} wallets unreadable this sweep` : ''}`);
+      for (const g of full.gaps.slice(0, 8)) {
+        log(`  gap ${g.venue} ${g.key} ${g.side}: ours $${Math.round(g.oursUsd).toLocaleString('en-US')} of $${Math.round(g.totalUsd).toLocaleString('en-US')} (${coveragePct(g.oursUsd, g.totalUsd)})`);
+      }
+    } else {
+      log(`coverage not measured this sweep: ${totals.error.message}`);
+    }
   }
 
   /* ── 4. publish ───────────────────────────────────────────── */
@@ -299,6 +329,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     sweep: { kind: full ? 'full' : 'incremental', reread, carried, ms: Date.now() - t0 },
     counts,
     mix,
+    ...(state.coverage ? { coverage: state.coverage } : {}),
     ships: all.map(encodeShip),
   };
   if (darkNow) log(`${darkNow} wallets had a sensor fail this run and kept their previous reading`);

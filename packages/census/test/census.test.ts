@@ -24,13 +24,14 @@ describe('snapshot codec', () => {
       readBlock: 123,
       woundedSince: 120,
       wound: { tydro: false, nado: true },
+      correlatedLoop: true,
       extraSubs: [],
     };
     const back = decodeShip(encodeShip(s));
     expect(back.primary).toBe('CARRY');
     expect(back.tags[0]).toBe('CARRY');
     expect(new Set(back.tags)).toEqual(new Set(s.tags));
-    expect(back).toMatchObject({ hullTemp: 'CRITICAL', band: '10–100k', watch: true, readBlock: 123, woundedSince: 120, venues: { nado: true, tydro: false }, wound: { tydro: false, nado: true } });
+    expect(back).toMatchObject({ hullTemp: 'CRITICAL', band: '10–100k', watch: true, readBlock: 123, woundedSince: 120, venues: { nado: true, tydro: false }, wound: { tydro: false, nado: true }, correlatedLoop: true });
   });
 
   it('reads rows written before wound bits existed as "source unknown", not as a wrong venue', () => {
@@ -80,7 +81,7 @@ describe('census run (fake Ink)', () => {
     expect(snap.mix).toEqual({ 'KBTC-CORE': 1, LOCKED: 1, CARRY: 1 });
 
     // the health filter kept the heavy Querier call to the one non-empty Nado subaccount
-    expect(stats.subaccountInfoCalls).toBe(1);
+    expect(stats.subaccountInfoCalls).toBe(2); // 1 book read + 1 for the protocol totals (coverage, full sweep only)
 
     // privacy: the public file carries no dollar figures or HF numbers
     const raw = readFileSync(join(dir, 'census.json'), 'utf8');
@@ -222,5 +223,36 @@ describe('incomplete token list (the STABLE-BALLAST → LOCKED flips on the live
     expect(saver.primary).toBe('LOCKED');
     expect(saver.tags).not.toContain('STABLE-BALLAST'); // $1k stables of $5k margin = 20% < 50%
     expect(saver.band).toBe('1–10k'); // $5k, not $1k
+  });
+});
+
+describe('coverage vs protocol totals', () => {
+  it('a full sweep compares known wallets with on-chain totals; the public file gets shares only, the log gets the gaps', async () => {
+    const { client } = fakeChain({ head: HEAD });
+    const lines: string[] = [];
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-cov-'));
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client, store: fileStore(dir), log: (m) => lines.push(m) });
+    const c = snap.coverage!;
+    expect(c.block).toBe(snap.block);
+    // Tydro: $100k of $125k kBTC + all $1k USDG supplied → 101/126; all $60k USDC debt
+    expect(c.share.tydroSupply).toBeCloseTo(101 / 126, 3);
+    expect(c.share.tydroDebt).toBe(1);
+    // Nado: 0.1 of 0.2 KBTC deposits; OI 0.1 BTC — we see the 0.1 short, no longs
+    expect(c.share.nadoDeposits).toBe(0.5);
+    expect(c.share.nadoOpenInterestShorts).toBe(1);
+    expect(c.share.nadoOpenInterestLongs).toBe(0);
+    // the gaps (in dollars) are in the job log only
+    expect(lines.find((l) => l.startsWith('coverage: '))).toMatch(/Tydro supply 80\.2%.*Nado deposits 50\.0%/);
+    expect(lines.some((l) => /gap tydro kBTC supply: ours \$100,000 of \$125,000/.test(l))).toBe(true);
+    const raw = readFileSync(join(dir, 'census.json'), 'utf8') + readFileSync(join(dir, 'known.json'), 'utf8');
+    expect(raw).not.toMatch(/usd|\$|gap/i);
+  });
+
+  it('an incremental run republishes the last full sweep\'s coverage instead of a partial one', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-cov2-'));
+    const first = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store: fileStore(dir) });
+    const second = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 50 }).client, store: fileStore(dir) });
+    expect(second.sweep.kind).toBe('incremental');
+    expect(second.coverage).toEqual(first.coverage);
   });
 });

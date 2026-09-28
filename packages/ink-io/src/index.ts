@@ -40,3 +40,4 @@ export { classifyRpcError, describeRpcError, type RpcErrorKind } from './rpc-err
 export { seedTydroHolders, INK_EXPLORER_API, type SeedResult } from './explorer.js';
 export { parseRangeLimit, getLearnedMaxSpan, resetLearnedMaxSpan } from './logs.js';
 export type { FetchLike } from './http.js';
+export { readProtocolTotals, type ProtocolTotals } from './totals.js';

@@ -6,13 +6,16 @@
  * never liquidation prices. Exact figures exist only on a hull page someone chose to open.
  */
 import { shipSizeUsd, sizeBand, type SizeBand } from '@aegis/glyphs';
-import { RULES, TAGS, type Book, type HullTemp, type Pose, type Tag } from '@aegis/pose';
+import { TAGS, type Book, type HullTemp, type Pose, type Tag } from '@aegis/pose';
+import type { CoveragePublic } from './coverage.js';
 
 export const CENSUS_VERSION = 1 as const;
 
 /** Tunables for who counts as "at risk" (re-read every 15 s live, and every hourly run). Not classification rules. */
 export const WATCH = {
   HF: 2.0,
+  /** same-family Tydro loops live near HF 1.05 by design; watch them only when close to their own (depeg) line */
+  HF_CORRELATED: 1.1,
   NADO_BUFFER: 0.5,
 } as const;
 
@@ -33,6 +36,8 @@ export interface CensusShip {
   woundedSince: number | null;
   /** which venue tripped the WOUNDED rule (a rule name, never a number). Both false when not wounded. */
   wound: { tydro: boolean; nado: boolean };
+  /** Tydro book is a same-family loop (judged by the depeg line) */
+  correlatedLoop: boolean;
   /** non-default Nado subaccounts (bytes32) — lets the live layer read isolated positions too */
   extraSubs: string[];
 }
@@ -50,12 +55,14 @@ export interface CensusSnapshot {
   sweep: { kind: 'full' | 'incremental'; reread: number; carried: number; ms: number };
   counts: { known: number; drawn: number; empty: number; dark: number; tydro: number; nado: number; wounded: number };
   mix: Record<string, number>;
+  /** from the last FULL sweep: what share of each protocol's on-chain totals the known wallets add up to */
+  coverage?: CoveragePublic;
   ships: ShipRow[];
 }
 
 export function encodeShip(s: CensusShip): ShipRow {
   const mask = s.tags.reduce((m, t) => m | (1 << TAGS.indexOf(t)), 0);
-  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0) | (s.wound.tydro ? 8 : 0) | (s.wound.nado ? 16 : 0);
+  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0) | (s.wound.tydro ? 8 : 0) | (s.wound.nado ? 16 : 0) | (s.correlatedLoop ? 32 : 0);
   const row: ShipRow = [
     s.address.toLowerCase(),
     s.primary ? TAGS.indexOf(s.primary) : -1,
@@ -89,6 +96,7 @@ export function decodeShip(r: ShipRow): CensusShip {
     readBlock: r[6],
     woundedSince: r[7] > 0 ? r[7] : null,
     wound: { tydro: (r[5] & 8) === 8, nado: (r[5] & 16) === 16 },
+    correlatedLoop: (r[5] & 32) === 32,
     extraSubs: r[8] ?? [],
   };
 }
@@ -97,21 +105,15 @@ export function decodeShip(r: ShipRow): CensusShip {
 export function isWatch(book: Book, pose: Pose): boolean {
   if (pose.tags.includes('WOUNDED') || pose.hullTemp === 'CRITICAL' || pose.hullTemp === 'ELEVATED') return true;
   const hf = pose.metrics.hf;
-  if (hf !== null && hf < WATCH.HF) return true;
+  if (hf !== null && hf < (pose.metrics.correlatedFamily !== null ? WATCH.HF_CORRELATED : WATCH.HF)) return true;
   const b = pose.metrics.nadoBuffer;
   if (b !== null && b < WATCH.NADO_BUFFER) return true;
   return false;
 }
 
-/** Which venue's number tripped the WOUNDED overlay (same thresholds as the rule in @aegis/pose). */
+/** Which venue tripped the WOUNDED overlay — straight from the classifier, so it can never disagree with the rule. */
 export function woundSource(pose: Pose): { tydro: boolean; nado: boolean } {
-  if (!pose.tags.includes('WOUNDED')) return { tydro: false, nado: false };
-  const hf = pose.metrics.hf;
-  const b = pose.metrics.nadoBuffer;
-  return {
-    tydro: hf !== null && (hf < RULES.WOUNDED_HF || 1 - 1 / hf < RULES.LIQ_DISTANCE_CRIT),
-    nado: b !== null && b < RULES.NADO_BUFFER_CRIT,
-  };
+  return pose.metrics.wound ?? { tydro: false, nado: false };
 }
 
 export function shipFromRead(book: Book, pose: Pose, prev: CensusShip | undefined, extraSubs: string[]): CensusShip {
@@ -129,6 +131,7 @@ export function shipFromRead(book: Book, pose: Pose, prev: CensusShip | undefine
     readBlock: book.asOfBlock ?? 0,
     woundedSince: wounded ? (prev?.woundedSince ?? book.asOfBlock ?? 0) : null,
     wound: woundSource(pose),
+    correlatedLoop: pose.metrics.correlatedFamily != null,
     extraSubs,
   };
 }
@@ -162,4 +165,5 @@ export function decodeSnapshot(json: unknown): { snap: CensusSnapshot; ships: Ce
   if (!snap || snap.v !== CENSUS_VERSION || !Array.isArray(snap.ships)) throw new Error('census: unexpected snapshot format');
   return { snap, ships: snap.ships.map(decodeShip) };
 }
+export { CoverageAcc, buildCoverage, coveragePct, coverageSummary, publicCoverage, sharePct, type Coverage, type CoverageLine, type CoveragePublic, type ProtocolTotals } from './coverage.js';
 export { LiveEngine, type LiveStats, type LiveChange, type LiveOpts } from './live.js';

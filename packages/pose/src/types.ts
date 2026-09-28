@@ -15,6 +15,8 @@ export const TAGS = [
   'STABLE-BALLAST',
   'WOUNDED',
   'LEVERED',
+  // v1.1 — appended (never reorder: the census stores tags as bit positions in this list)
+  'HOLD',
 ] as const;
 export type Tag = (typeof TAGS)[number];
 
@@ -170,6 +172,10 @@ export interface PoseMetrics {
   grossPerpUsd: number;
   grossUsd: number;
   families: FamilyRow[];
+  /** Tydro loop where every supply and every debt is one asset family (e.g. USD, ETH) — only a depeg can liquidate it. null = not such a loop. */
+  correlatedFamily: string | null;
+  /** which venue tripped WOUNDED (both false when not wounded) */
+  wound: { tydro: boolean; nado: boolean };
 }
 
 export interface Pose {

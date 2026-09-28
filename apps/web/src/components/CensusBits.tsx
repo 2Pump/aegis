@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { CensusShip, CensusSnapshot, LiveChange, LiveStats } from '@aegis/census';
+import { sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats } from '@aegis/census';
 import { COPY, tagColor } from '@aegis/glyphs';
 import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
@@ -24,7 +24,7 @@ export function sinceText(block: number, head: number | null): string {
   return `~${(d / 3600).toFixed(1)}h ago`;
 }
 
-const MIX_ORDER: Array<Tag | 'NONE'> = ['CARRY', 'EQUITY-MARGIN', 'NAKED', 'KBTC-CORE', 'LOCKED', 'STABLE-BALLAST', 'LEVERED', 'WOUNDED', 'DARK', 'NONE'];
+const MIX_ORDER: Array<Tag | 'NONE'> = ['CARRY', 'EQUITY-MARGIN', 'NAKED', 'KBTC-CORE', 'LOCKED', 'STABLE-BALLAST', 'LEVERED', 'HOLD', 'WOUNDED', 'DARK', 'NONE'];
 
 export function mixOf(ships: readonly CensusShip[]): Record<string, number> {
   const m: Record<string, number> = {};
@@ -83,9 +83,41 @@ export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: C
   );
 }
 
+/**
+ * How much of each protocol the known wallets add up to, measured against the protocols' own on-chain totals
+ * on the last full sweep. Shares only — the snapshot carries no dollar figures.
+ */
+export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: number }) {
+  const c = snap.coverage;
+  if (!c) {
+    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">Share of protocol totals: measured on the next full sweep (weekly, or “Run workflow” with full ticked).</div>;
+  }
+  const row = (label: string, x: number | null) => (
+    <>
+      <dt>{label}</dt>
+      <dd className="num" style={{ color: x !== null && x < 0.9 ? 'var(--amber)' : undefined }}>{sharePct(x)}</dd>
+    </>
+  );
+  return (
+    <div style={{ marginTop: 10 }} data-testid="coverage-shares">
+      <div className="faint" style={{ fontSize: 12, marginBottom: 4 }}>
+        Known wallets vs each protocol's own on-chain totals · full sweep at block {c.block.toLocaleString('en-US')} ({fmtAge(Date.parse(c.at), now)} ago)
+        {c.darkWallets ? ` · ${c.darkWallets} unreadable` : ''}
+      </div>
+      <dl className="kv">
+        {row('Tydro supplied', c.share.tydroSupply)}
+        {row('Tydro borrowed', c.share.tydroDebt)}
+        {row('Nado deposits', c.share.nadoDeposits)}
+        {row('Nado OI — longs seen', c.share.nadoOpenInterestLongs)}
+        {row('Nado OI — shorts seen', c.share.nadoOpenInterestShorts)}
+      </dl>
+    </div>
+  );
+}
+
 /** Which rule tripped — thresholds only, never the wallet's actual number (no liquidation math on the tape). */
 export function woundText(s: CensusShip): string {
-  const t = `Tydro HF < ${RULES.WOUNDED_HF}`;
+  const t = s.correlatedLoop ? `Tydro HF < ${RULES.WOUNDED_HF_CORRELATED} (same-family loop)` : `Tydro HF < ${RULES.WOUNDED_HF}`;
   const n = `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
   if (s.wound.tydro && s.wound.nado) return `${t} + ${n}`;
   if (s.wound.tydro) return t;
@@ -106,7 +138,7 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
       ) : (
         <>
           <div className="faint" style={{ fontSize: 12, marginBottom: 8 }} data-testid="wounded-explain">
-            {all.length} books tripped the WOUNDED rule · {asMain} have it as their main pose (the mix bar counts only those). Badge = main pose. Newest first
+            {all.length} {all.length === 1 ? 'book' : 'books'} tripped the WOUNDED rule · {asMain} {asMain === 1 ? 'has' : 'have'} it as their main pose (the mix bar counts only those). Badge = main pose. Newest first
             {all.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
           </div>
           <ul className="tape">

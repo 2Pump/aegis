@@ -1,4 +1,4 @@
-# AEGIS — Classification Rules (v1.0.0)
+# AEGIS — Classification Rules (v1.1.0)
 
 > AEGIS is a camera. It cannot move your funds. Classifications can be wrong.
 
@@ -24,6 +24,7 @@ The in-app `/rules` page renders from the same constants (`packages/pose/src/rul
 | `kb` | USD of kBTC (Nado `KBTC` spot + Tydro kBTC supply). SolvBTC is BTC family, not kBTC. |
 | `st` | USD of stables held (USDT0, USDC, USDG, GHO, USDe, sUSDe, syrupUSDT) |
 | `totalMargin` | Positive Nado spot USD + Tydro supply USD |
+| same-family loop | A Tydro book with debt where every supply and every debt (≥ dust) is in **one** asset family, e.g. sUSDe → USDT (USD) or weETH → WETH (ETH). Price moves hit both sides alike, so only a depeg can liquidate it. |
 
 **Asset families** hedge each other: `BTC` = kBTC, SolvBTC, BTC-PERP · `ETH` = WETH, weETH, wrsETH, ezETH, ETH-PERP ·
 `SPY` = wSPYx, SPY-PERP · `QQQ` = wQQQx, QQQ-PERP · (same for AAPL, NVDA, TSLA, GOOGL, META, MSFT, AMZN) ·
@@ -36,7 +37,7 @@ Unknown symbols become their own family, so an unknown token can never silently 
 |---|---|---|
 | DARK | state | Tydro or Nado sensor failed (RPC dead, timeout, parse fail, rate limit). Positional rules are **not** evaluated — we never guess S or P from half a book. WOUNDED may still attach from the readable sensor. |
 | EMPTY | state | Σ \|USD\| of every leg < `DUST_USD` |
-| WOUNDED | overlay | `hf < WOUNDED_HF` OR `nadoBuffer < NADO_BUFFER_CRIT` OR `(1 − 1/hf) < LIQ_DISTANCE_CRIT` |
+| WOUNDED | overlay | Tydro: `hf < WOUNDED_HF` OR `(1 − 1/hf) < LIQ_DISTANCE_CRIT` — for a **same-family loop** these two are replaced by `hf < WOUNDED_HF_CORRELATED`. Nado: `nadoBuffer < NADO_BUFFER_CRIT`. |
 | CARRY | primary | ∃ F: `\|S_F − P_F\| / max(S_F, P_F, 1) ≤ CARRY_BAND` AND `min(S_F, P_F) ≥ CARRY_MIN_LEG_USD` |
 | EQUITY-MARGIN | primary / overlay | `eq ≥ EQUITY_MIN_USD` AND `eq / max(nadoCollateral, eq, 1) ≥ EQUITY_SHARE` |
 | NAKED | primary | ∃ F: `(L_F + P_F) ≥ NAKED_MIN_GROSS_USD` AND NOT CARRY_F AND `\|L_F − P_F\| / max(L_F + P_F, 1) > NAKED_IMBALANCE` |
@@ -44,9 +45,10 @@ Unknown symbols become their own family, so an unknown token can never silently 
 | LOCKED | primary | Tydro supplies `> LOCKED_MIN_SUPPLY_USD` AND no Nado perps AND no Nado risk spots (non-stable or borrowed, ≥ dust) |
 | STABLE-BALLAST | primary | `st / max(totalMargin, 1) ≥ STABLE_SHARE` |
 | LEVERED | primary | `grossPerp / max(E, 1) ≥ LEVERED_RATIO` |
+| HOLD | primary | non-stable (positive Nado spot + Tydro supply) `≥ HOLD_MIN_USD` AND no perp ≥ `DUST_USD` AND no debt ≥ `DUST_USD` on either venue |
 
 **Primary priority:** DARK → EMPTY short-circuit. Otherwise first match of
-`CARRY > EQUITY-MARGIN > NAKED > KBTC-CORE > LOCKED > STABLE-BALLAST > LEVERED`.
+`CARRY > EQUITY-MARGIN > NAKED > KBTC-CORE > LOCKED > STABLE-BALLAST > LEVERED > HOLD`.
 WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fires at all,
 `primary = null` and the plate shows **NO RULE FIRED** (this is not a tag).
 
@@ -57,7 +59,7 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 | Temp | Condition | Copy |
 |---|---|---|
 | CRITICAL | WOUNDED | “Liquidation range on at least one venue.” |
-| ELEVATED | `hf < ELEVATED_HF` OR `nadoBuffer < NADO_BUFFER_WARN` | “Inside the warn band.” |
+| ELEVATED | `hf < ELEVATED_HF` (same-family loop: `hf < ELEVATED_HF_CORRELATED`) OR `nadoBuffer < NADO_BUFFER_WARN` | “Inside the warn band.” |
 | UNKNOWN | any sensor DARK (and no readable wound) | “A sensor is dark.” |
 | NOMINAL | otherwise | “Sensors below warn lines.” |
 
@@ -65,12 +67,14 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 | Constant | Value | Used by |
 |---|---|---|
-| `RULES_VERSION` | v1.0.0 | plate footer |
+| `RULES_VERSION` | v1.1.0 | plate footer |
 | `DUST_USD` | 10 | EMPTY, LOCKED |
 | `WOUNDED_HF` | 1.25 | WOUNDED |
 | `NADO_BUFFER_CRIT` | 0.1 | WOUNDED |
 | `LIQ_DISTANCE_CRIT` | 0.08 | WOUNDED |
+| `WOUNDED_HF_CORRELATED` | 1.03 | WOUNDED (same-family loop) |
 | `ELEVATED_HF` | 1.5 | hull temp |
+| `ELEVATED_HF_CORRELATED` | 1.08 | hull temp (same-family loop) |
 | `NADO_BUFFER_WARN` | 0.25 | hull temp |
 | `LOCKED_MIN_SUPPLY_USD` | 50 | LOCKED |
 | `CARRY_BAND` | 0.15 | CARRY |
@@ -83,6 +87,7 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 | `KBTC_SHARE` | 0.35 | KBTC-CORE |
 | `STABLE_SHARE` | 0.5 | STABLE-BALLAST |
 | `LEVERED_RATIO` | 3 | LEVERED |
+| `HOLD_MIN_USD` | 10 | HOLD |
 
 ## 5. Known limits of V1 rules
 
@@ -90,3 +95,9 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 - CARRY uses the Nado oracle for perp notional and the Tydro oracle for Tydro legs. Two venues, two prices — both labeled on the plate.
 - Isolated Nado subaccounts are read when the indexer lookup works; otherwise only `default` is read and the plate says so.
 - Funding rates are not wired in V1. The plate shows funding **side** only.
+- A same-family loop is judged by family, not by Tydro's e-mode setting. A USDe → USDT loop counts as a loop even outside e-mode (its HF is simply higher). sUSDe and USDT are both `USD` family, so a sUSDe depeg is exactly the risk the 1.03 line measures.
+- Anything that still fires no rule is below every rule's minimum size (e.g. perps under $200 gross) or mixes stables and non-stables with some debt below the LOCKED/STABLE lines.
+
+## 6. Changelog
+
+- **v1.1.0 (2026-09-28)** — Same-family Tydro loops get their own WOUNDED line (HF 1.03, warn 1.08) instead of 1.25 / 8% distance. New last-priority pose **HOLD** for wallets that simply own non-stable assets (no perps, no debt). Both approved by the project owner.

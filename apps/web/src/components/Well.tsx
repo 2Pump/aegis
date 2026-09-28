@@ -125,7 +125,7 @@ export function Well({ ships, onOpen }: { ships: WellShip[]; onOpen: (href: stri
         ) : null}
       </div>
       <div className="legend" aria-hidden>
-        {(['CARRY', 'NAKED', 'EQUITY-MARGIN', 'KBTC-CORE', 'LOCKED', 'STABLE-BALLAST', 'LEVERED', 'WOUNDED', 'DARK'] as const).map((t) => (
+        {(['CARRY', 'NAKED', 'EQUITY-MARGIN', 'KBTC-CORE', 'LOCKED', 'STABLE-BALLAST', 'LEVERED', 'HOLD', 'WOUNDED', 'DARK'] as const).map((t) => (
           <span key={t}>
             <i style={{ background: t === 'DARK' ? 'transparent' : TAG_COLORS[t], border: t === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
             {t}

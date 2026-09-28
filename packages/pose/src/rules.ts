@@ -28,8 +28,8 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'WOUNDED',
     kind: 'OVERLAY',
-    human: 'Close to liquidation on at least one venue. Stacks with any other tag.',
-    predicate: `hf < ${R.WOUNDED_HF} OR nadoBuffer < ${p(R.NADO_BUFFER_CRIT)} OR (1 − 1/hf) < ${p(R.LIQ_DISTANCE_CRIT)}`,
+    human: 'Close to liquidation on at least one venue. Stacks with any other tag. A same-family Tydro loop (stables on stables, ETH on ETH) can only be liquidated by a depeg, so it has its own, tighter line.',
+    predicate: `hf < ${R.WOUNDED_HF} OR (1 − 1/hf) < ${p(R.LIQ_DISTANCE_CRIT)} — or, for a same-family Tydro loop, hf < ${R.WOUNDED_HF_CORRELATED} instead — OR nadoBuffer < ${p(R.NADO_BUFFER_CRIT)}`,
   },
   {
     tag: 'CARRY',
@@ -73,6 +73,12 @@ export const RULE_TEXT: RuleText[] = [
     human: 'Perp notional is a large multiple of account equity.',
     predicate: `grossPerp / max(E, 1) ≥ ${R.LEVERED_RATIO}×`,
   },
+  {
+    tag: 'HOLD',
+    kind: 'PRIMARY',
+    human: 'Owns non-stable assets outright — no perps, no borrowing. Only when no other pose fits.',
+    predicate: `non-stable spot + Tydro supply ≥ $${R.HOLD_MIN_USD} AND no perp ≥ $${R.DUST_USD} AND no debt ≥ $${R.DUST_USD} (Tydro or Nado)`,
+  },
 ];
 
 export const PRIORITY_TEXT = `Primary = first match of ${PRIMARY_PRIORITY.join(' > ')}. WOUNDED is an overlay; it is primary only if nothing else fires. DARK and EMPTY short-circuit.`;
@@ -83,6 +89,7 @@ export const DEFINITIONS: Array<[string, string]> = [
   ['L_F', 'USD notional of long perps in family F'],
   ['E', 'Nado account equity: Σ spot USD + Σ perp (v_quote + size × oracle price)'],
   ['hf', 'Tydro health factor from Pool.getUserAccountData (on-chain, Tydro oracle)'],
+  ['same-family loop', 'Tydro book with debt where every supply and every debt (≥ dust) is in ONE asset family — e.g. USDe/sUSDe/USDT/USDC (USD), or weETH/ezETH/WETH (ETH)'],
   ['nadoBuffer', 'Nado maintenance health ÷ maintenance-weighted assets (healths[1]); < 0 means liquidatable'],
   ['eq', 'USD of xStock balances held as collateral (positive Nado spot, wSPYx / wQQQx / wAAPLx / …)'],
   ['kb', 'USD of kBTC (Nado KBTC spot + Tydro kBTC supply). SolvBTC is BTC family but not kBTC.'],

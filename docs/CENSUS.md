@@ -68,6 +68,21 @@ pnpm dev                            # the dev build shows the well as a PREVIEW
 
 A local run writes to `apps/web/public/census/`, which is git-ignored, so the dev server serves it at `/census/census.json`.
 
+## Coverage check (is anyone missing?)
+
+On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:
+
+- **Tydro:** Σ wallet aToken / debt-token balances vs `aToken.totalSupply()` / `variableDebtToken.totalSupply()`, per reserve.
+- **Nado:** Σ wallet spot deposits vs each spot product's `totalDepositsNormalized × cumulativeDepositsMultiplierX18`, and Σ wallet longs and shorts vs each perp product's `openInterest`. Both come from the same FQuerier call the hull page uses.
+
+What is published where:
+- The **public snapshot** carries **shares only**, for example "Tydro supplied 99.6%". The census page shows them under Coverage.
+- The **job log** (private repo) carries the dollar totals and the 8 largest per-asset gaps. That's where to look if a share is low.
+
+A gap would mean accounts the discovery doesn't see yet. One likely source is old isolated Nado subaccounts that haven't traded recently.
+
+The job log shows the coverage line only on full sweeps; the other runs republish the last full sweep's shares.
+
 ## The lock
 
 The production well stays locked until `verification/status.json` is proven (see VERIFICATION.md).

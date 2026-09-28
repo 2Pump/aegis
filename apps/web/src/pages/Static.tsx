@@ -1,5 +1,5 @@
 import { COPY } from '@aegis/glyphs';
-import { MixBar } from '../components/CensusBits';
+import { CoverageShares, MixBar } from '../components/CensusBits';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
@@ -50,6 +50,7 @@ export function CensusPage() {
                 <dt>wounded</dt><dd className="num">{census.snap.counts.wounded.toLocaleString('en-US')}</dd>
                 <dt>dark</dt><dd className="num">{census.snap.counts.dark.toLocaleString('en-US')}</dd>
               </dl>
+              <CoverageShares snap={census.snap} now={now} />
             </Panel>
             <Panel title="Snapshot" rail="var(--slate)">
               <dl className="kv">
