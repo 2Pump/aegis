@@ -20,7 +20,8 @@
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",
     "viem": "2.56.9",
-    "wagmi": "2.19.5"
+    "wagmi": "2.19.5",
+    "@aegis/census": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

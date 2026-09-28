@@ -67,6 +67,17 @@ So AEGIS reads Nado from the **Ink chain** with a `view` call to Nado's own `FQu
 ABI copied verbatim from SDK `packages/shared/src/abis/Querier.ts` @7a326cb; unit test round-trips it through viem's encoder/decoder.
 Price label: **NADO ON-CHAIN**, the last oracle price settled on Ink. Caveats: settled state can trail app.nado.xyz by seconds; only the `default` subaccount is read (isolated discovery needs the blocked archive API); product ids → symbols from the 2026-09-28 snapshot in `nado-registry.ts`.
 
+### C.0b Discovery events + start blocks (census)
+
+| Venue | Event | Contract | From block | Source |
+|---|---|---|---|---|
+| Tydro | `Transfer(address,address,uint256)` | all 14 aTokens + 14 variableDebtTokens | 19,954,047 | Pool proxy creation tx 0x0320…3c40 (Blockscout; 2025-07-25) |
+| Nado | `ModifyCollateral(int128,bytes32 indexed,uint32)`, `Liquidation(bytes32 indexed,bytes32 indexed,…)` | Clearinghouse | 29,851,015 | SDK `deployment.inkMainnet.json` startBlock |
+| Nado | `BalanceUpdate(uint32,bytes32)` (not indexed; every trade) | SpotEngine, PerpEngine | recent windows only | SDK abis @7a326cb |
+| Nado | `getHealth(bytes32,uint8)` → int128 | Clearinghouse | — | SDK abis; used to skip empty accounts cheaply |
+
+**Finding:** `FQuerier.getSubaccountInfo` returns **every** product (~100) per call. This was confirmed from the verified source on Blockscout, and it's why the census filters empty accounts via `getHealth` first.
+
 ### C.1 HTTP API (kept for reference; not used by default)
 
 Docs: https://docs.nado.xyz (index: `/llms.txt`). **Queries need no signature** — docs, *Core Concepts*: “Read operations (queries) don't require signing!” AEGIS never calls `/execute`.

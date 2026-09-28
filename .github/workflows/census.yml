@@ -1,0 +1,51 @@
+# AEGIS census — hourly.
+# Finds every wallet that has used Tydro or Nado (from public on-chain events), reads them from the Ink chain,
+# classifies them with the same rules as the site, and publishes census.json to Vercel Blob.
+# Read-only: the only secret is a storage token for Vercel Blob. Nothing here can move funds.
+#
+# Setup (once):
+#   1. Vercel → Storage → Create → Blob → connect to aegis-web. Copy BLOB_READ_WRITE_TOKEN.
+#   2. GitHub repo → Settings → Secrets and variables → Actions → New secret: BLOB_READ_WRITE_TOKEN
+#   3. (optional) secret INK_RPC with a private Ink RPC URL — faster and less likely to be throttled.
+#   4. Actions tab → "census" → Run workflow (the first run backfills history; it may take 2–3 runs).
+
+name: census
+
+on:
+  schedule:
+    - cron: '17 * * * *' # hourly at :17 (off the top of the hour, when GitHub is busiest)
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Re-read every known wallet (a full sweep also runs automatically once a week)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: census
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run census
+        run: pnpm census --store blob --budget-min 40 ${{ inputs.full && '--full' || '' }}
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          INK_RPC: ${{ secrets.INK_RPC }}

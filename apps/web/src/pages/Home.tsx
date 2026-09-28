@@ -1,20 +1,47 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { COPY } from '@aegis/glyphs';
+import type { CensusShip } from '@aegis/census';
+import { COPY, shipLiteFromPose } from '@aegis/glyphs';
+import { ActivityTape, CensusStatusLine, LivePanel, MixBar, WoundedTape, blocksAgo, mixOf } from '../components/CensusBits';
 import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
-import { useHullCache } from '../lib/hulls';
-import { PROOFS, VERIFIED } from '../lib/verification';
+import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
+import { useHullCache, useNow } from '../lib/hulls';
+import { useLiveWell } from '../lib/live';
 
 export function Home() {
   const nav = useNavigate();
   const cache = useHullCache();
-  // Live ships only. Fixtures never enter the well — they live on /calibration.
-  const ships: WellShip[] = useMemo(
-    () => [...cache.entries()].map(([addr, h]) => ({ address: addr, pose: h.pose, focused: true, href: `/hull/${addr}` })),
-    [cache],
-  );
+  const census = useCensus();
+  const lw = useLiveWell(census, WELL_ON);
+  const now = useNow(1000);
+  const snap = census.status === 'ok' ? census.snap : null;
+  const head = lw.stats.head ?? snap?.block ?? null;
+
+  const ships: WellShip[] = useMemo(() => {
+    const out = new Map<string, WellShip>();
+    const fromCensus = (s: CensusShip): WellShip => ({
+      address: s.address,
+      primary: s.primary,
+      tags: s.tags,
+      hullTemp: s.hullTemp,
+      band: s.band,
+      href: `/hull/${s.address}`,
+      meta: `read ${blocksAgo(s.readBlock, head)}${snap && s.readBlock > snap.block ? ' · live' : ''}`,
+      flashAt: lw.flashes.get(s.address),
+    });
+    for (const s of lw.ships) if (s.primary !== 'EMPTY') out.set(s.address, fromCensus(s));
+    // hulls this viewer opened: ringed, and their fresher hull-page reading wins
+    for (const [addr, h] of cache) {
+      if (h.pose.primary === 'EMPTY') continue;
+      out.set(addr, { ...shipLiteFromPose(addr, h.pose), focused: true, href: `/hull/${addr}`, meta: 'opened by you · live hull read' });
+    }
+    return [...out.values()];
+    // lw.stats.reads changes whenever the live layer updates a ship
+  }, [lw.ships, lw.flashes, lw.stats.reads, cache, head, snap]);
+
+  const sessionList = [...cache.entries()];
 
   return (
     <div className="stack" style={{ gap: 16 }}>
@@ -26,27 +53,27 @@ export function Home() {
         </div>
       </div>
 
-      {!VERIFIED ? (
+      {!WELL_ON ? (
         <>
           <div className="banner red" data-testid="unverified-banner">
             WELL LOCKED — SENSORS UNVERIFIED. No real Ink address has yet been matched against the official Tydro and Nado UIs.
             Hull pages work; the well is not drawn until <code>pnpm prove &lt;address&gt;</code> passes.
           </div>
-          <Panel title="Hulls read this session" rail="var(--slate)" right={<span className="mono">N={ships.length} · not the whole chain</span>}>
-            {ships.length === 0 ? (
+          <Panel title="Hulls read this session" rail="var(--slate)" right={<span className="mono">N={sessionList.length}</span>}>
+            {sessionList.length === 0 ? (
               <div className="dim">{COPY.wellEmpty}</div>
             ) : (
               <div className="table-wrap">
-                <table className="t" data-testid="ship-list">
+                <table className="t" data-testid="session-list">
                   <thead>
                     <tr><th>Hull</th><th>Tags</th><th>Temp</th></tr>
                   </thead>
                   <tbody>
-                    {ships.map((s) => (
-                      <tr key={s.address}>
-                        <td className="mono"><Link to={s.href}>{`${s.address.slice(0, 6)}…${s.address.slice(-4)}`}</Link></td>
-                        <td><div className="tags">{s.pose.tags.length ? s.pose.tags.map((t) => <TagChip key={t} tag={t} />) : <TagChip tag={null} />}</div></td>
-                        <td className="mono">{s.pose.hullTemp}</td>
+                    {sessionList.map(([addr, h]) => (
+                      <tr key={addr}>
+                        <td className="mono"><Link to={`/hull/${addr}`}>{`${addr.slice(0, 6)}…${addr.slice(-4)}`}</Link></td>
+                        <td><div className="tags">{h.pose.tags.length ? h.pose.tags.map((t) => <TagChip key={t} tag={t} />) : <TagChip tag={null} />}</div></td>
+                        <td className="mono">{h.pose.hullTemp}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -56,22 +83,49 @@ export function Home() {
           </Panel>
         </>
       ) : (
-        <Panel
-          title="The well"
-          rail="var(--cyan)"
-          right={<span className="mono">sample N={ships.length} live · not the whole chain · sensors proven {PROOFS.at(-1)?.at.slice(0, 10) ?? ''}</span>}
-        >
-          {ships.length === 0 ? <div className="banner cyan" style={{ marginBottom: 12 }}>{COPY.wellEmpty}</div> : null}
-          <Well ships={ships} onOpen={(href) => nav(href)} />
-        </Panel>
+        <>
+          {WELL_PREVIEW ? (
+            <div className="banner" data-testid="preview-banner">
+              PREVIEW — real chain reads, but no address has yet been matched field-by-field against app.tydro.com / app.nado.xyz.
+              Treat every pose as provisional. (Shown because this is a dev build or VITE_WELL_PREVIEW=1.)
+            </div>
+          ) : null}
+          {census.status === 'missing' || census.status === 'error' ? (
+            <div className="banner" data-testid="census-missing">{census.message}</div>
+          ) : null}
+
+          <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado account found on-chain</span>}>
+            <div className="stack" style={{ gap: 12 }}>
+              <CensusStatusLine snap={snap} stats={lw.stats} now={now} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
+              {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
+              {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
+              {ships.length > 0 ? <Well ships={ships} onOpen={(href) => nav(href)} /> : null}
+              <MixBar mix={mixOf(lw.ships)} label={COPY.censusFull} />
+            </div>
+          </Panel>
+
+          <div className="grid two">
+            <Panel title="Wounded" rail="var(--red)">
+              <WoundedTape ships={lw.ships} head={head} />
+            </Panel>
+            <Panel title="Activity" rail="var(--cyan)">
+              <ActivityTape changes={lw.changes} now={now} />
+            </Panel>
+          </div>
+
+          <Panel title="Live layer" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
+            <LivePanel stats={lw.stats} />
+          </Panel>
+        </>
       )}
 
-      <Panel title="Sample policy" rail="var(--slate)">
+      <Panel title="How the well is built" rail="var(--slate)">
         <ul className="dim" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
-          <li>Ships = addresses <em>you</em> opened in this browser tab. Nothing is scraped. No synthetic ships are ever drawn here.</li>
-          <li>The six synthetic calibration books live on <Link to="/calibration">/calibration</Link>, clearly labeled.</li>
-          <li>Curated seed list (<code>/fixtures/seeds.json</code>) is empty on purpose. Wounded tape, census and event-derived watchlist are Phase 2.</li>
-          <li>Size is shown as <strong>bands</strong>, never exact balances. Exact figures only on a hull page you open.</li>
+          <li>Every wallet here was found from public on-chain events (Tydro token transfers, Nado deposits and trades). Nothing is scraped or bought.</li>
+          <li>An hourly job reads them all and publishes a snapshot. While this page is open, your browser watches every new block and re-reads any wallet that acts, plus the ones near danger.</li>
+          <li>Each ship shows how old its reading is. A reading that fails is never filled in — the last good one is kept and its age shows.</li>
+          <li>Size is shown as <strong>bands</strong>, never balances. The wounded list is ordered by when a book was first seen wounded, never by how close it is to liquidation.</li>
+          <li>Synthetic calibration books live on <Link to="/calibration">/calibration</Link> and never appear here.</li>
         </ul>
       </Panel>
     </div>

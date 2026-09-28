@@ -51,15 +51,26 @@ export function shipColor(p: Pose): string {
 
 /* ───────────────────────── well layout ───────────────────────── */
 
-export interface Ship {
+/** What the well needs to draw a ship. Built from a live Pose or from a census row — never from balances. */
+export interface ShipLite {
   address: string;
-  pose: Pose;
+  primary: Tag | null;
+  tags: readonly Tag[];
+  hullTemp: HullTemp;
+  band: SizeBand;
   label?: string;
   fixture?: boolean;
+  /** opened by this viewer — ringed */
   focused?: boolean;
+  /** ms timestamp of the last live change — drawn as a short flash */
+  flashAt?: number;
 }
 
-export interface PlacedShip extends Ship {
+export function shipLiteFromPose(address: string, pose: Pose, extra: Partial<ShipLite> = {}): ShipLite {
+  return { address, primary: pose.primary, tags: pose.tags, hullTemp: pose.hullTemp, band: sizeBand(shipSizeUsd(pose)), ...extra };
+}
+
+export interface PlacedShip extends ShipLite {
   /** 0..1 of well radius */
   r: number;
   angle: number;
@@ -67,7 +78,6 @@ export interface PlacedShip extends Ship {
   color: string;
   hollow: boolean;
   pulse: boolean;
-  band: SizeBand;
 }
 
 /** Risk → radius. WOUNDED falls inward. DARK drifts at the rim. */
@@ -78,24 +88,27 @@ const RING: Record<HullTemp, [number, number]> = {
   UNKNOWN: [0.86, 0.96],
 };
 
-export function placeShips(ships: Ship[]): PlacedShip[] {
-  return ships.map((s) => {
-    const h1 = hash32(s.address);
-    const h2 = hash32(s.address, 0x9e3779b9);
-    const [lo, hi] = RING[s.pose.hullTemp];
-    const usd = shipSizeUsd(s.pose);
-    const sizePx = 3 + Math.min(14, Math.log10(Math.max(usd, 1) + 1) * 2.4);
-    return {
-      ...s,
-      r: lo + (hi - lo) * unit(h2),
-      angle: unit(h1) * Math.PI * 2,
-      sizePx,
-      color: shipColor(s.pose),
-      hollow: s.pose.primary === 'DARK' || s.pose.primary === 'EMPTY',
-      pulse: s.pose.tags.includes('WOUNDED'),
-      band: sizeBand(usd),
-    };
-  });
+/** Size band → dot size. Bands, not dollars: the public well never encodes exact balances. */
+const BAND_PX: Record<SizeBand, number> = { dust: 1.6, '<1k': 2.4, '1–10k': 3.4, '10–100k': 5, '100k+': 7.5 };
+
+export function placeShip(s: ShipLite): PlacedShip {
+  const h1 = hash32(s.address);
+  const h2 = hash32(s.address, 0x9e3779b9);
+  const [lo, hi] = RING[s.hullTemp];
+  const wounded = s.tags.includes('WOUNDED');
+  return {
+    ...s,
+    r: lo + (hi - lo) * unit(h2),
+    angle: unit(h1) * Math.PI * 2,
+    sizePx: BAND_PX[s.band],
+    color: wounded ? TAG_COLORS.WOUNDED! : tagColor(s.primary),
+    hollow: s.primary === 'DARK' || s.primary === 'EMPTY',
+    pulse: wounded,
+  };
+}
+
+export function placeShips(ships: readonly ShipLite[]): PlacedShip[] {
+  return ships.map(placeShip);
 }
 
 export interface WellView {
@@ -108,30 +121,63 @@ export function wellView(w: number, h: number): WellView {
   return { cx: w / 2, cy: h / 2, R: Math.min(w, h) / 2 - 12 };
 }
 
+/** Dots shrink on small wells (phones) so a crowded census stays readable. */
+export function dotScale(v: WellView): number {
+  return Math.max(0.45, Math.min(1, v.R / 330));
+}
+
 export function shipXY(s: PlacedShip, v: WellView): [number, number] {
   return [v.cx + Math.cos(s.angle) * s.r * v.R, v.cy + Math.sin(s.angle) * s.r * v.R];
 }
 
-export function hitTest(ships: PlacedShip[], v: WellView, x: number, y: number): PlacedShip | null {
+/** Uniform grid over the canvas so hover stays O(1) with tens of thousands of ships. */
+export interface ShipGrid {
+  cell: number;
+  cols: number;
+  buckets: Map<number, PlacedShip[]>;
+  view: WellView;
+}
+
+export function buildGrid(ships: readonly PlacedShip[], v: WellView, cell = 16): ShipGrid {
+  const cols = Math.ceil((v.cx * 2) / cell) + 1;
+  const buckets = new Map<number, PlacedShip[]>();
+  for (const s of ships) {
+    const [x, y] = shipXY(s, v);
+    const k = Math.floor(y / cell) * cols + Math.floor(x / cell);
+    let b = buckets.get(k);
+    if (!b) buckets.set(k, (b = []));
+    b.push(s);
+  }
+  return { cell, cols, buckets, view: v };
+}
+
+export function hitTest(grid: ShipGrid, x: number, y: number): PlacedShip | null {
+  const { cell, cols, buckets, view } = grid;
+  const cx = Math.floor(x / cell);
+  const cy = Math.floor(y / cell);
   let best: PlacedShip | null = null;
   let bestD = Infinity;
-  for (const s of ships) {
-    const [sx, sy] = shipXY(s, v);
-    const d = Math.hypot(sx - x, sy - y);
-    if (d < Math.max(10, s.sizePx + 4) && d < bestD) {
-      best = s;
-      bestD = d;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const b = buckets.get((cy + dy) * cols + (cx + dx));
+      if (!b) continue;
+      for (const s of b) {
+        const [sx, sy] = shipXY(s, view);
+        const d = Math.hypot(sx - x, sy - y);
+        if (d < Math.max(8, s.sizePx + 4) && d < bestD) {
+          best = s;
+          bestD = d;
+        }
+      }
     }
-  }
   return best;
 }
 
-/** 2D canvas draw. Light enough for phones. `t` = ms for pulses. */
-export function drawWell(ctx: CanvasRenderingContext2D, w: number, h: number, ships: PlacedShip[], t: number, hover: PlacedShip | null): void {
+/** Static layer: disc, contours and every ship. Redraw only when the data or size changes. */
+export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: number, ships: readonly PlacedShip[]): void {
   const v = wellView(w, h);
   ctx.clearRect(0, 0, w, h);
 
-  // disc + vignette
   const g = ctx.createRadialGradient(v.cx, v.cy, v.R * 0.05, v.cx, v.cy, v.R);
   g.addColorStop(0, '#000000');
   g.addColorStop(0.7, '#05080C');
@@ -141,7 +187,6 @@ export function drawWell(ctx: CanvasRenderingContext2D, w: number, h: number, sh
   ctx.arc(v.cx, v.cy, v.R, 0, Math.PI * 2);
   ctx.fill();
 
-  // gravity contours
   ctx.lineWidth = 1;
   for (const [frac, col] of [
     [0.32, 'rgba(255,77,77,0.22)'],
@@ -157,38 +202,81 @@ export function drawWell(ctx: CanvasRenderingContext2D, w: number, h: number, sh
   }
   ctx.setLineDash([]);
 
-  // ships
-  for (const s of ships) {
+  // Draw small → large so big hulls sit on top. Glow only for the largest bands, and only on roomy wells.
+  const k = dotScale(v);
+  const glowOn = k > 0.7 && ships.length < 40_000;
+  const order = [...ships].sort((a, b) => a.sizePx - b.sizePx);
+  for (const s of order) {
     const [x, y] = shipXY(s, v);
-    const pulse = s.pulse ? 0.5 + 0.5 * Math.sin(t / 260 + s.angle * 3) : 0;
-    const size = s.sizePx * (1 + pulse * 0.35);
-    // glow
-    if (!s.hollow) {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 3);
-      glow.addColorStop(0, hexA(s.color, 0.45 + pulse * 0.3));
+    const px = s.sizePx * k;
+    if (glowOn && !s.hollow && s.sizePx >= 5) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, px * 2.4);
+      glow.addColorStop(0, hexA(s.color, 0.3));
       glow.addColorStop(1, hexA(s.color, 0));
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(x, y, size * 3, 0, Math.PI * 2);
+      ctx.arc(x, y, px * 2.4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.beginPath();
-    ctx.arc(x, y, size / 2 + 1, 0, Math.PI * 2);
+    ctx.arc(x, y, px / 2 + 0.5, 0, Math.PI * 2);
     if (s.hollow) {
-      ctx.strokeStyle = hexA(s.color === '#6B7280' ? '#9CA3AF' : s.color, 0.9);
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = hexA(s.color === '#6B7280' ? '#9CA3AF' : s.color, 0.8);
+      ctx.lineWidth = 1;
       ctx.stroke();
     } else {
       ctx.fillStyle = s.color;
       ctx.fill();
     }
-    if (s.focused || s === hover) {
+    if (s.focused) {
       ctx.strokeStyle = '#E5F9F7';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(x, y, size / 2 + 6, 0, Math.PI * 2);
+      ctx.arc(x, y, px / 2 + 5, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+}
+
+/** Animated layer: WOUNDED pulses, live-change flashes, hover ring. Cheap — only a few ships. */
+export function drawWellOverlay(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  animated: readonly PlacedShip[],
+  t: number,
+  now: number,
+  hover: PlacedShip | null,
+): void {
+  const v = wellView(w, h);
+  const k = dotScale(v);
+  ctx.clearRect(0, 0, w, h);
+  for (const s of animated) {
+    const [x, y] = shipXY(s, v);
+    if (s.pulse) {
+      const p = 0.5 + 0.5 * Math.sin(t / 260 + s.angle * 3);
+      ctx.strokeStyle = hexA(TAG_COLORS.WOUNDED!, 0.3 + p * 0.4);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, (s.sizePx * k) / 2 + 2 + p * 4 * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (s.flashAt && now - s.flashAt < 6000) {
+      const k = 1 - (now - s.flashAt) / 6000;
+      ctx.strokeStyle = `rgba(229,249,247,${(0.8 * k).toFixed(3)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, s.sizePx / 2 + 4 + (1 - k) * 16, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  if (hover) {
+    const [x, y] = shipXY(hover, v);
+    ctx.strokeStyle = '#E5F9F7';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, hover.sizePx / 2 + 6, 0, Math.PI * 2);
+    ctx.stroke();
   }
 }
 
@@ -244,6 +332,7 @@ export const COPY = {
   footer: 'AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
   wellEmpty: 'No ships in sample. Paste an address to light the first hull.',
   census: 'Mix of the current readable sample. Not TVL. Not advice.',
+  censusFull: 'Every Tydro and Nado account AEGIS has found on-chain. Mix by count, not TVL. Not advice.',
   share: 'Pose per AEGIS rules. Rules are public. Camera, not a broker.',
   woundedTape: 'Wounded in sample — not a hit list.',
   oneLiner: 'A camera on how Ink books are aimed.',

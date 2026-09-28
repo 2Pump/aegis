@@ -31,6 +31,7 @@ pnpm dev                                          # http://localhost:5173
 ```
 
 ```powershell
+pnpm census --since-blocks 200000   # local census (see docs/CENSUS.md); pnpm dev then shows the well as PREVIEW
 pnpm prove 0xYOUR_ADDRESS   # read a real address, cross-check, compare to official UIs
 pnpm check     # write-path audit + typecheck + all unit tests
 pnpm build     # audit + typecheck + production build
@@ -47,16 +48,19 @@ Set the project **Root Directory** to `apps/web`. `apps/web/vercel.json` install
 apps/web          Vite + React 19 + TS strict. Routes: / /hull/:address /calibration /fixture/:name /rules /census /watch
 packages/pose     Classifier — pure functions, no React, no IO. Constants in src/config.ts only.
 packages/ink-io   Every network read. Result<T, InkError>. Tydro and Nado both via Ink RPC (Nado through its FQuerier contract).
-packages/glyphs   Well layout + canvas draw, hull sigil SVG (reused for OG in Phase 2), copy deck.
-docs              LOOKUPS · RULES · MATH · THREAT · VERIFICATION
+packages/glyphs   Well layout + layered canvas (20k+ ships), hull sigil SVG, copy deck.
+packages/census   Census snapshot format + LiveEngine (browser-safe) and the hourly job (./node: discovery, batch reads, Blob/file store).
+docs              LOOKUPS · RULES · MATH · THREAT · VERIFICATION · CENSUS
+.github/workflows census.yml — hourly census job
 verification      status.json (the well gate) + proof records written by `pnpm prove`
 fixtures          Six synthetic books (the dossier examples) + empty seeds.json
-scripts           prove · make-fixtures · sync-tydro-registry · audit-writes
+scripts           census · prove · make-fixtures · sync-tydro-registry · audit-writes
 ```
 
 ## Routes
-- `/`: the well. **Locked** (red banner, no canvas) until `verification/status.json` is proven; then it draws only ships you opened. Fixtures never appear in it.
+- `/`: the well. It shows every Tydro and Nado account from the hourly census, kept live in the browser (events every ~4 s, at-risk re-reads every ~15 s), plus the wounded tape, the live-changes tape and the live diagnostics. It stays **locked** in production until verification passes; dev builds and `VITE_WELL_PREVIEW=1` show it with a PREVIEW banner. Fixtures never appear in it.
 - `/hull/:address`: the ship plate. It re-reads every 15 s, backs off on 429, and pauses while the tab is hidden. It has sections REGISTRY, HULL TEMP, POSE, LOCKER, BOOK, VECTOR and SHARE, plus an on-page **sensor log**, so a screenshot shows exactly what each sensor returned.
 - `/calibration`: proof status + the six fixture books. `/fixture/carry|naked|equity-margin|wounded|dark|empty`: calibration plates.
 - `/rules`: rules page. There is also a rules drawer in the header.
-- `/census` and `/watch`: placeholders for Phase 2 and Phase 3.
+- `/census`: pose mix of every account found, coverage, and snapshot and backfill status.
+- `/watch`: placeholder for Phase 3 (Telegram).

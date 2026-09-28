@@ -10,3 +10,4 @@ playwright-report
 # proof runs hold full addresses — keep local
 verification/*.json
 !verification/status.json
+apps/web/public/census/

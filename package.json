@@ -18,7 +18,8 @@
     "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && pnpm -r test",
     "fixtures": "node scripts/make-fixtures.mjs",
     "sync:tydro": "node scripts/sync-tydro-registry.mjs",
-    "prove": "tsx scripts/prove.ts"
+    "prove": "tsx scripts/prove.ts",
+    "census": "tsx scripts/census.ts"
   },
   "devDependencies": {
     "@aegis/ink-io": "workspace:*",
@@ -26,6 +27,7 @@
     "@types/node": "^22.20.4",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "viem": "2.56.9"
+    "viem": "2.56.9",
+    "@aegis/census": "workspace:*"
   }
 }
