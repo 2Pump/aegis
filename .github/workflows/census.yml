@@ -9,18 +9,30 @@
 #   3. (optional) secret INK_RPC with a private Ink RPC URL (or several, comma-separated). Without it the job rotates
 #      over Ink's four public RPCs (docs.inkonchain.com/tools/rpc) and rests any that throttle it.
 #   4. Actions tab → "census" → Run workflow (the first run backfills history; it may take 2–3 runs).
+#
+# The hourly start (docs/CENSUS.md → "Hourly start"):
+#   GitHub's own schedule is best-effort — on 2026-09-28/29 it started this workflow every 5–7 hours instead of
+#   hourly. So the hour is kept by an outside timer (cron-job.org) that calls GitHub's "run workflow" API with
+#   source=timer. GitHub's schedule below stays as a slow backup and skips itself when the census is fresh.
+#   Repo variable CENSUS_URL (Settings → Secrets and variables → Actions → Variables) = the public census.json URL,
+#   so the freshness check can read the snapshot's age. Without it, every run goes ahead.
 
 name: census
+run-name: census · ${{ inputs.source || github.event_name }}${{ inputs.full && ' · full' || '' }}
 
 on:
   schedule:
-    - cron: '17 * * * *' # hourly at :17 (off the top of the hour, when GitHub is busiest)
+    - cron: '41 */6 * * *' # backup only — skipped when the timer kept the census fresh
   workflow_dispatch:
     inputs:
       full:
         description: 'Re-read every known wallet (a full sweep also runs automatically once a week)'
         type: boolean
         default: false
+      source:
+        description: 'Who started this run (the outside timer sends "timer")'
+        type: string
+        default: manual
 
 concurrency:
   group: census
@@ -34,23 +46,55 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
+      # Cheap check before installing anything: skip if the census was published moments ago.
+      #  - timer runs skip only if the last publish was < 15 min ago (a duplicate queued behind a long run)
+      #  - the backup schedule skips if < 50 min ago (the timer is doing its job)
+      #  - runs you start by hand never skip
+      - name: Freshness check
+        id: fresh
+        env:
+          CENSUS_URL: ${{ vars.CENSUS_URL }}
+          SOURCE: ${{ github.event_name == 'schedule' && 'schedule' || inputs.source }}
+          FULL: ${{ inputs.full }}
+        run: |
+          node -e '
+            const src = process.env.SOURCE || "manual";
+            const limitMin = src === "timer" ? 15 : src === "schedule" ? 50 : 0;
+            const out = (skip, why) => { console.log(why); require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`); };
+            if (!limitMin || process.env.FULL === "true") return out(false, `started by ${src} — no freshness check`);
+            if (!process.env.CENSUS_URL) return out(false, "repo variable CENSUS_URL not set — running without a freshness check");
+            fetch(process.env.CENSUS_URL + "?t=" + Date.now(), { cache: "no-store" })
+              .then((r) => r.json())
+              .then((j) => {
+                const age = (Date.now() - Date.parse(j.generatedAt)) / 60000;
+                if (age < limitMin) out(true, `census published ${age.toFixed(0)} min ago (< ${limitMin}) — skipping this ${src} run`);
+                else out(false, `census is ${age.toFixed(0)} min old — running`);
+              })
+              .catch((e) => out(false, `could not read the census (${e.message}) — running anyway`));
+          '
+
       - uses: actions/checkout@v5
+        if: steps.fresh.outputs.skip != 'true'
 
       - uses: actions/setup-node@v5
+        if: steps.fresh.outputs.skip != 'true'
         with:
           node-version: 22
           package-manager-cache: false
 
       # pnpm at the exact version pinned in package.json ("packageManager"), via Node's corepack
       - run: corepack enable
+        if: steps.fresh.outputs.skip != 'true'
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
       - run: pnpm install --frozen-lockfile
+        if: steps.fresh.outputs.skip != 'true'
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
       - name: Run census
+        if: steps.fresh.outputs.skip != 'true'
         run: pnpm census --store blob --budget-min 40 ${{ inputs.full && '--full' || '' }}
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}

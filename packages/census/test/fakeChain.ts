@@ -33,10 +33,18 @@ export interface FakeOpts {
   gasCalls?: number;
   /** the saver also holds 1 WETH supplied long ago — no event for it in the scanned window */
   saverOldWeth?: boolean;
+  /**
+   * the CARRY owner also opened an isolated-margin BTC-PERP long at this block. Isolated subaccounts are created by
+   * Nado's engine and funded from the main account — no ModifyCollateral, only trades (BalanceUpdate) name them.
+   */
+  isolatedTradeAt?: number;
 }
 
+/** Isolated subaccount of the CARRY owner: name bytes 00 00 02 00 "iso" (layout from the Nado SDK bytes32 tests). */
+export const ISO_SUB = `${U.carry}0000020069736f0000000000`.toLowerCase() as `0x${string}`;
+
 export function fakeChain(o: FakeOpts) {
-  const stats = { getLogs: 0, getLogsRejected: 0, multicalls: 0, multicallRejected: 0, subaccountInfoCalls: 0 };
+  const stats = { getLogs: 0, getLogsRejected: 0, multicalls: 0, multicallRejected: 0, subaccountInfoCalls: 0, isolatedReads: 0 };
   const logs: Log[] = [];
   const mkLog = (address: string, topics: `0x${string}`[], data: `0x${string}`, block: number) =>
     logs.push({ address: address as `0x${string}`, topics: topics as never, data, blockNumber: BigInt(block) } as unknown as Log);
@@ -58,6 +66,8 @@ export function fakeChain(o: FakeOpts) {
   // a trade near head (BalanceUpdate: data = abi.encode(uint32 productId, bytes32 subaccount))
   mkLog(NADO_CONTRACTS.perpEngine, [TOPIC.balanceUpdate], `0x${(2).toString(16).padStart(64, '0')}${sCarry.slice(2)}`, o.tradeAt ?? o.head - 100);
 
+  if (o.isolatedTradeAt) mkLog(NADO_CONTRACTS.perpEngine, [TOPIC.balanceUpdate], `0x${(2).toString(16).padStart(64, '0')}${ISO_SUB.slice(2)}`, o.isolatedTradeAt);
+
   const prices = TYDRO_RESERVES.map((r) => (r.symbol === 'kBTC' ? 100_000n : r.symbol === 'WETH' ? 4_000n : 1n) * 10n ** 8n);
   const tydroBal = (token: string, user: string): bigint => {
     const t = token.toLowerCase(), u = user.toLowerCase();
@@ -73,8 +83,29 @@ export function fakeChain(o: FakeOpts) {
     if (u === U.saver) return [(o.saverOldWeth ? 5_000n : 1_000n) * 10n ** 8n, 0n, 0n, 7500n, 7000n, 2n ** 256n - 1n];
     return [0n, 0n, 0n, 0n, 0n, 2n ** 256n - 1n];
   };
-  const health = (sub: string, type: number): bigint => (sub.toLowerCase() === sCarry ? (type === 1 ? 9_400n * e18 : 10_000n * e18) : 0n);
+  const health = (sub: string, type: number): bigint =>
+    sub.toLowerCase() === sCarry ? (type === 1 ? 9_400n * e18 : 10_000n * e18) : o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB ? (type === 1 ? 400n * e18 : 500n * e18) : 0n;
   const subInfo = (sub: string) => {
+    if (o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB) {
+      stats.subaccountInfoCalls++;
+      stats.isolatedReads++;
+      return {
+        subaccount: ISO_SUB,
+        exists: true,
+        healths: [
+          { assets: 500n * e18, liabilities: 0n, health: 450n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 400n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 500n * e18 },
+        ],
+        healthContributions: [],
+        spotCount: 1,
+        perpCount: 1,
+        spotBalances: [{ productId: 0, balance: { amount: 500n * e18 } }],
+        perpBalances: [{ productId: 2, balance: { amount: e18 / 20n, vQuoteBalance: -5_000n * e18, lastCumulativeFundingX18: 0n } }],
+        spotProducts: [],
+        perpProducts: [],
+      };
+    }
     if (sub.toLowerCase() !== sCarry) throw new Error('fake: getSubaccountInfo called for an empty subaccount (health filter should have skipped it)');
     stats.subaccountInfoCalls++;
     return {

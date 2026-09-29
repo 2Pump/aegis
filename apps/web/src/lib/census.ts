@@ -47,7 +47,7 @@ export function useCensus(): CensusState {
         const { snap, ships } = decodeSnapshot(await res.json());
         if (!alive) return;
         set({ status: 'ok', snap, ships, loadedAt: Date.now() });
-        log('ok', 'live', `census loaded · ${snap.counts.drawn} ships · block ${snap.block} · ${snap.sweep.kind} sweep`);
+        log('ok', 'live', `census loaded · ${snap.counts.drawn} ships · block ${snap.block} · ${snap.sweep.kind}${snap.sweep.complete === false ? ' (partial — continues next run)' : ''} sweep`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (alive) set((prev) => (prev.status === 'ok' ? prev : { status: 'error', message: msg }));

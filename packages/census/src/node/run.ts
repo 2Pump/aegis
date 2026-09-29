@@ -47,11 +47,28 @@ export type History = { done: true } | { done: false; next: number; end: number;
 export interface CensusState {
   v: 1;
   tydro: { scannedTo: number; users: Record<string, number[]>; seededFromExplorerAt?: number; history?: History };
-  nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[]; history?: History };
+  nado: {
+    accountsScannedTo: number;
+    activityScannedTo: number;
+    subs: Record<string, string[]>;
+    active: string[];
+    history?: History;
+    /**
+     * Every trade (BalanceUpdate) since launch, scanned once. Isolated-margin subaccounts are created by Nado's engine
+     * and funded from the owner's main account, so they never emit a deposit (ModifyCollateral) — trades are the only
+     * public event that names them.
+     */
+    tradeHistory?: History;
+  };
   lastFullBlock: number;
   lastFullAt: string | null;
-  /** a full sweep ran out of time: the next run tries again (a full sweep is what measures coverage) */
+  /** start a full sweep at the next run (e.g. a history backfill just finished) */
   fullDue?: boolean;
+  /**
+   * A full sweep in progress. Wallets are swept in address order; `cursor` is the last address read. A sweep that
+   * runs out of time continues from here next run instead of starting over.
+   */
+  fullSweep?: { cursor: string; startBlock: number; startedAt: string; runs: number };
   /** wallets read as EMPTY → block of that read. Kept here (addresses only) instead of in census.json, which only carries ships worth drawing */
   empty?: Record<string, number>;
   /** last full sweep's coverage vs protocol totals — shares only, no dollar figures (this file is public too) */
@@ -105,6 +122,9 @@ function retryLog(log: (m: string) => void, label: string) {
   };
 }
 
+/** Isolated-margin subaccounts carry "iso" in their 12-byte name (Nado SDK bytes32 tests). Used for logging only. */
+export const isIsolatedSub = (sub: string) => sub.slice(42).toLowerCase().includes('69736f');
+
 const freshState = (): CensusState => ({
   v: 1,
   tydro: { scannedTo: 0, users: {} },
@@ -120,6 +140,9 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const client = o.client;
 
   const state = ((await o.store.get('known.json')) as CensusState | null) ?? freshState();
+  // a full sweep requested by an earlier run starts now; one requested during this run starts next run (full budget)
+  const fullDueAtStart = state.fullDue === true;
+  let fullDueNext = false;
   let prevShips = new Map<string, CensusShip>();
   const prevRaw = await o.store.get('census.json');
   if (prevRaw) {
@@ -222,8 +245,14 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     log(`nado account discovery → ${r.scannedTo}${r.complete ? '' : ` — PAUSED (${r.stoppedBecause}); progress saved, resumes next run`} · ${r.logs.length} logs`);
   }
 
-  // Nado activity (every trade) — only the window since the last run, max ~6 h of blocks
-  const aFrom = Math.max(state.nado.activityScannedTo + 1, head - 21_600, NADO_START_BLOCK, floor);
+  // Nado activity (every trade) since the last run. The very first run starts ~6 h back; older trades are covered
+  // once by the trade-history backfill below. No cap after that: a long gap between runs must not be skipped.
+  if (!state.nado.tradeHistory) {
+    const end = state.nado.activityScannedTo > 0 ? state.nado.activityScannedTo : Math.max(head - 21_600, NADO_START_BLOCK, floor) - 1;
+    state.nado.tradeHistory = end >= NADO_START_BLOCK && !o.sinceBlocks ? { done: false, next: NADO_START_BLOCK, end } : { done: true };
+    if (!state.nado.tradeHistory.done) log('nado: scanning every trade since launch once, to find isolated-margin subaccounts (they never make a deposit)');
+  }
+  const aFrom = state.nado.activityScannedTo > 0 ? Math.max(state.nado.activityScannedTo + 1, floor) : Math.max(head - 21_600, NADO_START_BLOCK, floor);
   if (aFrom <= head && Date.now() < deadline) {
     const r = await scanNadoActivity(client, aFrom, head, { deadline, initialSpan: 2_000, onRetry: retryLog(log, 'nado activity'), backoffBaseMs: o.scanBackoffMs, paceMs: o.scanPaceMs });
     if (!r.complete) log(`nado activity paused at ${r.scannedTo}: ${r.stoppedBecause}`);
@@ -256,6 +285,24 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     }
   }
   const historyJustDone = !historyWasDone && state.tydro.history.done && state.nado.history.done;
+
+  // Nado trade history (one time): finds isolated-margin subaccounts, which only ever appear in trades
+  const trh = state.nado.tradeHistory;
+  if (!o.sinceBlocks && trh && trh.done === false && Date.now() < backfillDeadline) {
+    const r = await scanNadoActivity(client, trh.next, trh.end, { deadline: backfillDeadline, onProgress: progress(log, 'nado trade history', trh.next, trh.end), onRetry: retryLog(log, 'nado trade history'), ...scanOpts });
+    const subCount = () => Object.values(state.nado.subs).reduce((n, l) => n + l.length, 0);
+    const before = subCount();
+    const seen = decodeNadoSubaccounts(r.logs);
+    for (const sub of seen) addSub(sub);
+    const iso = [...seen].filter(isIsolatedSub);
+    const done = r.scannedTo >= trh.end;
+    state.nado.tradeHistory = done ? { done: true } : { ...trh, next: r.scannedTo + 1 };
+    if (done) fullDueNext = true; // the next run re-reads everyone, with its whole budget, and measures coverage
+    await o.store.put('known.json', state);
+    log(`nado trade history → ${r.scannedTo} of ${trh.end}${done ? ' — COMPLETE' : ' — continues next run'} · ${r.logs.length} logs · ${seen.size} subaccounts seen, +${subCount() - before} new · ${iso.length} isolated`);
+    if (iso.length) log(`  isolated subaccount names (bytes after the owner), e.g. ${[...new Set(iso.map((x) => x.slice(42)))].slice(0, 3).join(', ')}`);
+    if (done) log('trade history complete — the next run re-reads every wallet and measures coverage again');
+  }
   if (historyJustDone) log('history backfill complete — this run re-reads everyone and measures coverage');
 
   async function seedTydro(first: boolean) {
@@ -324,21 +371,45 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const activeSet = new Set(state.nado.active);
   const hasActiveNado = (a: string) => (state.nado.subs[a] ?? [nadoSubaccount(a)]).some((s) => activeSet.has(s)) || activeSet.has(nadoSubaccount(a));
   const stale = o.fullIfOlderThanMs !== undefined && (!state.lastFullAt || Date.now() - Date.parse(state.lastFullAt) > o.fullIfOlderThanMs);
-  const full = o.full || prevShips.size === 0 || stale || historyJustDone || state.fullDue === true;
-  const toRead: string[] = [];
+  const startNow = o.full || prevShips.size === 0 || stale || historyJustDone || fullDueAtStart;
+  const createdNow = !state.fullSweep && startNow;
+  if (createdNow) {
+    state.fullSweep = { cursor: '', startBlock: head, startedAt: new Date().toISOString(), runs: 0 };
+    state.fullDue = false;
+  }
+  // requested during this run (trade history just finished) and no sweep starting now: a fresh sweep next run,
+  // with its whole budget, so it can finish in one run and measure coverage
+  if (fullDueNext && !createdNow) state.fullDue = true;
+  const sweep = state.fullSweep;
+  const full = sweep !== undefined;
+  if (sweep) sweep.runs++;
+  // a wallet that never touched a Tydro debt token has no debt, so price alone can't wound it
+  const neverBorrowedTydro = (a: string) => !(state.tydro.users[a] ?? []).some((i) => i % 2 === 1);
+  const mustRead: string[] = [];
+  const sweepList: string[] = [];
   let carried = 0;
   for (const a of owners) {
     const prev = prevShips.get(a);
-    // carried between full sweeps (still re-read the moment an event touches them):
-    //  - quiet, healthy Nado-active wallets (the expensive reads)
-    //  - EMPTY wallets: an empty wallet can only fill up through a deposit/transfer event, which marks it touched
-    const skip = !full && prev && !touched.has(a) && ((hasActiveNado(a) && !prev.watch) || prev.primary === 'EMPTY');
-    if (skip) carried++;
-    else toRead.push(a);
+    // quiet = safe to carry between full sweeps; an event that touches it gets it re-read at once:
+    //  - EMPTY wallets (they can only fill up through a deposit/transfer event)
+    //  - healthy Nado-active wallets (the expensive reads)
+    //  - healthy wallets that never borrowed on Tydro (no debt → no liquidation risk from price)
+    const quiet =
+      prev !== undefined && !touched.has(a) && !prev.watch && prev.primary !== 'DARK' && (prev.primary === 'EMPTY' || hasActiveNado(a) || neverBorrowedTydro(a));
+    if (!quiet) mustRead.push(a);
+    else if (sweep && a > sweep.cursor) sweepList.push(a);
+    else carried++;
   }
-  // most important first, so a budget stop still covers what matters
-  toRead.sort((x, y) => Number(prevShips.get(y)?.watch ?? 0) - Number(prevShips.get(x)?.watch ?? 0) || Number(touched.has(y)) - Number(touched.has(x)));
-  log(`${full ? 'FULL' : 'incremental'} sweep: read ${toRead.length}, carry ${carried}, touched ${touched.size}`);
+  // at risk and touched first, so a budget stop still covers what matters; then the sweep in address order
+  mustRead.sort((x, y) => Number(prevShips.get(y)?.watch ?? 0) - Number(prevShips.get(x)?.watch ?? 0) || Number(touched.has(y)) - Number(touched.has(x)));
+  sweepList.sort();
+  const toRead = [...mustRead, ...sweepList];
+  log(
+    sweep
+      ? `FULL sweep${sweep.runs > 1 ? ` (continuing, run ${sweep.runs})` : ''}: read ${toRead.length} (${mustRead.length} due + ${sweepList.length} sweep), carry ${carried}, touched ${touched.size}`
+      : `incremental sweep: read ${toRead.length}, carry ${carried}, touched ${touched.size}`,
+  );
+
 
   /* ── 3. read at one block, in slices ──────────────────────── */
   const readBlock = BigInt(head);
@@ -365,12 +436,14 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   };
   const tydroComplete = state.tydro.history.done && state.tydro.scannedTo >= head;
   const nadoComplete = state.nado.history.done && state.nado.accountsScannedTo >= head;
-  // coverage is only meaningful when every known wallet is read in the same sweep
-  const cov = full ? new CoverageAcc() : null;
+  // coverage is only meaningful when every known wallet is read at one block: a sweep that started this run
+  const cov = sweep && sweep.runs === 1 ? new CoverageAcc() : null;
+  let budgetStopped = false;
   const SLICE = 1500;
   for (let i = 0; i < toRead.length; i += SLICE) {
     if (Date.now() > deadline) {
       log(`budget hit after ${reread} reads — the rest keep their previous reading`);
+      budgetStopped = true;
       break;
     }
     const slice = toRead.slice(i, i + SLICE);
@@ -402,18 +475,25 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       ships.set(a, shipFromRead(book, pose, prev, extra));
       reread++;
     }
-    log(`read ${Math.min(i + SLICE, toRead.length)}/${toRead.length}`);
+    const lastIdx = Math.min(i + SLICE, toRead.length) - 1;
+    if (sweep && lastIdx >= mustRead.length) sweep.cursor = toRead[lastIdx]!;
+    log(`read ${lastIdx + 1}/${toRead.length}`);
   }
   state.nado.active = [...nextActive];
-  const sweptAll = full && reread + darkNow === toRead.length;
-  if (full && reread === toRead.length) {
+  // a sweep is finished when every wallet in it was attempted; a failed read keeps its last good reading and
+  // does NOT make the whole sweep start over
+  const sweepDone = sweep !== undefined && !budgetStopped;
+  if (sweep && sweepDone) {
     state.lastFullBlock = head;
     state.lastFullAt = new Date().toISOString();
-    state.fullDue = false;
-  } else if (full && reread + darkNow < toRead.length) {
-    state.fullDue = true;
-    log(`full sweep did not finish (${reread + darkNow}/${toRead.length}) — the next run tries the full sweep again`);
+    state.fullSweep = undefined;
+    log(`full sweep complete${sweep.runs > 1 ? ` (took ${sweep.runs} runs)` : ''}`);
+  } else if (sweep) {
+    const left = toRead.length - Math.max(0, toRead.indexOf(sweep.cursor) + 1);
+    log(`full sweep paused at ${sweep.cursor ? `${sweep.cursor.slice(0, 10)}…` : 'the start'} (${left} left) — the next run continues from there`);
   }
+  const sweptAll = sweepDone && cov !== null;
+  if (sweepDone && !cov) log(`coverage not measured: this full sweep spanned ${sweep!.runs} runs (coverage needs every wallet read at one block) — the next single-run sweep measures it`);
 
   /* ── 3b. coverage: known wallets vs the protocols' own on-chain totals ── */
   if (cov && sweptAll) {
@@ -450,7 +530,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       head,
       backfillComplete: state.tydro.scannedTo >= head && state.nado.accountsScannedTo >= head && state.tydro.history.done && state.nado.history.done && !o.sinceBlocks,
     },
-    sweep: { kind: full ? 'full' : 'incremental', reread, carried, ms: Date.now() - t0 },
+    sweep: { kind: full ? 'full' : 'incremental', complete: full ? sweepDone : true, reread, carried, ms: Date.now() - t0 },
     counts,
     mix,
     ...(state.coverage ? { coverage: state.coverage } : {}),

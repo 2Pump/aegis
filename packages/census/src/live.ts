@@ -77,7 +77,8 @@ export class LiveEngine {
       watchEvery: opts.watchEvery ?? 4,
       readsPerTick: opts.readsPerTick ?? 12,
       maxBlocksPerTick: opts.maxBlocksPerTick ?? 1000,
-      maxCatchUp: opts.maxCatchUp ?? 5000,
+      // ~4 h at Ink's ~1 block/s: a late or missed hourly census run is filled in, not skipped
+      maxCatchUp: opts.maxCatchUp ?? 14_400,
       now: opts.now ?? (() => Date.now()),
       onLog: opts.onLog,
     };
@@ -139,7 +140,7 @@ export class LiveEngine {
       this.stats.head = head;
       if (this.stats.cursor === null) this.stats.cursor = head - 1;
       if (head - this.stats.cursor > this.o.maxCatchUp) {
-        log('err', `live: ${head - this.stats.cursor} blocks behind — skipping to the last ${this.o.maxCatchUp}`);
+        log('err', `live: snapshot is ${head - this.stats.cursor} blocks old (~${((head - this.stats.cursor) / 3600).toFixed(1)} h) — catching up the last ${this.o.maxCatchUp} (~4 h); older changes arrive with the next census`);
         this.stats.cursor = head - this.o.maxCatchUp;
         this.stats.gap = true;
       }

@@ -7,7 +7,7 @@ beforeEach(() => resetLearnedMaxSpan());
 import { multicallAdaptive, scanTydro } from '@aegis/ink-io';
 import { decodeShip, decodeSnapshot, encodeShip, type CensusShip } from '../src/index.js';
 import { fileStore, runCensus } from '../src/node/index.js';
-import { U, fakeChain } from './fakeChain.js';
+import { ISO_SUB, U, fakeChain } from './fakeChain.js';
 
 const HEAD = 57_200_000;
 
@@ -99,7 +99,8 @@ describe('census run (fake Ink)', () => {
     const second = fakeChain({ head: HEAD + 50_000, tradeAt: HEAD - 100 }); // same history, nothing new since run 1
     const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: second.client, store });
     expect(snap.sweep.kind).toBe('incremental');
-    expect(snap.sweep.carried).toBe(3); // the quiet CARRY wallet + the 2 empty wallets (nothing touched them)
+    // the quiet CARRY wallet + the 2 empty wallets + the saver (never borrowed on Tydro: price alone can't wound it)
+    expect(snap.sweep.carried).toBe(4);
     expect(second.stats.subaccountInfoCalls).toBe(0);
     const ships = new Map(decodeSnapshot(snap).ships.map((s) => [s.address, s]));
     expect(ships.get(U.borrower)!.readBlock).toBe(HEAD + 50_000 - 2); // watch → fresh
@@ -113,7 +114,7 @@ describe('census run (fake Ink)', () => {
     // the "quitter" trades again near the new head → its subaccount shows up in the activity scan
     const { client } = fakeChain({ head: HEAD + 1_000, tradeAt: HEAD + 900 });
     const snap = await runCensus({ scanPaceMs: 0, explorer: false, client, store });
-    expect(snap.sweep.carried).toBe(2); // the 2 empty wallets; CARRY was touched by the trade → re-read
+    expect(snap.sweep.carried).toBe(3); // the 2 empty wallets + the no-debt saver; CARRY was touched by the trade → re-read
   });
 });
 
@@ -392,15 +393,75 @@ describe('reads after history is complete (the 41-minute full sweep of 55,070 wa
     expect(c.tydro.status === 'OK' && c.tydro.data.notes[0]).toMatch(/never held a Tydro token/);
   });
 
-  it('a full sweep that runs out of time is retried by the next run', async () => {
+  it('a full sweep that runs out of time continues where it stopped next run (never restarts from zero)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aegis-fulldue-'));
     const store = fileStore(dir);
     await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
     const logs: string[] = [];
-    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 5 }).client, store, full: true, budgetMs: 0, log: (m) => logs.push(m) });
-    expect(logs.some((l) => l.includes('the next run tries the full sweep again'))).toBe(true);
+    const paused = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 5 }).client, store, full: true, budgetMs: 0, log: (m) => logs.push(m) });
+    expect(logs.some((l) => l.includes('full sweep paused'))).toBe(true);
+    expect(paused.sweep).toMatchObject({ kind: 'full', complete: false });
+    const logs2: string[] = [];
+    const next = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 9 }).client, store, log: (m) => logs2.push(m) });
+    expect(next.sweep).toMatchObject({ kind: 'full', complete: true });
+    expect(logs2.some((l) => l.includes('continuing, run 2'))).toBe(true);
+    expect(logs2.some((l) => l.includes('full sweep complete (took 2 runs)'))).toBe(true);
+    // wallets read at different blocks can't be summed against one block's protocol totals
+    expect(logs2.some((l) => l.includes('coverage not measured: this full sweep spanned 2 runs'))).toBe(true);
+    expect(next.coverage).toBeDefined(); // the last single-run measurement is kept
+    const after = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 20 }).client, store });
+    expect(after.sweep.kind).toBe('incremental');
+  });
+
+  it('a failed read inside a full sweep keeps its last reading and does not make the sweep start over', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-darkfull-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    // every multicall call past the first fails (out of gas) → some wallets read DARK this run
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 5, gasCalls: 1 }).client, store, full: true });
+    expect(snap.sweep).toMatchObject({ kind: 'full', complete: true });
     const next = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 9 }).client, store });
-    expect(next.sweep.kind).toBe('full');
-    expect(next.coverage).toBeDefined();
+    expect(next.sweep.kind).toBe('incremental');
+  });
+});
+
+describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage found on 2026-09-29)', () => {
+  it('trade history since launch is scanned once; isolated subaccounts it finds are read with their owner', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-iso-'));
+    const store = fileStore(dir);
+    // an existing state from before this change: forward trade cursor already near head, no trade history
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    const known = (await store.get('known.json')) as { nado: { tradeHistory?: unknown; subs: Record<string, string[]> } };
+    delete known.nado.tradeHistory;
+    await store.put('known.json', known);
+
+    // the isolated position was opened long before the 6-hour trade window
+    const chain = fakeChain({ head: HEAD + 100, isolatedTradeAt: 30_500_000 });
+    const logs: string[] = [];
+    await runCensus({ scanPaceMs: 0, explorer: false, client: chain.client, store, log: (m) => logs.push(m) });
+    expect(logs.some((l) => /nado trade history → .* COMPLETE .* 1 isolated/.test(l))).toBe(true);
+    expect(logs.some((l) => l.includes('0000020069736f0000000000'))).toBe(true);
+    const k2 = (await store.get('known.json')) as { fullDue?: boolean; nado: { subs: Record<string, string[]>; tradeHistory: { done: boolean } } };
+    expect(k2.nado.subs[U.carry]).toContain(ISO_SUB);
+    expect(k2.nado.tradeHistory.done).toBe(true);
+    expect(k2.fullDue).toBe(true);
+
+    // next run: full sweep; the owner's book now includes the isolated subaccount
+    const chain3 = fakeChain({ head: HEAD + 200, isolatedTradeAt: 30_500_000 });
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: chain3.client, store });
+    expect(snap.sweep.kind).toBe('full');
+    expect(chain3.stats.isolatedReads).toBeGreaterThan(0);
+  });
+
+  it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-gap-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    // 12 hours later, and the isolated trade happened 10 hours ago (outside the old 6-hour cap)
+    const chain = fakeChain({ head: HEAD + 43_200, isolatedTradeAt: HEAD + 7_200 });
+    await runCensus({ scanPaceMs: 0, explorer: false, client: chain.client, store });
+    const k = (await store.get('known.json')) as { nado: { subs: Record<string, string[]> } };
+    expect(k.nado.subs[U.carry]).toContain(ISO_SUB);
+    expect(chain.stats.isolatedReads).toBeGreaterThan(0);
   });
 });

@@ -56,7 +56,8 @@ export interface CensusSnapshot {
   block: number;
   rulesVersion: string;
   discovery: { tydroScannedTo: number; nadoScannedTo: number; head: number; backfillComplete: boolean };
-  sweep: { kind: 'full' | 'incremental'; reread: number; carried: number; ms: number };
+  /** complete=false: a full sweep that ran out of time this run and continues next run */
+  sweep: { kind: 'full' | 'incremental'; complete?: boolean; reread: number; carried: number; ms: number };
   counts: { known: number; drawn: number; empty: number; dark: number; tydro: number; nado: number; wounded: number };
   mix: Record<string, number>;
   /** from the last FULL sweep: what share of each protocol's on-chain totals the known wallets add up to */

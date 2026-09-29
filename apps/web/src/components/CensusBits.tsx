@@ -72,7 +72,7 @@ export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: C
         <>
           {cell('SNAP', snap.block.toLocaleString('en-US'))}
           {cell('AGE', fmtAge(Date.parse(snap.generatedAt), now).toUpperCase())}
-          {cell('SWEEP', snap.sweep.kind === 'full' ? 'FULL' : 'INCR')}
+          {cell('SWEEP', snap.sweep.kind === 'full' ? (snap.sweep.complete === false ? 'FULL · PARTIAL' : 'FULL') : 'INCR')}
           {cell('N', snap.counts.drawn.toLocaleString('en-US'))}
           {cell('KNOWN', snap.counts.known.toLocaleString('en-US'))}
           {cell('RULES', snap.rulesVersion.toUpperCase())}

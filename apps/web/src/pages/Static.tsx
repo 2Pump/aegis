@@ -57,7 +57,7 @@ export function CensusPage() {
               <dl className="kv">
                 <dt>block</dt><dd className="num">{census.snap.block.toLocaleString('en-US')}</dd>
                 <dt>generated</dt><dd className="mono">{fmtAge(Date.parse(census.snap.generatedAt), now)} ago</dd>
-                <dt>sweep</dt><dd className="mono">{census.snap.sweep.kind} · {census.snap.sweep.reread.toLocaleString('en-US')} re-read · {census.snap.sweep.carried.toLocaleString('en-US')} carried · {Math.round(census.snap.sweep.ms / 1000)}s</dd>
+                <dt>sweep</dt><dd className="mono">{census.snap.sweep.kind}{census.snap.sweep.complete === false ? ' (partial — continues next run)' : ''} · {census.snap.sweep.reread.toLocaleString('en-US')} re-read · {census.snap.sweep.carried.toLocaleString('en-US')} carried · {Math.round(census.snap.sweep.ms / 1000)}s</dd>
                 <dt>history</dt>
                 <dd className="mono">
                   {census.snap.discovery.backfillComplete
