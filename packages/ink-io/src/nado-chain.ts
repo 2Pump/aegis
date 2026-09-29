@@ -1,7 +1,7 @@
 import type { NadoBook } from '@aegis/pose';
 import type { PublicClient } from 'viem';
 import { nadoSubaccount } from './address.js';
-import { INK_CHAIN_ID } from './chain.js';
+import { INK_CHAIN_ID, isZeroData, stableHead } from './chain.js';
 import { aggregate, parseSubaccountInfo } from './nado.js';
 import { NADO_CONTRACTS, NADO_PRODUCTS, QUERIER_GET_SUBACCOUNT_INFO_ABI } from './nado-registry.js';
 import { Err, Ok, errMessage, type Result } from './result.js';
@@ -51,10 +51,18 @@ export function chainInfoToGatewayShape(info: ChainInfo): unknown {
 }
 
 export async function readNadoChain(client: PublicClient, address: string, blockNumber?: bigint): Promise<Result<NadoChainRead>> {
+  const first = await readNadoChainAt(client, address, blockNumber);
+  if (!first.ok && blockNumber === undefined && isZeroData(first.error.message)) {
+    return readNadoChainAt(client, address, await stableHead(client, 20n));
+  }
+  return first;
+}
+
+async function readNadoChainAt(client: PublicClient, address: string, blockNumber?: bigint): Promise<Result<NadoChainRead>> {
   try {
     const chainId = await client.getChainId();
     if (chainId !== INK_CHAIN_ID) return Err('WRONG_CHAIN', `RPC is chain ${chainId}, expected ${INK_CHAIN_ID}`);
-    const block = blockNumber ?? (await client.getBlockNumber());
+    const block = blockNumber ?? (await stableHead(client));
     const sub = nadoSubaccount(address, 'default');
     const info = (await client.readContract({
       address: NADO_CONTRACTS.querier,

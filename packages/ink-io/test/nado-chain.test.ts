@@ -68,7 +68,7 @@ describe('Nado on-chain sensor (FQuerier)', () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     const b = res.value.book;
-    expect(res.value.block).toBe(999);
+    expect(res.value.block).toBe(996); // 3 blocks behind the tip (stableHead);
     const kbtc = b.spots.find((s) => s.symbol === 'KBTC')!;
     expect(kbtc.usd).toBeCloseTo(-69_375.52, 1);
     expect(kbtc.priceSource).toBe('NADO_ONCHAIN');

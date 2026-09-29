@@ -1,6 +1,7 @@
 import { COPY } from '@aegis/glyphs';
 import { CoverageShares, MixBar } from '../components/CensusBits';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
+import { verificationText } from '../lib/verification';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { Panel } from '../components/bits';
@@ -31,7 +32,7 @@ export function CensusPage() {
   return (
     <div className="stack">
       <h2 className="page">Census</h2>
-      {WELL_PREVIEW ? <div className="banner">PREVIEW — sensors not yet matched against app.tydro.com / app.nado.xyz.</div> : null}
+      {WELL_PREVIEW ? <div className="banner">PREVIEW — {verificationText()}.</div> : null}
       {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
       {census.status === 'missing' || census.status === 'error' ? <div className="banner">{census.message}</div> : null}
       {census.status === 'ok' ? (

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { classify } from '@aegis/pose';
 import { Panel, TagChip } from '../components/bits';
 import { FIXTURES } from '../lib/fixtures';
-import { PROOFS, VERIFIED } from '../lib/verification';
+import { PROOFS, VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
 
 /** Synthetic books + proof status. Nothing on this page is a real account. */
 export function CalibrationPage() {
@@ -10,13 +10,18 @@ export function CalibrationPage() {
     <div className="stack">
       <h2 className="page">Calibration</h2>
 
-      <Panel title="Sensor proof" rail={VERIFIED ? 'var(--cyan)' : 'var(--red)'} testId="proof-panel">
-        {VERIFIED ? (
-          <ul className="reasons">
-            {PROOFS.map((p) => (
-              <li key={p.at}>PROVEN · {p.address} · block {p.block ?? '?'} · {p.fields} UI fields matched · rules {p.rulesVersion} · {p.at}</li>
-            ))}
-          </ul>
+      <Panel title="Sensor proof" rail={VERIFIED ? 'var(--cyan)' : VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? 'var(--amber)' : 'var(--red)'} testId="proof-panel">
+        {VERIFIED || VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? (
+          <div className="stack" style={{ gap: 8 }}>
+            <div className={`banner${VERIFIED ? ' cyan' : ''}`}>{VERIFIED ? 'VERIFIED' : 'PARTLY VERIFIED'} — {verificationText()}.</div>
+            <ul className="reasons">
+              {PROOFS.map((p) => (
+                <li key={p.at}>
+                  PROVEN · {(p.venues ?? ['tydro', 'nado']).join(' + ')} · {p.address} · block {p.block ?? '?'} · {p.fields} UI fields matched · rules {p.rulesVersion} · {p.at}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : (
           <div className="stack" style={{ gap: 8 }}>
             <div className="banner red">UNVERIFIED — no real address has been matched against app.tydro.com / app.nado.xyz yet.</div>

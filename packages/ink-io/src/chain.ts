@@ -40,6 +40,19 @@ export async function checkInkEndpoints(urls: readonly string[]): Promise<Array<
   );
 }
 
+/**
+ * A block a few behind the tip. Public RPCs are load-balanced over several nodes; asking one node for "latest" and then
+ * reading AT that number from another node that is 1–2 blocks behind returns empty data ("0x") instead of an error.
+ * Reading 3 blocks (~3 s) back avoids that on Ink's 1-second blocks.
+ */
+export async function stableHead(client: PublicClient, back = 3n): Promise<bigint> {
+  const tip = await client.getBlockNumber({ cacheTime: 0 });
+  return tip > back ? tip - back : tip;
+}
+
+/** The node answered with empty data — almost always "that node doesn't have this block yet". Worth one retry further back. */
+export const isZeroData = (msg: string) => /zero data \("0x"\)|returned no data \("0x"\)/i.test(msg);
+
 export interface ChainHead {
   chainId: number;
   block: number;

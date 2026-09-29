@@ -1,5 +1,20 @@
 {
   "verified": false,
-  "note": "Flipped to true ONLY by `pnpm prove <address>` when every machine check passes AND a human matched every field against app.tydro.com / app.nado.xyz. Do not hand-edit.",
-  "proofs": []
+  "venues": {
+    "tydro": true,
+    "nado": false
+  },
+  "note": "Changed ONLY by `pnpm prove <address>`: a venue flips to true when every machine check passes AND a human matched every field against that venue's official UI (app.tydro.com / app.nado.xyz). verified = both venues. Do not hand-edit.",
+  "proofs": [
+    {
+      "address": "0x0B3f…5eC5",
+      "at": "2026-09-29T00:56:46.923Z",
+      "block": 57144948,
+      "fields": 6,
+      "rulesVersion": "v1.1.0",
+      "venues": [
+        "tydro"
+      ]
+    }
+  ]
 }

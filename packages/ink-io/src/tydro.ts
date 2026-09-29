@@ -1,6 +1,6 @@
 import { familyOf, type Leg, type TydroBook } from '@aegis/pose';
 import type { Address, PublicClient } from 'viem';
-import { INK_CHAIN_ID } from './chain.js';
+import { INK_CHAIN_ID, isZeroData, stableHead } from './chain.js';
 import { Err, Ok, errMessage, type Result } from './result.js';
 import { TYDRO, TYDRO_RESERVES } from './tydro-registry.js';
 
@@ -51,11 +51,21 @@ const toNum = (x: bigint, decimals: number) => Number(x) / 10 ** decimals;
  *  - per-reserve legs: aToken / variableDebtToken balanceOf, priced by AaveOracle.getAssetsPrices
  *  - Pool.getReservesList detects reserves missing from our registry → note on the plate
  */
-export async function readTydro(client: PublicClient, user: Address): Promise<Result<TydroRead>> {
+export async function readTydro(client: PublicClient, user: Address, at?: bigint): Promise<Result<TydroRead>> {
+  const first = await readTydroAt(client, user, at);
+  // a load-balanced RPC node without this block yet answers "0x": try once more, a bit further back
+  if (!first.ok && at === undefined && isZeroData(first.error.message)) {
+    const back = (await stableHead(client, 20n));
+    return readTydroAt(client, user, back);
+  }
+  return first;
+}
+
+async function readTydroAt(client: PublicClient, user: Address, at?: bigint): Promise<Result<TydroRead>> {
   try {
     const chainId = await client.getChainId();
     if (chainId !== INK_CHAIN_ID) return Err('WRONG_CHAIN', `RPC is chain ${chainId}, expected ${INK_CHAIN_ID}`);
-    const blockNumber = await client.getBlockNumber();
+    const blockNumber = at ?? (await stableHead(client));
 
     const reserves = TYDRO_RESERVES;
     const settle = <T>(p: Promise<T>): Promise<{ ok: true; v: T } | { ok: false; e: unknown }> =>

@@ -76,3 +76,19 @@ describe('rotating RPC', () => {
     expect(maskRpc('https://rpc-gel.inkonchain.com')).toBe('https://rpc-gel.inkonchain.com');
   });
 });
+
+describe('reading a little behind the tip (the "0x" seen on the first pnpm prove)', () => {
+  it('recognizes the empty-data error a lagging load-balanced node produces', async () => {
+    const { isZeroData } = await import('../src/chain.js');
+    expect(isZeroData('Cannot decode zero data ("0x") with ABI parameters.')).toBe(true);
+    expect(isZeroData('The contract function "x" returned no data ("0x").')).toBe(true);
+    expect(isZeroData('execution reverted')).toBe(false);
+  });
+  it('stableHead reads 3 blocks behind the tip, uncached', async () => {
+    const { stableHead } = await import('../src/chain.js');
+    const a = node(1_000);
+    const cl = client(rotatingTransport([a.t]));
+    expect(await stableHead(cl)).toBe(997n);
+    expect(await stableHead(cl, 20n)).toBe(980n);
+  });
+});

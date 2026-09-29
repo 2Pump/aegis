@@ -147,7 +147,7 @@ describe('tydro reader (mock RPC)', () => {
     const r = await readTydro(client, '0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.block).toBe(123);
+    expect(r.value.block).toBe(120); // 3 blocks behind the tip (stableHead);
     expect(r.value.book.hf).toBeCloseTo(2.1);
     expect(r.value.book.supplies[0]).toMatchObject({ symbol: 'WETH', family: 'ETH', priceSource: 'TYDRO_ORACLE' });
     expect(r.value.book.supplies[0]!.usd).toBeCloseTo(3000);

@@ -7,6 +7,7 @@ import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
+import { verificationText } from '../lib/verification';
 import { useHullCache, useNow } from '../lib/hulls';
 import { useLiveWell } from '../lib/live';
 
@@ -86,8 +87,8 @@ export function Home() {
         <>
           {WELL_PREVIEW ? (
             <div className="banner" data-testid="preview-banner">
-              PREVIEW — real chain reads, but no address has yet been matched field-by-field against app.tydro.com / app.nado.xyz.
-              Treat every pose as provisional. (Shown because this is a dev build or VITE_WELL_PREVIEW=1.)
+              PREVIEW — real chain reads. {verificationText()}. Treat poses as provisional until both venues are verified.
+              (Shown because this is a dev build or VITE_WELL_PREVIEW=1.)
             </div>
           ) : null}
           {census.status === 'missing' || census.status === 'error' ? (

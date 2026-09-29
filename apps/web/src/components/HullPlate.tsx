@@ -6,7 +6,7 @@ import { INK_EXPLORER, parseAddress, TYDRO_FETCHED } from '@aegis/ink-io';
 import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
 import { Lamp, Panel, TagChip, TEMP_RAIL, Usd } from './bits';
 import { SensorLog } from './SensorLog';
-import { VERIFIED } from '../lib/verification';
+import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
 
 export interface HullPlateProps {
   book: Book;
@@ -34,7 +34,9 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         </div>
       ) : !VERIFIED ? (
         <div className="banner" data-testid="unverified-plate">
-          SENSORS UNVERIFIED — these numbers have not yet been matched against app.tydro.com / app.nado.xyz for any real address. Treat as provisional.
+          {VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado
+            ? `PARTLY VERIFIED — ${verificationText()}. Numbers from the unverified venue are provisional.`
+            : 'SENSORS UNVERIFIED — these numbers have not yet been matched against app.tydro.com / app.nado.xyz for any real address. Treat as provisional.'}
         </div>
       ) : null}
 

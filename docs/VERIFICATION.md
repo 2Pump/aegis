@@ -9,6 +9,24 @@ Until then, `/` shows a red **WELL LOCKED — SENSORS UNVERIFIED** banner. Every
 Nado's HTTP API refuses everything except its own website (Cloudflare challenge + CORS). **Resolved:** AEGIS and `pnpm prove` now read Nado from the Ink chain via Nado's `FQuerier` contract, so both work in Node and in the browser. Tydro works live: block 57,115,786 on the test vector, HF 1.389 = $2,994,782 × 0.87 ÷ $1,875,960.
 When comparing with app.nado.xyz, allow a few seconds of lag: on-chain is *settled* state.
 
+## Per-venue proofs with a watch-only address (2026-09-28)
+
+Neither official app has a "view any address" box. A read-only wallet can still connect *as* any public address:
+- **Rabby:** Add address → **Import Watch-Only Address**.
+
+The app then shows that address's dashboard. A watch-only address has no keys, so nothing can be signed.
+
+Because the address you can watch on Tydro rarely also trades on Nado, each venue is proven **on its own**:
+- `pnpm prove 0xADDR` asks only for the venues where the address has positions.
+- A venue is PROVEN when all of these hold:
+  - its machine checks have 0 FAIL;
+  - every one of its UI fields was typed in and matched, with none skipped;
+  - the address really has positions there.
+- `verification/status.json` records `venues.tydro` / `venues.nado`. `verified` is true only when **both** are proven.
+- Until then, the site states exactly which venue is verified, against which address and at which block, and keeps the PREVIEW label.
+
+Tydro Dashboard labels map to: **Health Factor**, **Assets** (Σ supplied USD), **Liabilities** (Σ borrowed USD), and each asset's **Amount**. Tolerances: HF ±0.01, USD ±1%, amounts ±0.1%.
+
 ## Protocol
 
 ```powershell

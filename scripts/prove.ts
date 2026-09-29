@@ -8,7 +8,7 @@
  *
  * Runs in Node (no browser, no CORS), talks to Nado directly at api.prod.nado.xyz.
  * Writes verification/<address>-<utc>.json and, only when every check passes, updates
- * verification/status.json → { verified: true } which un-gates the well in the web app.
+ * verification/status.json → venues.tydro / venues.nado (each venue can be proven on its own; verified = both).
  *
  * Read-only. No keys, no signing, no transactions.
  */
@@ -150,23 +150,33 @@ async function main() {
 
   /* ── 5. Human: compare against the official UIs ── */
   console.log('\n── official UI comparison ───────────────────────────────────────────');
-  console.log('Open app.tydro.com and app.nado.xyz connected with THIS address (or in read-only/watch mode).');
-  const ui: Array<{ id: string; label: string; aegis: number | null; tol: number; unit: 'abs' | 'rel' }> = [];
-  if (book.tydro.status === 'OK') {
+  console.log('Open app.tydro.com / app.nado.xyz as THIS address — your own wallet, or a watch-only address in a');
+  console.log('read-only wallet (e.g. Rabby → Add address → Import Watch-Only Address). Nothing is signed.');
+  type Venue = 'tydro' | 'nado';
+  const ui: Array<{ id: string; venue: Venue; label: string; aegis: number | null; tol: number; unit: 'abs' | 'rel' }> = [];
+  const tydroHas = book.tydro.status === 'OK' && (book.tydro.data.supplies.length > 0 || book.tydro.data.debts.length > 0);
+  const nadoHas = book.nado.status === 'OK' && (book.nado.data.spots.length > 0 || book.nado.data.perps.length > 0);
+  if (book.tydro.status === 'OK' && tydroHas) {
     const t = book.tydro.data;
-    if (t.hf !== null) ui.push({ id: 'ui.tydro.hf', label: 'Tydro · Health factor', aegis: t.hf, tol: 0.01, unit: 'abs' });
-    ui.push({ id: 'ui.tydro.supply', label: 'Tydro · Total supplied / collateral (USD)', aegis: t.totalCollateralUsd, tol: 0.01, unit: 'rel' });
-    ui.push({ id: 'ui.tydro.debt', label: 'Tydro · Total borrowed (USD)', aegis: t.totalDebtUsd, tol: 0.01, unit: 'rel' });
+    // labels = what the Tydro Dashboard shows
+    if (t.hf !== null) ui.push({ id: 'ui.tydro.hf', venue: 'tydro', label: 'Tydro · Health Factor', aegis: t.hf, tol: 0.01, unit: 'abs' });
+    ui.push({ id: 'ui.tydro.assets', venue: 'tydro', label: 'Tydro · Assets (USD)', aegis: t.supplies.reduce((a, l) => a + l.usd, 0), tol: 0.01, unit: 'rel' });
+    if (t.debts.length) ui.push({ id: 'ui.tydro.liabilities', venue: 'tydro', label: 'Tydro · Liabilities (USD)', aegis: t.debts.reduce((a, l) => a + l.usd, 0), tol: 0.01, unit: 'rel' });
+    for (const l of t.supplies) ui.push({ id: `ui.tydro.supply.${l.symbol}`, venue: 'tydro', label: `Tydro · Assets · ${l.symbol} Amount`, aegis: l.amount, tol: 0.001, unit: 'rel' });
+    for (const l of t.debts) ui.push({ id: `ui.tydro.debt.${l.symbol}`, venue: 'tydro', label: `Tydro · Liabilities · ${l.symbol} Amount`, aegis: l.amount, tol: 0.001, unit: 'rel' });
   }
-  if (book.nado.status === 'OK') {
+  if (book.nado.status === 'OK' && nadoHas) {
     const nd = book.nado.data;
-    ui.push({ id: 'ui.nado.equity', label: 'Nado · Account value / equity (USD)', aegis: nd.equityUsd, tol: 0.01, unit: 'rel' });
-    for (const p of nd.perps) ui.push({ id: `ui.nado.perp.${p.symbol}`, label: `Nado · ${p.symbol} position size (signed)`, aegis: p.sizeBase, tol: 0.0001, unit: 'rel' });
-    for (const s of nd.spots) ui.push({ id: `ui.nado.spot.${s.symbol}`, label: `Nado · ${s.symbol} balance`, aegis: s.amount, tol: 0.001, unit: 'rel' });
+    ui.push({ id: 'ui.nado.equity', venue: 'nado', label: 'Nado · Account value / equity (USD)', aegis: nd.equityUsd, tol: 0.01, unit: 'rel' });
+    for (const p of nd.perps) ui.push({ id: `ui.nado.perp.${p.symbol}`, venue: 'nado', label: `Nado · ${p.symbol} position size (signed)`, aegis: p.sizeBase, tol: 0.0001, unit: 'rel' });
+    for (const sp of nd.spots) ui.push({ id: `ui.nado.spot.${sp.symbol}`, venue: 'nado', label: `Nado · ${sp.symbol} balance`, aegis: sp.amount, tol: 0.001, unit: 'rel' });
   }
+  if (!tydroHas) console.log('  (Tydro: no positions on this address — nothing to compare)');
+  if (!nadoHas) console.log('  (Nado: no positions on this address — nothing to compare)');
   if (ask && ui.length) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
-    console.log('Type the number the official UI shows (Enter = skip). Tolerance: HF ±0.01, USD ±1%, sizes ±0.01%.\n');
+    console.log('Type the number the official UI shows (Enter = skip). Tolerance: HF ±0.01, USD ±1%, amounts ±0.1%, perp sizes ±0.01%.');
+    console.log('Read the UI right now — prices and interest move, so compare numbers from the same minute.\n');
     for (const f of ui) {
       const ans = (await rl.question(`${f.label}  [AEGIS: ${n(f.aegis ?? NaN, 6)}]  UI = `)).replace(/[$,\s]/g, '');
       if (!ans) {
@@ -182,13 +192,22 @@ async function main() {
     ui.forEach((f) => console.log(`  ${f.label.padEnd(44)} AEGIS ${n(f.aegis ?? NaN, 6)}   UI ______`));
   }
 
-  /* ── 6. Verdict + record ── */
+  /* ── 6. Verdict per venue + record ──
+     A venue is PROVEN when: its sensor was readable, the address has positions there, none of that venue's
+     machine checks FAILED, and every one of that venue's UI fields was typed in and matched (no skips). */
+  const venueOf = (id: string): Venue | null =>
+    id.startsWith('tydro.') || id.startsWith('blockscout') || id.startsWith('ui.tydro.') ? 'tydro' : id.startsWith('nado.') || id.startsWith('ui.nado.') ? 'nado' : null;
+  const provenVenue = (v: Venue) => {
+    const has = v === 'tydro' ? tydroHas : nadoHas;
+    const mine = checks.filter((c) => venueOf(c.id) === v);
+    const fields = ui.filter((f) => f.venue === v);
+    const matched = mine.filter((c) => c.id.startsWith('ui.') && c.verdict === 'PASS').length;
+    return has && fields.length > 0 && !mine.some((c) => c.verdict === 'FAIL') && matched === fields.length;
+  };
+  const venues: Venue[] = (['tydro', 'nado'] as const).filter(provenVenue);
+  const proven = venues.length > 0;
   const fails = checks.filter((c) => c.verdict === 'FAIL');
   const uiPass = checks.filter((c) => c.id.startsWith('ui.') && c.verdict === 'PASS');
-  const uiNeeded = ui.length;
-  const bothVenues = book.tydro.status === 'OK' && book.nado.status === 'OK';
-  const hasPositions = pose.primary !== 'EMPTY';
-  const proven = fails.length === 0 && bothVenues && hasPositions && uiNeeded > 0 && uiPass.length === uiNeeded;
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dir = join(root, 'verification');
@@ -202,30 +221,35 @@ async function main() {
     rulesVersion: pose.rulesVersion,
     pose: { tags: pose.tags, hullTemp: pose.hullTemp, reasons: pose.reasons },
     checks,
-    proven,
+    provenVenues: venues,
   };
   const file = join(dir, `${user}-${stamp}.json`);
   writeFileSync(file, JSON.stringify(record, null, 2) + '\n');
 
   console.log('\n── verdict ──────────────────────────────────────────────────────────');
   console.log(`checks: ${checks.filter((c) => c.verdict === 'PASS').length} pass · ${fails.length} fail · ${checks.filter((c) => c.verdict === 'WARN').length} warn · ${checks.filter((c) => c.verdict === 'SKIP').length} skip`);
-  console.log(`official UI: ${uiPass.length}/${uiNeeded} fields matched`);
-  if (!hasPositions) console.log('NOTE: address has no positions — it cannot prove anything. Use one with Tydro AND Nado positions.');
-  if (!bothVenues) console.log('NOTE: one venue was DARK — proof requires both sensors readable.');
+  console.log(`official UI: ${uiPass.length}/${ui.length} fields matched`);
+  for (const v of ['tydro', 'nado'] as const) {
+    const has = v === 'tydro' ? tydroHas : nadoHas;
+    console.log(`  ${v.padEnd(6)} ${venues.includes(v) ? '\x1b[36mPROVEN\x1b[0m' : has ? '\x1b[31mnot proven\x1b[0m (a check failed or a UI field was skipped)' : 'not tested (no positions here)'}`);
+  }
   console.log(`record: ${file}`);
 
   if (proven) {
     const statusFile = join(dir, 'status.json');
-    const status = JSON.parse(readFileSync(statusFile, 'utf8')) as { verified: boolean; proofs: unknown[] };
-    status.verified = true;
+    const status = JSON.parse(readFileSync(statusFile, 'utf8')) as { verified: boolean; venues?: Record<string, boolean>; proofs: unknown[] };
+    status.venues = { tydro: false, nado: false, ...(status.venues ?? {}) };
+    for (const v of venues) status.venues[v] = true;
+    status.verified = status.venues.tydro === true && status.venues.nado === true;
     status.proofs = [
       ...status.proofs,
-      { address: `${pa.value.checksum.slice(0, 6)}…${pa.value.checksum.slice(-4)}`, at: record.at, block: record.block, fields: uiNeeded, rulesVersion: record.rulesVersion },
+      { address: `${pa.value.checksum.slice(0, 6)}…${pa.value.checksum.slice(-4)}`, at: record.at, block: record.block, fields: uiPass.length, rulesVersion: record.rulesVersion, venues },
     ];
     writeFileSync(statusFile, JSON.stringify(status, null, 2) + '\n');
-    console.log('\x1b[36mPROVEN\x1b[0m — verification/status.json updated. The well is un-gated on next build.');
+    console.log(`\x1b[36mPROVEN: ${venues.join(' + ')}\x1b[0m — verification/status.json updated. ${status.verified ? 'Both venues verified: the PREVIEW label comes off on the next deploy.' : 'The other venue is still pending.'}`);
+    console.log('Commit the record and status.json (git add -A; git commit; git push) so the site shows it.');
   } else {
-    console.log('\x1b[31mNOT PROVEN\x1b[0m — the well stays gated. Send the record file (or a screenshot of this output).');
+    console.log('\x1b[31mNOT PROVEN\x1b[0m — nothing changed. Send a screenshot of this output.');
     process.exitCode = 1;
   }
 }
