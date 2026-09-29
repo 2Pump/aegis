@@ -58,19 +58,22 @@ jobs:
           FULL: ${{ inputs.full }}
         run: |
           node -e '
-            const src = process.env.SOURCE || "manual";
-            const limitMin = src === "timer" ? 15 : src === "schedule" ? 50 : 0;
-            const out = (skip, why) => { console.log(why); require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`); };
-            if (!limitMin || process.env.FULL === "true") return out(false, `started by ${src} — no freshness check`);
-            if (!process.env.CENSUS_URL) return out(false, "repo variable CENSUS_URL not set — running without a freshness check");
-            fetch(process.env.CENSUS_URL + "?t=" + Date.now(), { cache: "no-store" })
-              .then((r) => r.json())
-              .then((j) => {
+            (async () => {
+              const src = process.env.SOURCE || "manual";
+              const limitMin = src === "timer" ? 15 : src === "schedule" ? 50 : 0;
+              const out = (skip, why) => { console.log(why); require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`); };
+              if (!limitMin || process.env.FULL === "true") return out(false, `started by ${src} — no freshness check`);
+              if (!process.env.CENSUS_URL) return out(false, "repo variable CENSUS_URL not set — running without a freshness check");
+              try {
+                const r = await fetch(process.env.CENSUS_URL + "?t=" + Date.now(), { cache: "no-store" });
+                const j = await r.json();
                 const age = (Date.now() - Date.parse(j.generatedAt)) / 60000;
                 if (age < limitMin) out(true, `census published ${age.toFixed(0)} min ago (< ${limitMin}) — skipping this ${src} run`);
                 else out(false, `census is ${age.toFixed(0)} min old — running`);
-              })
-              .catch((e) => out(false, `could not read the census (${e.message}) — running anyway`));
+              } catch (e) {
+                out(false, `could not read the census (${e.message}) — running anyway`);
+              }
+            })();
           '
 
       - uses: actions/checkout@v5
