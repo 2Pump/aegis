@@ -50,6 +50,8 @@ export interface CensusState {
   nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[]; history?: History };
   lastFullBlock: number;
   lastFullAt: string | null;
+  /** a full sweep ran out of time: the next run tries again (a full sweep is what measures coverage) */
+  fullDue?: boolean;
   /** wallets read as EMPTY → block of that read. Kept here (addresses only) instead of in census.json, which only carries ships worth drawing */
   empty?: Record<string, number>;
   /** last full sweep's coverage vs protocol totals — shares only, no dollar figures (this file is public too) */
@@ -322,7 +324,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const activeSet = new Set(state.nado.active);
   const hasActiveNado = (a: string) => (state.nado.subs[a] ?? [nadoSubaccount(a)]).some((s) => activeSet.has(s)) || activeSet.has(nadoSubaccount(a));
   const stale = o.fullIfOlderThanMs !== undefined && (!state.lastFullAt || Date.now() - Date.parse(state.lastFullAt) > o.fullIfOlderThanMs);
-  const full = o.full || prevShips.size === 0 || stale || historyJustDone;
+  const full = o.full || prevShips.size === 0 || stale || historyJustDone || state.fullDue === true;
   const toRead: string[] = [];
   let carried = 0;
   for (const a of owners) {
@@ -361,6 +363,8 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     const k = `${sensor}: ${msg.replace(/0x[0-9a-f]{8,}/gi, '0x…').replace(/\d{5,}/g, 'N').slice(0, 220)}`;
     darkWhy.set(k, (darkWhy.get(k) ?? 0) + 1);
   };
+  const tydroComplete = state.tydro.history.done && state.tydro.scannedTo >= head;
+  const nadoComplete = state.nado.history.done && state.nado.accountsScannedTo >= head;
   // coverage is only meaningful when every known wallet is read in the same sweep
   const cov = full ? new CoverageAcc() : null;
   const SLICE = 1500;
@@ -370,14 +374,17 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       break;
     }
     const slice = toRead.slice(i, i + SLICE);
-    const tokens = new Map(slice.map((a) => [a, new Set(state.tydro.users[a] ?? [])] as const));
-    const subs = new Map(slice.map((a) => [a, (state.nado.subs[a] ?? []) as `0x${string}`[]] as const));
+    const tokens = new Map(slice.filter((a) => state.tydro.users[a]).map((a) => [a, new Set(state.tydro.users[a])] as const));
+    const subs = new Map(slice.filter((a) => state.nado.subs[a]).map((a) => [a, state.nado.subs[a] as `0x${string}`[]] as const));
     const res = await readBooksMany(client, {
       addresses: slice,
       tydroTokens: tokens,
       nadoSubs: subs,
       blockNumber: readBlock,
       tydroPrices: prices.value,
+      // once ALL history is scanned, a wallet never seen on a venue has nothing there: don't spend RPC calls proving it
+      tydroOnlyKnown: tydroComplete,
+      nadoOnlyKnown: nadoComplete,
     });
     for (const s of res.emptySubs) nextActive.delete(s);
     for (const s of res.activeSubs) nextActive.add(s);
@@ -402,6 +409,10 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   if (full && reread === toRead.length) {
     state.lastFullBlock = head;
     state.lastFullAt = new Date().toISOString();
+    state.fullDue = false;
+  } else if (full && reread + darkNow < toRead.length) {
+    state.fullDue = true;
+    log(`full sweep did not finish (${reread + darkNow}/${toRead.length}) — the next run tries the full sweep again`);
   }
 
   /* ── 3b. coverage: known wallets vs the protocols' own on-chain totals ── */

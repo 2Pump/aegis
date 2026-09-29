@@ -15,7 +15,25 @@ export interface ReadManyInput {
   blockNumber?: bigint;
   tydroPrices?: TydroPrices;
   onStage?: (stage: string, done: number, total: number) => void;
+  /**
+   * Discovery has covered ALL Tydro history: an address with no entry in `tydroTokens` has never held a Tydro
+   * token, so it is not read on Tydro (its Tydro sensor is OK and empty, with a note). Census only.
+   */
+  tydroOnlyKnown?: boolean;
+  /** Same for Nado: an address with no entry in `nadoSubs` never made a Nado deposit, so no Nado account exists. */
+  nadoOnlyKnown?: boolean;
 }
+
+const NO_TYDRO: TydroBook = {
+  hf: null,
+  supplies: [],
+  debts: [],
+  totalCollateralUsd: 0,
+  totalDebtUsd: 0,
+  usdNet: 0,
+  liquidationThreshold: null,
+  notes: ['No Tydro position: this wallet has never held a Tydro token (full Tydro history scanned)'],
+};
 
 export interface ReadManyResult {
   block: number;
@@ -34,9 +52,11 @@ export async function readBooksMany(client: PublicClient, input: ReadManyInput):
   const at = Date.now();
   const addrs = [...new Set(input.addresses.map((a) => a.toLowerCase()))];
 
-  // Tydro
-  input.onStage?.('tydro', 0, addrs.length);
-  const t = await readTydroMany(client, addrs, block, {
+  // Tydro (skip wallets that provably never touched Tydro)
+  const tydroAddrs = input.tydroOnlyKnown ? addrs.filter((a) => (input.tydroTokens?.get(a)?.size ?? 0) > 0) : addrs;
+  const tydroSkipped = new Set(input.tydroOnlyKnown ? addrs.filter((a) => !((input.tydroTokens?.get(a)?.size ?? 0) > 0)) : []);
+  input.onStage?.('tydro', 0, tydroAddrs.length);
+  const t = await readTydroMany(client, tydroAddrs, block, {
     tokens: input.tydroTokens,
     prices: input.tydroPrices,
     onChunk: (d, tot) => input.onStage?.('tydro', d, tot),
@@ -44,7 +64,12 @@ export async function readBooksMany(client: PublicClient, input: ReadManyInput):
 
   // Nado: health filter, then exact reads for non-empty subaccounts
   const subsOf = new Map<string, `0x${string}`[]>();
+  const nadoSkipped = new Set<string>();
   for (const a of addrs) {
+    if (input.nadoOnlyKnown && !(input.nadoSubs?.get(a)?.length)) {
+      nadoSkipped.add(a); // never deposited to Nado → no account exists
+      continue;
+    }
     const set = new Set<`0x${string}`>([nadoSubaccount(a), ...((input.nadoSubs?.get(a) ?? []).map((s) => s.toLowerCase() as `0x${string}`))]);
     subsOf.set(a, [...set]);
   }
@@ -67,7 +92,11 @@ export async function readBooksMany(client: PublicClient, input: ReadManyInput):
 
   const books = new Map<string, Book>();
   for (const a of addrs) {
-    const tr: Result<TydroBook> | undefined = t.ok ? t.value.get(a) : { ok: false, error: t.error };
+    const tr: Result<TydroBook> | undefined = tydroSkipped.has(a)
+      ? { ok: true, value: { ...NO_TYDRO, notes: [...NO_TYDRO.notes] } }
+      : t.ok
+        ? t.value.get(a)
+        : { ok: false, error: t.error };
     const tydro: Sensor<TydroBook> =
       tr && tr.ok
         ? { status: 'OK', data: tr.value, asOfTime: at, asOfBlock: Number(block) }
@@ -76,7 +105,8 @@ export async function readBooksMany(client: PublicClient, input: ReadManyInput):
     let nado: Sensor<NadoBook>;
     const herr = healthErr.get(a);
     const nb = nadoBooks.get(a);
-    if (herr) nado = { status: 'DARK', code: 'RPC_DEAD', message: `Nado health: ${herr}`, asOfTime: at };
+    if (nadoSkipped.has(a)) nado = { status: 'OK', data: aggregate([], ['No Nado account: this wallet never deposited to Nado (full Nado history scanned)']), asOfTime: at, asOfBlock: Number(block) };
+    else if (herr) nado = { status: 'DARK', code: 'RPC_DEAD', message: `Nado health: ${herr}`, asOfTime: at };
     else if (nb && !nb.ok) nado = { status: 'DARK', code: nb.error.code, message: nb.error.message, asOfTime: at };
     else if (nb && nb.ok) nado = { status: 'OK', data: nb.value, asOfTime: at, asOfBlock: Number(block) };
     else nado = { status: 'OK', data: aggregate([], ['No Nado balances (every known subaccount is empty)']), asOfTime: at, asOfBlock: Number(block) };

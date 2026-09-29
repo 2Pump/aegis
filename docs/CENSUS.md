@@ -90,6 +90,18 @@ Most wallets the explorer lists hold nothing, or only dust. On the first backfil
 - The empty ones are remembered in `known.json` as address → the block they were read at.
 - Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The weekly full sweep re-reads them anyway.
 
+## Reads once history is complete
+
+A full sweep read about 15 wallets a second, too slow for 55,070 wallets in 40 minutes (2026-09-29: 40,500 read, then the budget ran out). Most of that time went on proving a negative: Nado health calls for ~45k Tydro-only wallets, and all-28-token Tydro reads for Nado-only wallets.
+
+Once a venue's history is fully scanned, a wallet never seen there provably has nothing there:
+- A Nado account only exists after a deposit.
+- A Tydro position only exists after a token mint.
+
+So the census no longer reads that venue for such a wallet. Its sensor is OK and empty, with a note saying why. Hull pages still read both venues in full.
+
+A full sweep that still runs out of time sets `fullDue`, and the next run retries it until one finishes. Only a finished full sweep measures coverage.
+
 ## Coverage check (is anyone missing?)
 
 On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:

@@ -363,3 +363,44 @@ describe('explorer 404 (seen live: token 28/28 "Not found" on every page-1 reque
     expect(b.some((l) => l.includes('27 token lists done this run, 1 left'))).toBe(true);
   });
 });
+
+describe('reads after history is complete (the 41-minute full sweep of 55,070 wallets)', () => {
+  it('wallets never seen on a venue are not read there; their sensor says why', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-skip-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    const second = fakeChain({ head: HEAD + 10 });
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: second.client, store, full: true });
+    expect(snap.discovery.backfillComplete).toBe(true);
+    // the Tydro-only borrower is still read on Tydro and classified the same
+    expect(decodeSnapshot(snap).ships.find((s) => s.address === U.borrower)?.primary).toBe('KBTC-CORE');
+    // …but no Nado health calls were spent on the Tydro-only wallets (borrower, saver, gone) — only on Nado accounts
+    const { readBooksMany } = await import('@aegis/ink-io');
+    const probe = fakeChain({ head: HEAD + 10 });
+    const r = await readBooksMany(probe.client, {
+      addresses: [U.borrower],
+      tydroTokens: new Map([[U.borrower, new Set([2, 11])]]),
+      nadoSubs: new Map(),
+      nadoOnlyKnown: true,
+      tydroOnlyKnown: true,
+    });
+    const b = r.books.get(U.borrower)!;
+    expect(b.nado.status).toBe('OK');
+    expect(b.nado.status === 'OK' && b.nado.data.notes[0]).toMatch(/never deposited to Nado/);
+    const q = await readBooksMany(probe.client, { addresses: [U.carry], nadoSubs: new Map([[U.carry, []]]), tydroTokens: new Map(), tydroOnlyKnown: true, nadoOnlyKnown: false });
+    const c = q.books.get(U.carry)!;
+    expect(c.tydro.status === 'OK' && c.tydro.data.notes[0]).toMatch(/never held a Tydro token/);
+  });
+
+  it('a full sweep that runs out of time is retried by the next run', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-fulldue-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    const logs: string[] = [];
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 5 }).client, store, full: true, budgetMs: 0, log: (m) => logs.push(m) });
+    expect(logs.some((l) => l.includes('the next run tries the full sweep again'))).toBe(true);
+    const next = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 9 }).client, store });
+    expect(next.sweep.kind).toBe('full');
+    expect(next.coverage).toBeDefined();
+  });
+});
