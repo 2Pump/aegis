@@ -17,11 +17,17 @@ export interface WellShip extends ShipLite {
   href: string;
   /** freshness line for the tooltip, e.g. "read 12 s ago (live)" */
   meta?: string;
+  /** which venues this book is on (census ships); unknown for hulls opened this session */
+  venues?: { tydro: boolean; nado: boolean };
 }
+
+/** Above this many wounded ships in view, only the bigger ones pulse — hundreds of rings read as one red blob. */
+const PULSE_ALL_MAX = 250;
+const BIG_BANDS = new Set(['1–10k', '10–100k', '100k+']);
 
 const BAND_ORDER = ['100k+', '10–100k', '1–10k', '<1k', 'dust'];
 
-export function Well({ ships, onOpen }: { ships: WellShip[]; onOpen: (href: string) => void }) {
+export function Well({ ships, onOpen, found = null }: { ships: WellShip[]; onOpen: (href: string) => void; found?: string | null }) {
   const base = useRef<HTMLCanvasElement>(null);
   const over = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0, dpr: 1 });
@@ -30,6 +36,9 @@ export function Well({ ships, onOpen }: { ships: WellShip[]; onOpen: (href: stri
   const [hover, setHover] = useState<{ s: PlacedShip & WellShip; x: number; y: number } | null>(null);
   const hoverRef = useRef<PlacedShip | null>(null);
   hoverRef.current = hover?.s ?? null;
+  const foundShip = useMemo(() => (found ? placed.find((s) => s.address === found) ?? null : null), [placed, found]);
+  const foundRef = useRef<PlacedShip | null>(null);
+  foundRef.current = foundShip;
 
   // track size
   useEffect(() => {
@@ -64,11 +73,14 @@ export function Well({ ships, onOpen }: { ships: WellShip[]; onOpen: (href: stri
     if (!ctx) return;
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let raf = 0;
+    const pulseAll = placed.filter((s) => s.pulse).length <= PULSE_ALL_MAX;
     const frame = (t: number) => {
       const now = Date.now();
-      const animated = placed.filter((s) => s.pulse || (s.flashAt !== undefined && now - s.flashAt < 6000));
+      const animated = placed
+        .filter((s) => s.pulse || (s.flashAt !== undefined && now - s.flashAt < 6000))
+        .map((s) => (s.pulse && !pulseAll && !BIG_BANDS.has(s.band) ? { ...s, pulse: false } : s));
       ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
-      drawWellOverlay(ctx, size.w, size.h, animated, reduce ? 0 : t, now, hoverRef.current);
+      drawWellOverlay(ctx, size.w, size.h, animated, reduce ? 0 : t, now, hoverRef.current, foundRef.current);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

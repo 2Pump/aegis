@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CensusShip } from '@aegis/census';
 import { COPY, shipLiteFromPose } from '@aegis/glyphs';
 import { ActivityTape, CensusStatusLine, LivePanel, MixBar, WoundedTape, blocksAgo, mixOf } from '../components/CensusBits';
 import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
+import { WellFilters } from '../components/WellFilters';
+import { applyFilter, filterFromParams, filterToParams, type PoseKey, type WellFilter } from '../lib/wellFilter';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
 import { useHullCache, useNow } from '../lib/hulls';
@@ -31,6 +33,7 @@ export function Home() {
       href: `/hull/${s.address}`,
       meta: `read ${blocksAgo(s.readBlock, head)}${snap && s.readBlock > snap.block ? ' · live' : ''}`,
       flashAt: lw.flashes.get(s.address),
+      venues: s.venues,
     });
     for (const s of lw.ships) if (s.primary !== 'EMPTY') out.set(s.address, fromCensus(s));
     // hulls this viewer opened: ringed, and their fresher hull-page reading wins
@@ -41,6 +44,24 @@ export function Home() {
     return [...out.values()];
     // lw.stats.reads changes whenever the live layer updates a ship
   }, [lw.ships, lw.flashes, lw.stats.reads, cache, head, snap]);
+
+  const [params, setParams] = useSearchParams();
+  const filter = useMemo(() => filterFromParams(params), [params]);
+  const setFilter = (f: WellFilter) => setParams(filterToParams(f), { replace: true });
+  const counts = useMemo(() => {
+    const m = new Map<PoseKey, number>();
+    for (const s of ships) m.set(s.primary ?? 'NONE', (m.get(s.primary ?? 'NONE') ?? 0) + 1);
+    return m;
+  }, [ships]);
+  const shown = useMemo(() => {
+    const f = applyFilter(ships, filter);
+    // the ship you searched for is always drawn, even if a filter would hide it
+    if (filter.find && !f.some((s) => s.address === filter.find)) {
+      const hit = ships.find((s) => s.address === filter.find);
+      if (hit) f.push(hit);
+    }
+    return f;
+  }, [ships, filter]);
 
   const sessionList = [...cache.entries()];
 
@@ -100,7 +121,8 @@ export function Home() {
               <CensusStatusLine snap={snap} stats={lw.stats} now={now} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
               {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
               {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
-              {ships.length > 0 ? <Well ships={ships} onOpen={(href) => nav(href)} /> : null}
+              {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
+              {ships.length > 0 ? <Well ships={shown} found={filter.find || null} onOpen={(href) => nav(href)} /> : null}
               <MixBar mix={mixOf(lw.ships)} label={COPY.censusFull} />
             </div>
           </Panel>

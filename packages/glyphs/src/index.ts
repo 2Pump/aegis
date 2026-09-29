@@ -247,10 +247,33 @@ export function drawWellOverlay(
   t: number,
   now: number,
   hover: PlacedShip | null,
+  /** "find my ship": crosshair + double ring, so one dot is findable among thousands */
+  found: PlacedShip | null = null,
 ): void {
   const v = wellView(w, h);
   const k = dotScale(v);
   ctx.clearRect(0, 0, w, h);
+  if (found) {
+    const [x, y] = shipXY(found, v);
+    ctx.strokeStyle = 'rgba(229,249,247,0.35)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.moveTo(v.cx - v.R, y);
+    ctx.lineTo(v.cx + v.R, y);
+    ctx.moveTo(x, v.cy - v.R);
+    ctx.lineTo(x, v.cy + v.R);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const p = 0.5 + 0.5 * Math.sin(t / 300);
+    for (const [rad, a] of [[10 + p * 4, 0.95], [18 + p * 6, 0.5]] as const) {
+      ctx.strokeStyle = `rgba(229,249,247,${a})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
   for (const s of animated) {
     const [x, y] = shipXY(s, v);
     if (s.pulse) {
