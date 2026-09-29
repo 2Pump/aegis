@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { classify, type Book } from '@aegis/pose';
 import { buildGrid, hitTest, hullSigilSvg, placeShips, shipLiteFromPose, shipXY, sizeBand, summaryText, wellView, type ShipLite } from '../src/index.js';
+import { tagColor } from '../src/index.js';
 import carry from '../../../fixtures/carry.json';
 import wounded from '../../../fixtures/wounded.json';
 
@@ -18,6 +19,12 @@ describe('glyphs', () => {
     const [n, w] = placeShips([shipLiteFromPose(carry.address, pc), shipLiteFromPose(wounded.address, pw)]);
     expect(w!.r).toBeLessThan(n!.r);
     expect(w!.pulse).toBe(true);
+  });
+  it('a wounded ship keeps its pose color and gets a red ring instead', () => {
+    const [, w] = placeShips([shipLiteFromPose(carry.address, pc), shipLiteFromPose(wounded.address, pw)]);
+    expect(pw.primary).toBe('CARRY'); // fixture: CARRY + WOUNDED
+    expect(w!.color).toBe(tagColor('CARRY'));
+    expect(w!.wounded).toBe(true);
   });
   it('two addresses → two different sigils', () => {
     expect(hullSigilSvg(carry.address, pc)).not.toBe(hullSigilSvg(wounded.address, pc));

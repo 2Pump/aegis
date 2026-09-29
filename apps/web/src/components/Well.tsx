@@ -143,7 +143,11 @@ export function Well({ ships, onOpen, found = null }: { ships: WellShip[]; onOpe
             {t}
           </span>
         ))}
-        <span className="faint">· inner ring = closer to liquidation · dot size = size band</span>
+        <span>
+          <i style={{ background: 'transparent', border: '2px solid #FF4D4D' }} />
+          red ring = wounded
+        </span>
+        <span className="faint">· dot color = main pose · inner ring = closer to liquidation · dot size = size band</span>
       </div>
       <details className="ship-list">
         <summary className="mono dim" style={{ fontSize: 12, cursor: 'pointer' }}>

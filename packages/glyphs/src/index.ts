@@ -78,6 +78,8 @@ export interface PlacedShip extends ShipLite {
   color: string;
   hollow: boolean;
   pulse: boolean;
+  /** near liquidation: drawn with a red ring around its pose color */
+  wounded: boolean;
 }
 
 /** Risk → radius. WOUNDED falls inward. DARK drifts at the rim. */
@@ -101,9 +103,12 @@ export function placeShip(s: ShipLite): PlacedShip {
     r: lo + (hi - lo) * unit(h2),
     angle: unit(h1) * Math.PI * 2,
     sizePx: BAND_PX[s.band],
-    color: wounded ? TAG_COLORS.WOUNDED! : tagColor(s.primary),
+    // the dot keeps its POSE color; being wounded is shown as a red ring (static) + pulse (animated),
+    // so a wounded CARRY and a wounded LOCKED look different at a glance
+    color: tagColor(s.primary),
     hollow: s.primary === 'DARK' || s.primary === 'EMPTY',
     pulse: wounded,
+    wounded,
   };
 }
 
@@ -227,6 +232,13 @@ export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: numb
     } else {
       ctx.fillStyle = s.color;
       ctx.fill();
+    }
+    if (s.wounded) {
+      ctx.strokeStyle = hexA(TAG_COLORS.WOUNDED!, 0.95);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, px / 2 + 2.5, 0, Math.PI * 2);
+      ctx.stroke();
     }
     if (s.focused) {
       ctx.strokeStyle = '#E5F9F7';

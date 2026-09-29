@@ -50,6 +50,8 @@ export function WellFilters({
   };
 
   const found = filter.find ? all.find((s) => s.address === filter.find) : undefined;
+  // every ship near liquidation, whatever its main pose (the chip above counts only main-pose WOUNDED)
+  const woundedCount = all.reduce((n, s) => n + (s.tags.includes('WOUNDED') ? 1 : 0), 0);
 
   return (
     <div className="stack well-filters" style={{ gap: 8 }} data-testid="well-filters">
@@ -67,7 +69,7 @@ export function WellFilters({
               style={{ borderColor: on ? color : undefined }}
             >
               <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
-              {p === 'NONE' ? 'NO RULE' : p}
+              {p === 'NONE' ? 'NO RULE' : p === 'WOUNDED' ? 'WOUNDED (main pose)' : p}
               <span className="faint"> {(counts.get(p) ?? 0).toLocaleString('en-US')}</span>
             </button>
           );
@@ -86,7 +88,7 @@ export function WellFilters({
         </select>
         <label className="toggle">
           <input type="checkbox" checked={filter.woundedOnly} onChange={(e) => onChange({ ...filter, woundedOnly: e.target.checked })} />
-          wounded only
+          wounded only <span className="faint">({woundedCount.toLocaleString('en-US')})</span>
         </label>
         <form className="find" onSubmit={submitFind}>
           <input
