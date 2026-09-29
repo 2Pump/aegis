@@ -7,6 +7,7 @@ import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
 import { WellFilters } from '../components/WellFilters';
+import { WellLegacy } from '../components/WellLegacy';
 import { applyFilter, filterFromParams, filterToParams, type PoseKey, type WellFilter } from '../lib/wellFilter';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
@@ -47,7 +48,10 @@ export function Home() {
 
   const [params, setParams] = useSearchParams();
   const filter = useMemo(() => filterFromParams(params), [params]);
-  const setFilter = (f: WellFilter) => setParams(filterToParams(f), { replace: true });
+  // ?well=legacy keeps the pre-WELL GLASS well for one release, so the two can be diffed
+  const legacy = params.get('well') === 'legacy';
+  const setFilter = (f: WellFilter) => setParams({ ...filterToParams(f), ...(legacy ? { well: 'legacy' } : {}) }, { replace: true });
+  const resetKey = useMemo(() => JSON.stringify({ ...filter, find: '' }), [filter]);
   const counts = useMemo(() => {
     const m = new Map<PoseKey, number>();
     for (const s of ships) m.set(s.primary ?? 'NONE', (m.get(s.primary ?? 'NONE') ?? 0) + 1);
@@ -122,7 +126,13 @@ export function Home() {
               {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
               {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
               {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
-              {ships.length > 0 ? <Well ships={shown} found={filter.find || null} onOpen={(href) => nav(href)} /> : null}
+              {ships.length > 0 ? (
+                legacy ? (
+                  <WellLegacy ships={shown} found={filter.find || null} onOpen={(href) => nav(href)} />
+                ) : (
+                  <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} />
+                )
+              ) : null}
               <MixBar mix={mixOf(lw.ships)} label={COPY.censusFull} />
             </div>
           </Panel>

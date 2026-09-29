@@ -59,26 +59,39 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
   );
 }
 
+/** Telemetry strip: what the well is showing, how old it is, and whether the live layer is watching. */
 export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: CensusSnapshot | null; stats: LiveStats; now: number; live: boolean; onToggle: () => void }) {
+  const cell = (k: string, v: React.ReactNode, style?: React.CSSProperties) => (
+    <div className="tele-cell" style={style}>
+      {k} <b>{v}</b>
+    </div>
+  );
   return (
-    <div className="statline" data-testid="census-status">
+    <div className="tele" data-testid="census-status">
       {snap ? (
         <>
-          <span>census <b>{snap.counts.drawn.toLocaleString('en-US')}</b> ships of <b>{snap.counts.known.toLocaleString('en-US')}</b> known wallets</span>
-          <span>snapshot block <b>{snap.block.toLocaleString('en-US')}</b> · {fmtAge(Date.parse(snap.generatedAt), now)} ago · {snap.sweep.kind}</span>
-          {!snap.discovery.backfillComplete ? <span style={{ color: 'var(--amber)' }}>history backfill in progress</span> : null}
+          {cell('SNAP', snap.block.toLocaleString('en-US'))}
+          {cell('AGE', fmtAge(Date.parse(snap.generatedAt), now).toUpperCase())}
+          {cell('SWEEP', snap.sweep.kind === 'full' ? 'FULL' : 'INCR')}
+          {cell('N', snap.counts.drawn.toLocaleString('en-US'))}
+          {cell('KNOWN', snap.counts.known.toLocaleString('en-US'))}
+          {cell('RULES', snap.rulesVersion.toUpperCase())}
+          {!snap.discovery.backfillComplete ? <div className="tele-cell amber">HISTORY BACKFILL IN PROGRESS</div> : null}
         </>
       ) : (
-        <span>no census snapshot — live layer only</span>
+        <div className="tele-cell">NO CENSUS SNAPSHOT · LIVE LAYER ONLY</div>
       )}
-      <span>
-        <i className={`live-dot${stats.running ? '' : ' off'}`} />
-        {stats.running ? 'LIVE' : 'PAUSED'} {stats.cursor ? <>at block <b>{stats.cursor.toLocaleString('en-US')}</b></> : null}
-        {stats.lagBlocks !== null ? ` · lag ${stats.lagBlocks}` : ''}
-      </span>
-      <button className="pill-btn" style={{ padding: '3px 10px', fontSize: 10 }} onClick={onToggle} data-testid="live-toggle">
-        {live ? 'Pause live' : 'Resume live'}
-      </button>
+      <div className={`tele-live${stats.running ? '' : ' off'}`}>
+        <i aria-hidden />
+        <span>
+          {stats.running ? 'LIVE' : 'PAUSED'}
+          {stats.cursor ? <> <b>{stats.cursor.toLocaleString('en-US')}</b></> : null}
+          {stats.lagBlocks !== null ? <> · LAG <b>{stats.lagBlocks}</b></> : null}
+        </span>
+        <button className="sq-btn" onClick={onToggle} data-testid="live-toggle" aria-pressed={!live}>
+          {live ? 'PAUSE' : 'RESUME'}
+        </button>
+      </div>
     </div>
   );
 }

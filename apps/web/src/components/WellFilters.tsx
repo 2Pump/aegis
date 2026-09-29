@@ -66,7 +66,7 @@ export function WellFilters({
               className={`chip-btn${on ? ' on' : ''}`}
               aria-pressed={on}
               onClick={() => togglePose(p)}
-              style={{ borderColor: on ? color : undefined }}
+              style={{ ['--chip' as string]: color }}
             >
               <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
               {p === 'NONE' ? 'NO RULE' : p === 'WOUNDED' ? 'WOUNDED (main pose)' : p}
