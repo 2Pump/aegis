@@ -23,6 +23,8 @@ export interface SeedResult {
   failedTokens: number[];
   /** tokens whose holder list WAS fully read — lets the caller resume with the rest next run */
   done: number[];
+  /** tokens the explorer answered 404 for (usually: never had a holder). The caller checks totalSupply on-chain. */
+  notFound: number[];
 }
 
 export async function seedTydroHolders(o: {
@@ -40,6 +42,7 @@ export async function seedTydroHolders(o: {
   const users = new Map<string, Set<number>>();
   const failedTokens: number[] = [];
   const done: number[] = [];
+  const notFound: number[] = [];
   let pages = 0;
 
   for (const ti of o.tokens ?? TYDRO_TOKENS.map((_, i) => i)) {
@@ -56,6 +59,13 @@ export async function seedTydroHolders(o: {
       const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)] as [string, string])).toString();
       const url = `${base}/tokens/${token}/holders${qs ? `?${qs}` : ''}`;
       let r = await getJson(url, undefined, { fetch: o.fetch, timeoutMs: 20_000 });
+      // 404 "Not found" on the first page = the explorer has no holder list for this token (it never had a holder).
+      // Retrying won't change that; hand it back so the caller can confirm on-chain.
+      if (!r.ok && tokenPages === 0 && /HTTP 404/.test(r.error.message)) {
+        notFound.push(ti);
+        ok = false;
+        break;
+      }
       for (let attempt = 1; !r.ok && attempt <= 6; attempt++) {
         const wait = r.error.retryAfterS ? r.error.retryAfterS * 1000 : backoffMs(attempt, o.backoffBaseMs);
         o.onRetry?.(`explorer ${r.error.code} on token ${ti + 1}/28 page ${tokenPages + 1} — waiting ${Math.round(wait / 1000)}s (${r.error.message})`);
@@ -80,9 +90,10 @@ export async function seedTydroHolders(o: {
       params = page.next_page_params && Object.keys(page.next_page_params).length ? page.next_page_params : null;
       if (params && (o.pageDelayMs ?? 120) > 0) await sleep(o.pageDelayMs ?? 120);
     }
-    if (!ok) failedTokens.push(ti);
-    else done.push(ti);
+    if (!ok) {
+      if (!notFound.includes(ti)) failedTokens.push(ti);
+    } else done.push(ti);
     if (ok || tokenPages > 0) o.onToken?.(ti, holders, tokenPages);
   }
-  return { users, pages, failedTokens, done };
+  return { users, pages, failedTokens, done, notFound };
 }

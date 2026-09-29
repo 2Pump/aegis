@@ -1,6 +1,7 @@
 import {
   NADO_START_BLOCK,
   TYDRO_START_BLOCK,
+  TYDRO_TOKENS,
   decodeNadoSubaccounts,
   decodeTydroTransfers,
   nadoSubaccount,
@@ -278,8 +279,26 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     });
     const before = Object.keys(state.tydro.users).length;
     for (const [addr, idxs] of seed.users) addTydro(addr, idxs, false);
-    const left = todo.filter((t) => !seed.done.includes(t));
-    const stalls = seed.done.length === 0 ? (h.stalls ?? 0) + 1 : 0;
+    // explorer 404 = no holder list. Confirm on-chain: a token with totalSupply 0 has no holders, so it is done.
+    const emptyOnChain: number[] = [];
+    for (const ti of seed.notFound) {
+      try {
+        const supply = (await client.readContract({
+          address: TYDRO_TOKENS[ti]!,
+          abi: [{ type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }] as const,
+          functionName: 'totalSupply',
+          blockNumber: BigInt(head),
+        })) as bigint;
+        if (supply === 0n) {
+          emptyOnChain.push(ti);
+          log(`tydro seed: token ${ti + 1}/28 — explorer has no holder list, and on-chain totalSupply is 0: nobody holds it (done)`);
+        } else log(`tydro seed: token ${ti + 1}/28 — explorer has no holder list but totalSupply is ${supply} — will retry`);
+      } catch (e) {
+        log(`tydro seed: token ${ti + 1}/28 — explorer 404 and totalSupply unreadable (${String(e).slice(0, 120)}) — will retry`);
+      }
+    }
+    const left = todo.filter((t) => !seed.done.includes(t) && !emptyOnChain.includes(t));
+    const stalls = seed.done.length + emptyOnChain.length === 0 ? (h.stalls ?? 0) + 1 : 0;
     if (left.length === 0) {
       state.tydro.history = { done: true };
       state.tydro.seededFromExplorerAt = head;

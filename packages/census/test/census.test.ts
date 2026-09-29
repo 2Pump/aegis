@@ -336,3 +336,29 @@ describe('history backfill (the 10% coverage found on 2026-09-28)', () => {
     expect(decodeSnapshot(snap).ships.find((s) => s.address === U.borrower)?.primary).toBe('KBTC-CORE');
   }, 60_000);
 });
+
+describe('explorer 404 (seen live: token 28/28 "Not found" on every page-1 request)', () => {
+  it('a token the explorer 404s is confirmed on-chain: totalSupply 0 → done; totalSupply > 0 → retried next run', async () => {
+    const { TYDRO_TOKENS } = await import('@aegis/ink-io');
+    const empty = TYDRO_TOKENS[27]!.toLowerCase(); // fake chain: totalSupply 0
+    const aKbtc = TYDRO_TOKENS[2]!.toLowerCase(); // fake chain: totalSupply > 0
+    const make = (notFound: string[]) => async (url: string) => {
+      const token = url.split('/tokens/')[1]!.split('/')[0]!.toLowerCase();
+      if (notFound.includes(token)) return new Response('{"message":"Not found"}', { status: 404, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ items: [], next_page_params: null }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const run = async (dir: string, nf: string[]) => {
+      const logs: string[] = [];
+      await runCensus({ scanPaceMs: 0, client: fakeChain({ head: HEAD }).client, store: fileStore(dir), explorer: { fetch: make(nf), pageDelayMs: 0, backoffBaseMs: 1 }, log: (m) => logs.push(m) });
+      return logs;
+    };
+    const a = await run(mkdtempSync(join(tmpdir(), 'aegis-404a-')), [empty]);
+    expect(a.some((l) => l.includes('token 28/28 — explorer has no holder list, and on-chain totalSupply is 0'))).toBe(true);
+    expect(a.some((l) => l.startsWith('tydro seed complete'))).toBe(true);
+    expect(a.some((l) => /VENUE_TIMEOUT on token 28/.test(l))).toBe(false); // no pointless retries
+
+    const b = await run(mkdtempSync(join(tmpdir(), 'aegis-404b-')), [aKbtc]);
+    expect(b.some((l) => l.includes('token 3/28 — explorer has no holder list but totalSupply is'))).toBe(true);
+    expect(b.some((l) => l.includes('27 token lists done this run, 1 left'))).toBe(true);
+  });
+});
