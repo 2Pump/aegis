@@ -1,0 +1,36 @@
+{
+  "address": "0x0B3fadeF84ea8877cA3C898133b4056950b75eC5",
+  "at": "2026-09-29T00:47:11.329Z",
+  "block": null,
+  "rpc": "https://rpc-gel.inkonchain.com",
+  "nado": "ink-chain:FQuerier",
+  "rulesVersion": "v1.1.0",
+  "pose": {
+    "tags": [
+      "DARK"
+    ],
+    "hullTemp": "UNKNOWN",
+    "reasons": [
+      "DARK · both sensors unreadable — positional rules (CARRY, NAKED, …) not evaluated"
+    ]
+  },
+  "checks": [
+    {
+      "id": "tydro.sensor",
+      "what": "Tydro sensor readable",
+      "aegis": "DARK",
+      "other": "PARSE_FAIL: getUserAccountData failed: Cannot decode zero data (\"0x\") with ABI parameters.",
+      "source": "self",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "nado.sensor",
+      "what": "Nado sensor readable",
+      "aegis": "DARK",
+      "other": "RPC_DEAD: Nado on-chain read (Ink RPC): Cannot decode zero data (\"0x\") with ABI parameters.",
+      "source": "self",
+      "verdict": "FAIL"
+    }
+  ],
+  "provenVenues": []
+}

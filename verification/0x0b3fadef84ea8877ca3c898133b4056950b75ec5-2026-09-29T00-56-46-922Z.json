@@ -1,0 +1,176 @@
+{
+  "address": "0x0B3fadeF84ea8877cA3C898133b4056950b75eC5",
+  "at": "2026-09-29T00:56:46.923Z",
+  "block": 57144948,
+  "rpc": "https://rpc-gel.inkonchain.com",
+  "nado": "ink-chain:FQuerier",
+  "rulesVersion": "v1.1.0",
+  "pose": {
+    "tags": [
+      "KBTC-CORE",
+      "LOCKED"
+    ],
+    "hullTemp": "ELEVATED",
+    "reasons": [
+      "KBTC-CORE · kBTC $3,293,102 = 100.0% of total margin $3,293,102 (≥ 35%)",
+      "LOCKED · Tydro supplies $3,293,102 > $50.00, no Nado perps, no Nado risk spots"
+    ]
+  },
+  "checks": [
+    {
+      "id": "tydro.sensor",
+      "what": "Tydro sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.sensor",
+      "what": "Nado sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.supply.kBTC",
+      "what": "Tydro kBTC supplied",
+      "aegis": "39.52984379",
+      "other": "39.52984379",
+      "source": "DataProvider",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.debt.USDT0",
+      "what": "Tydro USDT0 borrowed",
+      "aegis": "75,276.051561",
+      "other": "75,276.051561",
+      "source": "DataProvider",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.debt.USDC",
+      "what": "Tydro USDC borrowed",
+      "aegis": "1,976,100.27168",
+      "other": "1,976,100.27168",
+      "source": "DataProvider",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.hf.recompute",
+      "what": "Tydro HF (Pool) vs Σ(coll×LT)/debt",
+      "aegis": "1.3966",
+      "other": "1.3966",
+      "source": "recomputed",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.debt.total",
+      "what": "Tydro Σ debt legs vs Pool totalDebt",
+      "aegis": "2,051,340.21",
+      "other": "2,051,340.21",
+      "source": "Pool",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.notes",
+      "what": "Tydro registry notes",
+      "aegis": "none",
+      "other": "—",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "blockscout.kBTC.supplied",
+      "what": "Blockscout kBTC supplied (indexer lags)",
+      "aegis": "39.529844",
+      "other": "39.529844",
+      "source": "Blockscout",
+      "verdict": "PASS"
+    },
+    {
+      "id": "blockscout.USDT0.borrowed",
+      "what": "Blockscout USDT0 borrowed (indexer lags)",
+      "aegis": "75,276.051561",
+      "other": "75,276.026256",
+      "source": "Blockscout",
+      "verdict": "PASS"
+    },
+    {
+      "id": "blockscout.USDC.borrowed",
+      "what": "Blockscout USDC borrowed (indexer lags)",
+      "aegis": "1,976,100.27168",
+      "other": "1,976,099.482142",
+      "source": "Blockscout",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.health.index",
+      "what": "Nado healths[2] ≈ computed equity",
+      "aegis": "0",
+      "other": "0",
+      "source": "Nado API",
+      "verdict": "SKIP"
+    },
+    {
+      "id": "nado.discovery",
+      "what": "Nado subaccount discovery (archive)",
+      "aegis": "1 subaccount(s)",
+      "other": "ok",
+      "source": "Nado archive",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.hf",
+      "what": "Tydro · Health Factor",
+      "aegis": "1.396647",
+      "other": "1.39",
+      "source": "official UI",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.assets",
+      "what": "Tydro · Assets (USD)",
+      "aegis": "3,293,102.083317",
+      "other": "3293102.08",
+      "source": "official UI",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.liabilities",
+      "what": "Tydro · Liabilities (USD)",
+      "aegis": "2,051,340.214122",
+      "other": "2051339.40",
+      "source": "official UI",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.supply.kBTC",
+      "what": "Tydro · Assets · kBTC Amount",
+      "aegis": "39.529844",
+      "other": "39.5298",
+      "source": "official UI",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.debt.USDT0",
+      "what": "Tydro · Liabilities · USDT0 Amount",
+      "aegis": "75,276.051561",
+      "other": "75276.03",
+      "source": "official UI",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.debt.USDC",
+      "what": "Tydro · Liabilities · USDC Amount",
+      "aegis": "1,976,100.27168",
+      "other": "1976099.48",
+      "source": "official UI",
+      "verdict": "PASS"
+    }
+  ],
+  "provenVenues": [
+    "tydro"
+  ]
+}
