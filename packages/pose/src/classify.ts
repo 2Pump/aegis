@@ -57,6 +57,20 @@ export function correlatedLoopFamily(t: TydroBook | null, dustUsd: number = RULE
   return fams.size === 1 ? [...fams][0]! : null;
 }
 
+/**
+ * Same-family Nado loop: no perps, some borrowing, and every spot leg (≥ dust) in ONE family — e.g. USDC deposited,
+ * USDT0 borrowed. Like the Tydro loop, only a depeg (or interest slowly eating the buffer) can liquidate it.
+ * An unknown product becomes its own family, so it can never make a book look safer than it is.
+ */
+export function correlatedNadoFamily(n: NadoBook | null, dustUsd: number = RULES.DUST_USD): string | null {
+  if (!n) return null;
+  if (n.perps.some((p) => Math.abs(p.notionalUsd) >= dustUsd)) return null;
+  const legs = n.spots.filter((s) => Math.abs(s.usd) >= dustUsd);
+  if (!legs.some((s) => s.usd < 0)) return null;
+  const fams = new Set(legs.map((s) => s.family));
+  return fams.size === 1 ? [...fams][0]! : null;
+}
+
 /* ────────────────────────────── family table ────────────────────────────── */
 
 interface Acc {
@@ -127,9 +141,15 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
       woundReasons.push(`WOUNDED · Tydro liquidation distance ${pct(liq)} < ${pct(cfg.LIQ_DISTANCE_CRIT, 0)}`);
     }
   }
-  if (buf !== null && buf < cfg.NADO_BUFFER_CRIT) {
+  const nCorr = correlatedNadoFamily(n, cfg.DUST_USD);
+  const nadoLine = nCorr !== null ? cfg.NADO_BUFFER_CRIT_CORRELATED : cfg.NADO_BUFFER_CRIT;
+  if (buf !== null && buf < nadoLine) {
     woundNado = true;
-    woundReasons.push(`WOUNDED · Nado maintenance buffer ${pct(buf)} < ${pct(cfg.NADO_BUFFER_CRIT, 0)}`);
+    woundReasons.push(
+      nCorr !== null
+        ? `WOUNDED · Nado maintenance buffer ${pct(buf)} < ${pct(nadoLine, 0)} on a same-family ${nCorr} loop (only a depeg or accrued interest can liquidate it)`
+        : `WOUNDED · Nado maintenance buffer ${pct(buf)} < ${pct(nadoLine, 0)}`,
+    );
   }
   const wounded = woundReasons.length > 0;
 
@@ -172,6 +192,7 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
   const metrics: PoseMetrics = {
     S, P, L, E, hf, nadoBuffer: buf, eq, kb, st, totalMarginUsd, nadoCollateralUsd, grossPerpUsd, grossUsd, families,
     correlatedFamily: corr,
+    correlatedNadoFamily: nCorr,
     wound: { tydro: woundTydro, nado: woundNado },
   };
   const liqDistanceBps = liq === null ? null : Math.round(liq * 10_000);
@@ -255,6 +276,7 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
   }
 
   reasons.push(...woundReasons);
+  if (nCorr !== null) reasons.push(`NOTE · same-family ${nCorr} loop on Nado — judged by the depeg line buffer ${pct(cfg.NADO_BUFFER_CRIT_CORRELATED, 0)} (warn ${pct(cfg.NADO_BUFFER_WARN_CORRELATED, 0)}), not ${pct(cfg.NADO_BUFFER_CRIT, 0)}`);
   if (corr !== null) reasons.push(`NOTE · same-family ${corr} loop on Tydro — judged by the depeg line HF ${cfg.WOUNDED_HF_CORRELATED} (warn ${cfg.ELEVATED_HF_CORRELATED}), not ${cfg.WOUNDED_HF}`);
 
   const primary: Tag | null = PRIMARY_PRIORITY.find((tag) => fired.has(tag)) ?? (wounded ? 'WOUNDED' : null);
@@ -266,7 +288,7 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
 
   let hullTemp: HullTemp = 'NOMINAL';
   if (wounded) hullTemp = 'CRITICAL';
-  else if ((hf !== null && hf < (corr !== null ? cfg.ELEVATED_HF_CORRELATED : cfg.ELEVATED_HF)) || (buf !== null && buf < cfg.NADO_BUFFER_WARN)) hullTemp = 'ELEVATED';
+  else if ((hf !== null && hf < (corr !== null ? cfg.ELEVATED_HF_CORRELATED : cfg.ELEVATED_HF)) || (buf !== null && buf < (nCorr !== null ? cfg.NADO_BUFFER_WARN_CORRELATED : cfg.NADO_BUFFER_WARN))) hullTemp = 'ELEVATED';
 
   const residualDeltaUsd = sum(families.map((f) => f.residualUsd));
   const exposure = sum(families.map((f) => Math.abs(f.S) + f.L + f.P));

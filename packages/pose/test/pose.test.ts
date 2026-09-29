@@ -222,3 +222,47 @@ describe('v1.1 HOLD', () => {
     expect(classify(nadoSpotBook([['USDT0', 'USD', 'STABLE', 5_000], ['WETH', 'ETH', 'CRYPTO', 200]])).primary).toBe('STABLE-BALLAST');
   });
 });
+
+describe('v1.2 same-family Nado loops (from two real wounded wallets, 2026-09-29)', () => {
+  function nadoBook(spots: Array<[string, string, Leg['assetClass'], number]>, buffer: number, perpUsd = 0): Book {
+    const x = structuredClone(b(emptyFx));
+    if (x.nado.status === 'OK') {
+      x.nado.data.spots = spots.map(([symbol, family, assetClass, usd], i): NadoSpot => ({
+        ...leg(symbol, family, assetClass, usd), priceSource: 'NADO_ONCHAIN', productId: i, subaccount: '0xsub',
+      }));
+      x.nado.data.perps = perpUsd
+        ? [{ productId: 2, subaccount: '0xsub', symbol: 'ETH-PERP', family: 'ETH', assetClass: 'CRYPTO', sizeBase: perpUsd / 2600, notionalUsd: perpUsd, priceUsd: 2600, priceSource: 'NADO_ONCHAIN', vQuoteUsd: -perpUsd, unsettledUsd: 0 } as never]
+        : [];
+      const assets = 22_400;
+      x.nado.data.maintenance = { assetsUsd: assets, liabilitiesUsd: 0, healthUsd: assets * buffer };
+      x.nado.data.equityUsd = spots.reduce((s, r) => s + r[3], 0);
+    }
+    return x;
+  }
+  const loop = (buffer: number) => nadoBook([['USDC', 'USD', 'STABLE', 22_650], ['USDT0', 'USD', 'STABLE', -21_967]], buffer);
+
+  it('the real wallet at a 2.0% buffer is still WOUNDED — closer than the 3% depeg line', () => {
+    const p = classify(loop(0.02));
+    expect(p.metrics.correlatedNadoFamily).toBe('USD');
+    expect(p.tags).toContain('WOUNDED');
+    expect(p.metrics.wound).toEqual({ tydro: false, nado: true });
+    expect(p.reasons.find((r) => r.startsWith('WOUNDED ·'))).toMatch(/same-family USD loop/);
+  });
+
+  it('the same loop at a 5% buffer is no longer wounded (was, under the 10% line), and sits in the 8% warn band', () => {
+    const p = classify(loop(0.05));
+    expect(p.tags).not.toContain('WOUNDED');
+    expect(p.hullTemp).toBe('ELEVATED');
+  });
+
+  it('a perp, or an unknown token, means it is not a pure loop → the normal 10% line', () => {
+    expect(classify(nadoBook([['USDC', 'USD', 'STABLE', 22_650], ['USDT0', 'USD', 'STABLE', -21_967]], 0.05, 5_000)).tags).toContain('WOUNDED');
+    const unknown = nadoBook([['USDC', 'USD', 'STABLE', 22_650], ['USDT0', 'USD', 'STABLE', -21_967], ['SPOT#11', 'SPOT#11', 'CRYPTO', 531]], 0.05);
+    expect(classify(unknown).metrics.correlatedNadoFamily).toBeNull();
+    expect(classify(unknown).tags).toContain('WOUNDED');
+  });
+
+  it('no borrowing → not a loop', () => {
+    expect(classify(nadoBook([['USDC', 'USD', 'STABLE', 22_650]], 0.05)).metrics.correlatedNadoFamily).toBeNull();
+  });
+});

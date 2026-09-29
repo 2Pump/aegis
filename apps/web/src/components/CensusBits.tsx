@@ -118,7 +118,9 @@ export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: numbe
 /** Which rule tripped — thresholds only, never the wallet's actual number (no liquidation math on the tape). */
 export function woundText(s: CensusShip): string {
   const t = s.correlatedLoop ? `Tydro HF < ${RULES.WOUNDED_HF_CORRELATED} (same-family loop)` : `Tydro HF < ${RULES.WOUNDED_HF}`;
-  const n = `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
+  const n = s.correlatedNado
+    ? `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT_CORRELATED * 100)}% (same-family loop)`
+    : `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
   if (s.wound.tydro && s.wound.nado) return `${t} + ${n}`;
   if (s.wound.tydro) return t;
   if (s.wound.nado) return n;

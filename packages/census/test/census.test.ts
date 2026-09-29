@@ -25,6 +25,7 @@ describe('snapshot codec', () => {
       woundedSince: 120,
       wound: { tydro: false, nado: true },
       correlatedLoop: true,
+      correlatedNado: false,
       extraSubs: [],
     };
     const back = decodeShip(encodeShip(s));

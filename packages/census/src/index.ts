@@ -16,6 +16,8 @@ export const WATCH = {
   HF: 2.0,
   /** same-family Tydro loops live near HF 1.05 by design; watch them only when close to their own (depeg) line */
   HF_CORRELATED: 1.1,
+  /** same-family Nado loops run on thin buffers by design; watch them only when close to their own line */
+  NADO_BUFFER_CORRELATED: 0.1,
   NADO_BUFFER: 0.5,
 } as const;
 
@@ -38,6 +40,8 @@ export interface CensusShip {
   wound: { tydro: boolean; nado: boolean };
   /** Tydro book is a same-family loop (judged by the depeg line) */
   correlatedLoop: boolean;
+  /** Nado book is a same-family loop (judged by the depeg line) */
+  correlatedNado: boolean;
   /** non-default Nado subaccounts (bytes32) — lets the live layer read isolated positions too */
   extraSubs: string[];
 }
@@ -62,7 +66,7 @@ export interface CensusSnapshot {
 
 export function encodeShip(s: CensusShip): ShipRow {
   const mask = s.tags.reduce((m, t) => m | (1 << TAGS.indexOf(t)), 0);
-  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0) | (s.wound.tydro ? 8 : 0) | (s.wound.nado ? 16 : 0) | (s.correlatedLoop ? 32 : 0);
+  const flags = (s.watch ? 1 : 0) | (s.venues.tydro ? 2 : 0) | (s.venues.nado ? 4 : 0) | (s.wound.tydro ? 8 : 0) | (s.wound.nado ? 16 : 0) | (s.correlatedLoop ? 32 : 0) | (s.correlatedNado ? 64 : 0);
   const row: ShipRow = [
     s.address.toLowerCase(),
     s.primary ? TAGS.indexOf(s.primary) : -1,
@@ -97,6 +101,7 @@ export function decodeShip(r: ShipRow): CensusShip {
     woundedSince: r[7] > 0 ? r[7] : null,
     wound: { tydro: (r[5] & 8) === 8, nado: (r[5] & 16) === 16 },
     correlatedLoop: (r[5] & 32) === 32,
+    correlatedNado: (r[5] & 64) === 64,
     extraSubs: r[8] ?? [],
   };
 }
@@ -107,7 +112,7 @@ export function isWatch(book: Book, pose: Pose): boolean {
   const hf = pose.metrics.hf;
   if (hf !== null && hf < (pose.metrics.correlatedFamily !== null ? WATCH.HF_CORRELATED : WATCH.HF)) return true;
   const b = pose.metrics.nadoBuffer;
-  if (b !== null && b < WATCH.NADO_BUFFER) return true;
+  if (b !== null && b < (pose.metrics.correlatedNadoFamily != null ? WATCH.NADO_BUFFER_CORRELATED : WATCH.NADO_BUFFER)) return true;
   return false;
 }
 
@@ -132,6 +137,7 @@ export function shipFromRead(book: Book, pose: Pose, prev: CensusShip | undefine
     woundedSince: wounded ? (prev?.woundedSince ?? book.asOfBlock ?? 0) : null,
     wound: woundSource(pose),
     correlatedLoop: pose.metrics.correlatedFamily != null,
+    correlatedNado: pose.metrics.correlatedNadoFamily != null,
     extraSubs,
   };
 }

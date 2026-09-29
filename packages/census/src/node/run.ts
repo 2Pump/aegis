@@ -133,7 +133,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     if (!prevShips.has(addr)) {
       prevShips.set(addr, {
         address: addr, primary: 'EMPTY', tags: ['EMPTY'], hullTemp: 'NOMINAL', band: 'dust', watch: false,
-        venues: { tydro: false, nado: false }, readBlock: block, woundedSince: null, wound: { tydro: false, nado: false }, correlatedLoop: false, extraSubs: [],
+        venues: { tydro: false, nado: false }, readBlock: block, woundedSince: null, wound: { tydro: false, nado: false }, correlatedLoop: false, correlatedNado: false, extraSubs: [],
       });
     }
   }

@@ -1,4 +1,4 @@
-# AEGIS — Classification Rules (v1.1.0)
+# AEGIS — Classification Rules (v1.2.0)
 
 > AEGIS is a camera. It cannot move your funds. Classifications can be wrong.
 
@@ -24,7 +24,7 @@ The in-app `/rules` page renders from the same constants (`packages/pose/src/rul
 | `kb` | USD of kBTC (Nado `KBTC` spot + Tydro kBTC supply). SolvBTC is BTC family, not kBTC. |
 | `st` | USD of stables held (USDT0, USDC, USDG, GHO, USDe, sUSDe, syrupUSDT) |
 | `totalMargin` | Positive Nado spot USD + Tydro supply USD |
-| same-family loop | A Tydro book with debt where every supply and every debt (≥ dust) is in **one** asset family, e.g. sUSDe → USDT (USD) or weETH → WETH (ETH). Price moves hit both sides alike, so only a depeg can liquidate it. |
+| same-family loop | A Tydro book with debt where every supply and every debt (≥ dust) is in **one** asset family, e.g. sUSDe → USDT (USD) or weETH → WETH (ETH). **On Nado:** borrowing, no perps, and every spot leg (≥ dust) in one family, e.g. USDC deposited → USDT0 borrowed. Price moves hit both sides alike, so only a depeg (or accrued interest) can liquidate it. An unknown Nado product counts as its own family. |
 
 **Asset families** hedge each other: `BTC` = kBTC, SolvBTC, BTC-PERP · `ETH` = WETH, weETH, wrsETH, ezETH, ETH-PERP ·
 `SPY` = wSPYx, SPY-PERP · `QQQ` = wQQQx, QQQ-PERP · (same for AAPL, NVDA, TSLA, GOOGL, META, MSFT, AMZN) ·
@@ -37,7 +37,7 @@ Unknown symbols become their own family, so an unknown token can never silently 
 |---|---|---|
 | DARK | state | Tydro or Nado sensor failed (RPC dead, timeout, parse fail, rate limit). Positional rules are **not** evaluated — we never guess S or P from half a book. WOUNDED may still attach from the readable sensor. |
 | EMPTY | state | Σ \|USD\| of every leg < `DUST_USD` |
-| WOUNDED | overlay | Tydro: `hf < WOUNDED_HF` OR `(1 − 1/hf) < LIQ_DISTANCE_CRIT` — for a **same-family loop** these two are replaced by `hf < WOUNDED_HF_CORRELATED`. Nado: `nadoBuffer < NADO_BUFFER_CRIT`. |
+| WOUNDED | overlay | Tydro: `hf < WOUNDED_HF` OR `(1 − 1/hf) < LIQ_DISTANCE_CRIT` — for a **same-family loop** these two are replaced by `hf < WOUNDED_HF_CORRELATED`. Nado: `nadoBuffer < NADO_BUFFER_CRIT` — for a **same-family Nado loop**, `nadoBuffer < NADO_BUFFER_CRIT_CORRELATED` instead. |
 | CARRY | primary | ∃ F: `\|S_F − P_F\| / max(S_F, P_F, 1) ≤ CARRY_BAND` AND `min(S_F, P_F) ≥ CARRY_MIN_LEG_USD` |
 | EQUITY-MARGIN | primary / overlay | `eq ≥ EQUITY_MIN_USD` AND `eq / max(nadoCollateral, eq, 1) ≥ EQUITY_SHARE` |
 | NAKED | primary | ∃ F: `(L_F + P_F) ≥ NAKED_MIN_GROSS_USD` AND NOT CARRY_F AND `\|L_F − P_F\| / max(L_F + P_F, 1) > NAKED_IMBALANCE` |
@@ -59,7 +59,7 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 | Temp | Condition | Copy |
 |---|---|---|
 | CRITICAL | WOUNDED | “Liquidation range on at least one venue.” |
-| ELEVATED | `hf < ELEVATED_HF` (same-family loop: `hf < ELEVATED_HF_CORRELATED`) OR `nadoBuffer < NADO_BUFFER_WARN` | “Inside the warn band.” |
+| ELEVATED | `hf < ELEVATED_HF` (same-family loop: `hf < ELEVATED_HF_CORRELATED`) OR `nadoBuffer < NADO_BUFFER_WARN` (same-family Nado loop: `< NADO_BUFFER_WARN_CORRELATED`) | “Inside the warn band.” |
 | UNKNOWN | any sensor DARK (and no readable wound) | “A sensor is dark.” |
 | NOMINAL | otherwise | “Sensors below warn lines.” |
 
@@ -67,14 +67,16 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 | Constant | Value | Used by |
 |---|---|---|
-| `RULES_VERSION` | v1.1.0 | plate footer |
+| `RULES_VERSION` | v1.2.0 | plate footer |
 | `DUST_USD` | 10 | EMPTY, LOCKED |
 | `WOUNDED_HF` | 1.25 | WOUNDED |
 | `NADO_BUFFER_CRIT` | 0.1 | WOUNDED |
 | `LIQ_DISTANCE_CRIT` | 0.08 | WOUNDED |
 | `WOUNDED_HF_CORRELATED` | 1.03 | WOUNDED (same-family loop) |
+| `NADO_BUFFER_CRIT_CORRELATED` | 0.03 | WOUNDED (same-family Nado loop) |
 | `ELEVATED_HF` | 1.5 | hull temp |
 | `ELEVATED_HF_CORRELATED` | 1.08 | hull temp (same-family loop) |
+| `NADO_BUFFER_WARN_CORRELATED` | 0.08 | hull temp (same-family Nado loop) |
 | `NADO_BUFFER_WARN` | 0.25 | hull temp |
 | `LOCKED_MIN_SUPPLY_USD` | 50 | LOCKED |
 | `CARRY_BAND` | 0.15 | CARRY |
@@ -100,4 +102,5 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 ## 6. Changelog
 
+- **v1.2.0 (2026-09-29)** — The same depeg logic now applies to Nado. A Nado book that only holds and borrows one family (e.g. USDC deposited, USDT0 borrowed; no perps) is WOUNDED below a 3% maintenance buffer (warn 8%) instead of 10%. This was found by checking two real wounded wallets (1.7% and 2.0% buffers, which stay wounded) and approved by the project owner.
 - **v1.1.0 (2026-09-28)** — Same-family Tydro loops get their own WOUNDED line (HF 1.03, warn 1.08) instead of 1.25 / 8% distance. New last-priority pose **HOLD** for wallets that simply own non-stable assets (no perps, no debt). Both approved by the project owner.

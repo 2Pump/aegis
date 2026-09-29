@@ -4,7 +4,7 @@
  * packages/pose/test/rules-doc.test.ts. Change a number here → update RULES.md or the test fails.
  */
 export const RULES = {
-  RULES_VERSION: 'v1.1.0',
+  RULES_VERSION: 'v1.2.0',
 
   /** EMPTY: gross |USD| across every leg below this */
   DUST_USD: 10,
@@ -17,11 +17,15 @@ export const RULES = {
   LIQ_DISTANCE_CRIT: 0.08,
   /** WOUNDED for a same-family Tydro loop (only a depeg liquidates it): HF below this. Replaces the two lines above for such loops. */
   WOUNDED_HF_CORRELATED: 1.03,
+  /** WOUNDED for a same-family Nado loop (stables only, no perps): maintenance buffer below this. Replaces NADO_BUFFER_CRIT for such books. */
+  NADO_BUFFER_CRIT_CORRELATED: 0.03,
 
   /** ELEVATED hull: Tydro HF below this */
   ELEVATED_HF: 1.5,
   /** ELEVATED hull for a same-family Tydro loop: HF below this */
   ELEVATED_HF_CORRELATED: 1.08,
+  /** ELEVATED hull for a same-family Nado loop: maintenance buffer below this */
+  NADO_BUFFER_WARN_CORRELATED: 0.08,
   /** ELEVATED hull: Nado maintenance buffer below this */
   NADO_BUFFER_WARN: 0.25,
 

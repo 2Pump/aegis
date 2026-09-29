@@ -174,6 +174,8 @@ export interface PoseMetrics {
   families: FamilyRow[];
   /** Tydro loop where every supply and every debt is one asset family (e.g. USD, ETH) — only a depeg can liquidate it. null = not such a loop. */
   correlatedFamily: string | null;
+  /** Nado book with borrowing and no perps where every spot leg (≥ dust) is one family — only a depeg can liquidate it. null = not such a loop. */
+  correlatedNadoFamily: string | null;
   /** which venue tripped WOUNDED (both false when not wounded) */
   wound: { tydro: boolean; nado: boolean };
 }
