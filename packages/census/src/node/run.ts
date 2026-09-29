@@ -49,6 +49,8 @@ export interface CensusState {
   nado: { accountsScannedTo: number; activityScannedTo: number; subs: Record<string, string[]>; active: string[]; history?: History };
   lastFullBlock: number;
   lastFullAt: string | null;
+  /** wallets read as EMPTY → block of that read. Kept here (addresses only) instead of in census.json, which only carries ships worth drawing */
+  empty?: Record<string, number>;
   /** last full sweep's coverage vs protocol totals — shares only, no dollar figures (this file is public too) */
   coverage?: CoveragePublic;
 }
@@ -122,6 +124,16 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       prevShips = new Map(decodeSnapshot(prevRaw).ships.map((s) => [s.address, s]));
     } catch (e) {
       log(`previous census unreadable, starting clean: ${String(e)}`);
+    }
+  }
+
+  // empty wallets live in known.json, not census.json — bring them back as EMPTY ships for the carry decision
+  for (const [addr, block] of Object.entries(state.empty ?? {})) {
+    if (!prevShips.has(addr)) {
+      prevShips.set(addr, {
+        address: addr, primary: 'EMPTY', tags: ['EMPTY'], hullTemp: 'NOMINAL', band: 'dust', watch: false,
+        venues: { tydro: false, nado: false }, readBlock: block, woundedSince: null, wound: { tydro: false, nado: false }, correlatedLoop: false, extraSubs: [],
+      });
     }
   }
 
@@ -296,8 +308,10 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   let carried = 0;
   for (const a of owners) {
     const prev = prevShips.get(a);
-    // quiet, healthy Nado-active wallets are the only expensive ones; carry them between full sweeps
-    const skip = !full && prev && hasActiveNado(a) && !touched.has(a) && !prev.watch;
+    // carried between full sweeps (still re-read the moment an event touches them):
+    //  - quiet, healthy Nado-active wallets (the expensive reads)
+    //  - EMPTY wallets: an empty wallet can only fill up through a deposit/transfer event, which marks it touched
+    const skip = !full && prev && !touched.has(a) && ((hasActiveNado(a) && !prev.watch) || prev.primary === 'EMPTY');
     if (skip) carried++;
     else toRead.push(a);
   }
@@ -391,6 +405,9 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   /* ── 4. publish ───────────────────────────────────────────── */
   const all = [...ships.values()].filter((s) => owners.has(s.address));
   const { counts, mix } = summarize(all, owners.size);
+  // census.json carries ships worth drawing; the (many) empty wallets go to known.json as address → read block
+  const drawnShips = all.filter((s) => s.primary !== 'EMPTY');
+  state.empty = Object.fromEntries(all.filter((s) => s.primary === 'EMPTY').map((s) => [s.address, s.readBlock]));
   const snap: CensusSnapshot = {
     v: CENSUS_VERSION,
     chainId: 57073,
@@ -407,7 +424,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     counts,
     mix,
     ...(state.coverage ? { coverage: state.coverage } : {}),
-    ships: all.map(encodeShip),
+    ships: drawnShips.map(encodeShip),
   };
   if (darkNow) log(`${darkNow} wallets had a sensor fail this run and kept their previous reading`);
   if (darkWhy.size) {

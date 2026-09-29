@@ -83,6 +83,13 @@ Fix (census v1.1):
 - Backfill uses at most 60% of each run's budget, so the hourly reads still happen. While it runs, the site shows **"history backfill in progress"**.
 - When the backfill finishes, that run automatically re-reads every wallet and measures coverage again.
 
+## Empty wallets
+
+Most wallets the explorer lists hold nothing, or only dust. On the first backfill run, 22,991 of 32,499 were empty. So:
+- `census.json` carries only ships worth drawing. It stays small enough for phones.
+- The empty ones are remembered in `known.json` as address → the block they were read at.
+- Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The weekly full sweep re-reads them anyway.
+
 ## Coverage check (is anyone missing?)
 
 On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:

@@ -77,7 +77,9 @@ describe('census run (fake Ink)', () => {
     expect(ships.get(U.saver)).toMatchObject({ primary: 'LOCKED', hullTemp: 'NOMINAL', watch: false });
     expect(ships.get(U.saver)!.tags).toContain('STABLE-BALLAST');
     expect(ships.get(U.carry)).toMatchObject({ primary: 'CARRY', hullTemp: 'NOMINAL', venues: { tydro: false, nado: true } });
-    expect(ships.get(U.gone)!.primary).toBe('EMPTY');
+    expect(ships.has(U.gone)).toBe(false); // empty wallets are not in census.json…
+    const known = JSON.parse(readFileSync(join(dir, 'known.json'), 'utf8'));
+    expect(Object.keys(known.empty).sort()).toEqual([U.gone, U.quitter].sort()); // …they are remembered in known.json
     expect(snap.mix).toEqual({ 'KBTC-CORE': 1, LOCKED: 1, CARRY: 1 });
 
     // the health filter kept the heavy Querier call to the one non-empty Nado subaccount
@@ -96,11 +98,21 @@ describe('census run (fake Ink)', () => {
     const second = fakeChain({ head: HEAD + 50_000, tradeAt: HEAD - 100 }); // same history, nothing new since run 1
     const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: second.client, store });
     expect(snap.sweep.kind).toBe('incremental');
-    expect(snap.sweep.carried).toBe(1); // the CARRY wallet
+    expect(snap.sweep.carried).toBe(3); // the quiet CARRY wallet + the 2 empty wallets (nothing touched them)
     expect(second.stats.subaccountInfoCalls).toBe(0);
     const ships = new Map(decodeSnapshot(snap).ships.map((s) => [s.address, s]));
     expect(ships.get(U.borrower)!.readBlock).toBe(HEAD + 50_000 - 2); // watch → fresh
     expect(ships.get(U.carry)!.readBlock).toBe(HEAD - 2); // carried → keeps its older read block
+  });
+
+  it('a wallet touched by an event is re-read; untouched empty wallets stay carried', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-census-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    // the "quitter" trades again near the new head → its subaccount shows up in the activity scan
+    const { client } = fakeChain({ head: HEAD + 1_000, tradeAt: HEAD + 900 });
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client, store });
+    expect(snap.sweep.carried).toBe(2); // the 2 empty wallets; CARRY was touched by the trade → re-read
   });
 });
 
