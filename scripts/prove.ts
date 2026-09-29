@@ -5,6 +5,8 @@
  *   pnpm prove 0xYOURADDRESS                 # interactive (asks for the UI numbers)
  *   pnpm prove 0xYOURADDRESS --no-ask        # machine checks only
  *   pnpm prove 0x… --rpc https://…           # custom Ink RPC
+ *   pnpm prove 0x… --nado-json nado.json     # Nado reference = Nado's official API reply, saved from your browser
+ *                                            # (for when app.nado.xyz is not available in your region)
  *
  * Runs in Node (no browser, no CORS), talks to Nado directly at api.prod.nado.xyz.
  * Writes verification/<address>-<utc>.json and, only when every check passes, updates
@@ -12,7 +14,7 @@
  *
  * Read-only. No keys, no signing, no transactions.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +22,11 @@ import { parseAbi, type Address } from 'viem';
 import {
   INK_DEFAULT_RPC,
   NADO_DIRECT,
+  NADO_PRODUCTS,
   TYDRO,
+  aggregate,
+  nadoSubaccount,
+  parseSubaccountInfo,
   TYDRO_RESERVES,
   makeInkClient,
   parseAddress,
@@ -37,6 +43,7 @@ const flag = (k: string) => {
 const addrArg = args.find((a) => /^0x[0-9a-fA-F]{40}$/.test(a));
 const ask = !args.includes('--no-ask') && process.stdin.isTTY;
 const rpc = flag('--rpc') ?? process.env.VITE_INK_RPC ?? INK_DEFAULT_RPC;
+const nadoJsonPath = flag('--nado-json');
 
 type Verdict = 'PASS' | 'FAIL' | 'WARN' | 'SKIP';
 interface Check {
@@ -165,19 +172,83 @@ async function main() {
     for (const l of t.supplies) ui.push({ id: `ui.tydro.supply.${l.symbol}`, venue: 'tydro', label: `Tydro · Assets · ${l.symbol} Amount`, aegis: l.amount, tol: 0.001, unit: 'rel' });
     for (const l of t.debts) ui.push({ id: `ui.tydro.debt.${l.symbol}`, venue: 'tydro', label: `Tydro · Liabilities · ${l.symbol} Amount`, aegis: l.amount, tol: 0.001, unit: 'rel' });
   }
-  if (book.nado.status === 'OK' && nadoHas) {
+  const nadoUrl = `${NADO_DIRECT.gateway}/query?type=subaccount_info&subaccount=${nadoSubaccount(user)}`;
+  let nadoSource: 'ui' | 'api' = 'ui';
+  if (book.nado.status === 'OK' && nadoHas && nadoJsonPath) {
+    /* Nado reference = Nado's OWN API reply (what app.nado.xyz is built on), fetched by you in your browser.
+       Independent of AEGIS's path (Ink chain via FQuerier). The API is the sequencer's live state, the chain is settled
+       state, so fetch the JSON and run prove within a minute of each other. */
+    nadoSource = 'api';
+    const nd = book.nado.data;
+    if (!existsSync(nadoJsonPath)) throw new Error(`--nado-json: file not found: ${nadoJsonPath}`);
+    const json = JSON.parse(readFileSync(nadoJsonPath, 'utf8').replace(/^\uFEFF/, '')) as { data?: { subaccount?: string } };
+    const sub = String(json.data?.subaccount ?? '').toLowerCase();
+    if (sub !== nadoSubaccount(user).toLowerCase()) {
+      add({ id: 'nado.api.subaccount', what: 'Nado API reply is for THIS address', aegis: nadoSubaccount(user), other: sub || '—', source: 'Nado API', verdict: 'FAIL' });
+    } else {
+      add({ id: 'nado.api.subaccount', what: 'Nado API reply is for THIS address', aegis: 'default', other: 'match', source: 'Nado API', verdict: 'PASS' });
+      const parsed = parseSubaccountInfo(json, NADO_PRODUCTS, 'NADO_ORACLE');
+      if (!parsed.ok) add({ id: 'nado.api.parse', what: 'Nado API reply parses', aegis: '—', other: parsed.error.message, source: 'Nado API', verdict: 'FAIL' });
+      else {
+        const api = aggregate([parsed.value], []);
+        const cmp = (id: string, label: string, a: number, b: number, tol: number) => {
+          ui.push({ id, venue: 'nado', label, aegis: a, tol, unit: 'rel' });
+          add({ id, what: label, aegis: n(a, 6), other: n(b, 6), source: 'Nado API', verdict: rel(a, b) <= tol ? 'PASS' : 'FAIL' });
+        };
+        // Equity moves with the oracle price every second (a 5× position turns a 0.2% price move into 1% of equity),
+        // so the API copy and the chain read are compared on the BOOK, not on prices taken minutes apart:
+        //  1) the API's own positions, re-priced at the chain read's oracle prices, must give the same equity (±0.5%)
+        //  2) every perp's v_quote (the position's cost basis) must match (±0.1%)
+        //  3) raw equity / maintenance health at each side's own prices are shown for information (WARN if far apart)
+        const chainPx = new Map<string, number>([...nd.spots.map((x) => [x.symbol, x.priceUsd] as const), ...nd.perps.map((x) => [x.symbol, x.priceUsd] as const)]);
+        const px = (sym: string, fallback: number) => chainPx.get(sym) ?? fallback;
+        const repriced =
+          api.spots.reduce((a, x) => a + x.amount * px(x.symbol, x.priceUsd), 0) +
+          api.perps.reduce((a, x) => a + x.vQuoteUsd + x.sizeBase * px(x.symbol, x.priceUsd), 0);
+        cmp('ui.nado.api.equity', 'Nado · equity, API book at chain prices', nd.equityUsd, repriced, 0.005);
+        for (const p of api.perps) {
+          const mine = nd.perps.find((x) => x.symbol === p.symbol);
+          cmp(`ui.nado.api.vquote.${p.symbol}`, `Nado · ${p.symbol} v_quote (cost basis)`, mine?.vQuoteUsd ?? 0, p.vQuoteUsd, 0.001);
+        }
+        const info = (id: string, label: string, a: number, b: number, tol: number) =>
+          add({ id, what: label, aegis: n(a, 4), other: n(b, 4), source: 'Nado API (own prices)', verdict: rel(a, b) <= tol ? 'PASS' : 'WARN' });
+        info('nado.api.equity.raw', 'Nado · equity at each side\'s own prices', nd.equityUsd, api.equityUsd, 0.01);
+        if (nd.maintenance && api.maintenance) info('nado.api.maint', 'Nado · maintenance health (price-dependent)', nd.maintenance.healthUsd, api.maintenance.healthUsd, 0.02);
+        for (const p of api.perps) {
+          const mine = nd.perps.find((x) => x.symbol === p.symbol);
+          if (mine) info(`nado.api.price.${p.symbol}`, `Nado · ${p.symbol} oracle price (moves between reads)`, mine.priceUsd, p.priceUsd, 0.01);
+        }
+        const syms = new Set([...nd.spots.map((x) => x.symbol), ...api.spots.map((x) => x.symbol)]);
+        for (const sym of syms) cmp(`ui.nado.api.spot.${sym}`, `Nado · ${sym} balance`, nd.spots.find((x) => x.symbol === sym)?.amount ?? 0, api.spots.find((x) => x.symbol === sym)?.amount ?? 0, 0.001);
+        const perps = new Set([...nd.perps.map((x) => x.symbol), ...api.perps.map((x) => x.symbol)]);
+        for (const sym of perps) cmp(`ui.nado.api.perp.${sym}`, `Nado · ${sym} position size`, nd.perps.find((x) => x.symbol === sym)?.sizeBase ?? 0, api.perps.find((x) => x.symbol === sym)?.sizeBase ?? 0, 0.0001);
+      }
+    }
+  } else if (book.nado.status === 'OK' && nadoHas) {
     const nd = book.nado.data;
     ui.push({ id: 'ui.nado.equity', venue: 'nado', label: 'Nado · Account value / equity (USD)', aegis: nd.equityUsd, tol: 0.01, unit: 'rel' });
     for (const p of nd.perps) ui.push({ id: `ui.nado.perp.${p.symbol}`, venue: 'nado', label: `Nado · ${p.symbol} position size (signed)`, aegis: p.sizeBase, tol: 0.0001, unit: 'rel' });
     for (const sp of nd.spots) ui.push({ id: `ui.nado.spot.${sp.symbol}`, venue: 'nado', label: `Nado · ${sp.symbol} balance`, aegis: sp.amount, tol: 0.001, unit: 'rel' });
+    console.log(`  Nado: no app.nado.xyz in your region? Open this link in your browser instead (Nado's official API, read-only):`);
+    console.log(`    ${nadoUrl}`);
+    console.log('  then save it (Ctrl+A, Ctrl+C, and in PowerShell: Get-Clipboard | Set-Content nado.json -Encoding utf8) and re-run with --nado-json nado.json');
   }
   if (!tydroHas) console.log('  (Tydro: no positions on this address — nothing to compare)');
   if (!nadoHas) console.log('  (Nado: no positions on this address — nothing to compare)');
-  if (ask && ui.length) {
+  const already = (() => {
+    try {
+      return (JSON.parse(readFileSync(join(root, 'verification', 'status.json'), 'utf8')) as { venues?: Record<string, boolean> }).venues ?? {};
+    } catch {
+      return {} as Record<string, boolean>;
+    }
+  })();
+  for (const v of ['tydro', 'nado'] as const) if (already[v]) console.log(`  (${v === 'tydro' ? 'Tydro' : 'Nado'} is already proven — its questions are skipped here)`);
+  const toAsk = ui.filter((f) => !f.id.startsWith('ui.nado.api.') && !already[f.venue]);
+  if (ask && toAsk.length) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     console.log('Type the number the official UI shows (Enter = skip). Tolerance: HF ±0.01, USD ±1%, amounts ±0.1%, perp sizes ±0.01%.');
     console.log('Read the UI right now — prices and interest move, so compare numbers from the same minute.\n');
-    for (const f of ui) {
+    for (const f of toAsk) {
       const ans = (await rl.question(`${f.label}  [AEGIS: ${n(f.aegis ?? NaN, 6)}]  UI = `)).replace(/[$,\s]/g, '');
       if (!ans) {
         add({ id: f.id, what: f.label, aegis: n(f.aegis ?? NaN, 6), other: '—', source: 'official UI', verdict: 'SKIP' });
@@ -188,8 +259,8 @@ async function main() {
       add({ id: f.id, what: f.label, aegis: n(f.aegis ?? NaN, 6), other: ans, source: 'official UI', verdict: ok ? 'PASS' : 'FAIL' });
     }
     rl.close();
-  } else if (ui.length) {
-    ui.forEach((f) => console.log(`  ${f.label.padEnd(44)} AEGIS ${n(f.aegis ?? NaN, 6)}   UI ______`));
+  } else if (toAsk.length) {
+    toAsk.forEach((f) => console.log(`  ${f.label.padEnd(44)} AEGIS ${n(f.aegis ?? NaN, 6)}   UI ______`));
   }
 
   /* ── 6. Verdict per venue + record ──
@@ -222,6 +293,7 @@ async function main() {
     pose: { tags: pose.tags, hullTemp: pose.hullTemp, reasons: pose.reasons },
     checks,
     provenVenues: venues,
+    nadoReference: nadoSource === 'api' ? `Nado official API (${nadoUrl})` : 'app.nado.xyz',
   };
   const file = join(dir, `${user}-${stamp}.json`);
   writeFileSync(file, JSON.stringify(record, null, 2) + '\n');
@@ -231,7 +303,8 @@ async function main() {
   console.log(`official UI: ${uiPass.length}/${ui.length} fields matched`);
   for (const v of ['tydro', 'nado'] as const) {
     const has = v === 'tydro' ? tydroHas : nadoHas;
-    console.log(`  ${v.padEnd(6)} ${venues.includes(v) ? '\x1b[36mPROVEN\x1b[0m' : has ? '\x1b[31mnot proven\x1b[0m (a check failed or a UI field was skipped)' : 'not tested (no positions here)'}`);
+    const was = (already as Record<string, boolean>)[v];
+    console.log(`  ${v.padEnd(6)} ${venues.includes(v) ? '\x1b[36mPROVEN\x1b[0m' : was ? 'already proven earlier (not re-tested here)' : has ? '\x1b[31mnot proven\x1b[0m (a check failed or a UI field was skipped)' : 'not tested (no positions here)'}`);
   }
   console.log(`record: ${file}`);
 
@@ -243,7 +316,16 @@ async function main() {
     status.verified = status.venues.tydro === true && status.venues.nado === true;
     status.proofs = [
       ...status.proofs,
-      { address: `${pa.value.checksum.slice(0, 6)}…${pa.value.checksum.slice(-4)}`, at: record.at, block: record.block, fields: uiPass.length, rulesVersion: record.rulesVersion, venues },
+      {
+        address: `${pa.value.checksum.slice(0, 6)}…${pa.value.checksum.slice(-4)}`,
+        at: record.at,
+        block: record.block,
+        fields: uiPass.length,
+        rulesVersion: record.rulesVersion,
+        venues,
+        // where each venue's numbers were matched: the official app ('ui') or, for Nado, Nado's official API ('api')
+        sources: Object.fromEntries(venues.map((v) => [v, v === 'nado' ? nadoSource : 'ui'])),
+      },
     ];
     writeFileSync(statusFile, JSON.stringify(status, null, 2) + '\n');
     console.log(`\x1b[36mPROVEN: ${venues.join(' + ')}\x1b[0m — verification/status.json updated. ${status.verified ? 'Both venues verified: the PREVIEW label comes off on the next deploy.' : 'The other venue is still pending.'}`);

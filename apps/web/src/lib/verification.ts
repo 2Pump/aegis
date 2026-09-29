@@ -15,6 +15,8 @@ export interface Proof {
   rulesVersion: string;
   /** venues this proof covered (older proofs: both) */
   venues?: Venue[];
+  /** what each venue was matched against: the official app ('ui') or Nado's official API ('api') */
+  sources?: Partial<Record<Venue, 'ui' | 'api'>>;
 }
 
 interface StatusFile {
@@ -43,8 +45,9 @@ export function verificationText(): string {
   const parts = (['tydro', 'nado'] as const).map((v) => {
     const p = proofFor(v);
     const name = v === 'tydro' ? 'Tydro' : 'Nado';
+    const against = p?.sources?.[v] === 'api' ? `${name}'s official API` : VENUE_UI[v];
     return VENUE_VERIFIED[v] && p
-      ? `${name} verified against ${VENUE_UI[v]} (${p.address}, block ${p.block?.toLocaleString('en-US') ?? '—'})`
+      ? `${name} verified against ${against} (${p.address}, block ${p.block?.toLocaleString('en-US') ?? '—'})`
       : `${name} not yet matched against ${VENUE_UI[v]}`;
   });
   return parts.join(' · ');

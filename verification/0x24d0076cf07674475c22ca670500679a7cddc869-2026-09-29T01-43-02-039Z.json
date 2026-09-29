@@ -1,0 +1,169 @@
+{
+  "address": "0x24d0076cF07674475C22ca670500679A7cDdC869",
+  "at": "2026-09-29T01:43:02.040Z",
+  "block": 57147765,
+  "rpc": "https://rpc-gel.inkonchain.com",
+  "nado": "ink-chain:FQuerier",
+  "rulesVersion": "v1.1.0",
+  "pose": {
+    "tags": [
+      "NAKED",
+      "LEVERED"
+    ],
+    "hullTemp": "ELEVATED",
+    "reasons": [
+      "NAKED · ETH: long perp $837, short perp $0.00 → imbalance 100.0% > 50%, not hedged by spot",
+      "LEVERED · gross perp $837 / equity $150 = 5.58× ≥ 3×"
+    ]
+  },
+  "checks": [
+    {
+      "id": "tydro.sensor",
+      "what": "Tydro sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.sensor",
+      "what": "Nado sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.supply.WETH",
+      "what": "Tydro WETH supplied",
+      "aegis": "1.00396736",
+      "other": "1.00396736",
+      "source": "DataProvider",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.hf.recompute",
+      "what": "Tydro HF recompute",
+      "aegis": "∞",
+      "other": "no debt",
+      "source": "recomputed",
+      "verdict": "SKIP"
+    },
+    {
+      "id": "tydro.debt.total",
+      "what": "Tydro Σ debt legs vs Pool totalDebt",
+      "aegis": "0",
+      "other": "0",
+      "source": "Pool",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.notes",
+      "what": "Tydro registry notes",
+      "aegis": "none",
+      "other": "—",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "blockscout.WETH.supplied",
+      "what": "Blockscout WETH supplied (indexer lags)",
+      "aegis": "1.003967",
+      "other": "1.003967",
+      "source": "Blockscout",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.health.index",
+      "what": "Nado healths[2] ≈ computed equity",
+      "aegis": "150.16",
+      "other": "150.16",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.discovery",
+      "what": "Nado subaccount discovery (archive)",
+      "aegis": "1 subaccount(s)",
+      "other": "ok",
+      "source": "Nado archive",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.api.subaccount",
+      "what": "Nado API reply is for THIS address",
+      "aegis": "default",
+      "other": "match",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.equity",
+      "what": "Nado · equity, API book at chain prices",
+      "aegis": "150.162906",
+      "other": "150.162906",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.vquote.ETH-PERP",
+      "what": "Nado · ETH-PERP v_quote (cost basis)",
+      "aegis": "-849.164544",
+      "other": "-849.164544",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.api.equity.raw",
+      "what": "Nado · equity at each side's own prices",
+      "aegis": "150.1629",
+      "other": "151.2131",
+      "source": "Nado API (own prices)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.api.maint",
+      "what": "Nado · maintenance health (price-dependent)",
+      "aegis": "111.6954",
+      "other": "112.7353",
+      "source": "Nado API (own prices)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.api.price.ETH-PERP",
+      "what": "Nado · ETH-PERP oracle price (moves between reads)",
+      "aegis": "2,658.07",
+      "other": "2,661.42",
+      "source": "Nado API (own prices)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.spot.USDT0",
+      "what": "Nado · USDT0 balance",
+      "aegis": "-841.116687",
+      "other": "-841.116687",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.spot.USDC",
+      "what": "Nado · USDC balance",
+      "aegis": "1,002.725928",
+      "other": "1,002.725928",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.perp.ETH-PERP",
+      "what": "Nado · ETH-PERP position size",
+      "aegis": "0.315",
+      "other": "0.315",
+      "source": "Nado API",
+      "verdict": "PASS"
+    }
+  ],
+  "provenVenues": [
+    "nado"
+  ],
+  "nadoReference": "Nado official API (https://api.prod.nado.xyz/gateway/v1/query?type=subaccount_info&subaccount=0x24d0076cf07674475c22ca670500679a7cddc86964656661756c740000000000)"
+}

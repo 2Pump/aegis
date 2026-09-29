@@ -1,0 +1,159 @@
+{
+  "address": "0x24d0076cF07674475C22ca670500679A7cDdC869",
+  "at": "2026-09-29T01:37:52.163Z",
+  "block": 57147441,
+  "rpc": "https://rpc-gel.inkonchain.com",
+  "nado": "ink-chain:FQuerier",
+  "rulesVersion": "v1.1.0",
+  "pose": {
+    "tags": [
+      "NAKED",
+      "LEVERED"
+    ],
+    "hullTemp": "ELEVATED",
+    "reasons": [
+      "NAKED · ETH: long perp $838, short perp $0.00 → imbalance 100.0% > 50%, not hedged by spot",
+      "LEVERED · gross perp $838 / equity $151 = 5.54× ≥ 3×"
+    ]
+  },
+  "checks": [
+    {
+      "id": "tydro.sensor",
+      "what": "Tydro sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.sensor",
+      "what": "Nado sensor readable",
+      "aegis": "OK",
+      "other": "ok",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.supply.WETH",
+      "what": "Tydro WETH supplied",
+      "aegis": "1.00396735",
+      "other": "1.00396735",
+      "source": "DataProvider",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.hf.recompute",
+      "what": "Tydro HF recompute",
+      "aegis": "∞",
+      "other": "no debt",
+      "source": "recomputed",
+      "verdict": "SKIP"
+    },
+    {
+      "id": "tydro.debt.total",
+      "what": "Tydro Σ debt legs vs Pool totalDebt",
+      "aegis": "0",
+      "other": "0",
+      "source": "Pool",
+      "verdict": "PASS"
+    },
+    {
+      "id": "tydro.notes",
+      "what": "Tydro registry notes",
+      "aegis": "none",
+      "other": "—",
+      "source": "self",
+      "verdict": "PASS"
+    },
+    {
+      "id": "blockscout.WETH.supplied",
+      "what": "Blockscout WETH supplied (indexer lags)",
+      "aegis": "1.003967",
+      "other": "1.003967",
+      "source": "Blockscout",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.health.index",
+      "what": "Nado healths[2] ≈ computed equity",
+      "aegis": "151.18",
+      "other": "151.18",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.discovery",
+      "what": "Nado subaccount discovery (archive)",
+      "aegis": "1 subaccount(s)",
+      "other": "ok",
+      "source": "Nado archive",
+      "verdict": "PASS"
+    },
+    {
+      "id": "nado.api.subaccount",
+      "what": "Nado API reply is for THIS address",
+      "aegis": "default",
+      "other": "match",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.equity",
+      "what": "Nado · account equity (USD)",
+      "aegis": "151.184792",
+      "other": "153.089589",
+      "source": "Nado API",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "ui.nado.api.maint",
+      "what": "Nado · maintenance health (USD)",
+      "aegis": "112.70719",
+      "other": "114.592852",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.spot.USDT0",
+      "what": "Nado · USDT0 balance",
+      "aegis": "-841.116687",
+      "other": "-841.116016",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.spot.USDC",
+      "what": "Nado · USDC balance",
+      "aegis": "1,002.725928",
+      "other": "1,002.72559",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.nado.api.perp.ETH-PERP",
+      "what": "Nado · ETH-PERP position size",
+      "aegis": "0.315",
+      "other": "0.315",
+      "source": "Nado API",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ui.tydro.assets",
+      "what": "Tydro · Assets (USD)",
+      "aegis": "2,668.068941",
+      "other": "—",
+      "source": "official UI",
+      "verdict": "SKIP"
+    },
+    {
+      "id": "ui.tydro.supply.WETH",
+      "what": "Tydro · Assets · WETH Amount",
+      "aegis": "1.003967",
+      "other": "—",
+      "source": "official UI",
+      "verdict": "SKIP"
+    }
+  ],
+  "provenVenues": [],
+  "nadoReference": "Nado official API (https://api.prod.nado.xyz/gateway/v1/query?type=subaccount_info&subaccount=0x24d0076cf07674475c22ca670500679a7cddc86964656661756c740000000000)"
+}

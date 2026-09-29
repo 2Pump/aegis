@@ -27,6 +27,27 @@ Because the address you can watch on Tydro rarely also trades on Nado, each venu
 
 Tydro Dashboard labels map to: **Health Factor**, **Assets** (Σ supplied USD), **Liabilities** (Σ borrowed USD), and each asset's **Amount**. Tolerances: HF ±0.01, USD ±1%, amounts ±0.1%.
 
+### Nado when app.nado.xyz is blocked in your region
+
+app.nado.xyz answers some regions with `{"reason":"ip_query_only","blocked":true}`. That means the app is off, but **queries** still work. Don't bypass it with a VPN; that breaks Nado's terms.
+
+Nado's official API, the one the app is built on, still answers `subaccount_info` in your browser. It is an independent path from AEGIS's own read, which goes through the Ink chain via FQuerier:
+
+```powershell
+pnpm prove 0xNADO_ADDRESS                  # prints the API link for that address
+# open the link, Ctrl+A, Ctrl+C, then:
+Get-Clipboard | Set-Content nado.json -Encoding utf8
+pnpm prove 0xNADO_ADDRESS --nado-json nado.json
+```
+
+`prove` checks that the reply is for **this** address's `default` subaccount. It then compares:
+- equity: ±1%
+- maintenance health: ±2%
+- every spot balance: ±0.1%
+- every perp size: ±0.01%
+
+The API is the sequencer's live state and the chain is settled state, so fetch the JSON and run prove within a minute of each other. A proof made this way is recorded as `sources.nado = "api"`, and the site says **"Nado verified against Nado's official API"**, not "app.nado.xyz".
+
 ## Protocol
 
 ```powershell

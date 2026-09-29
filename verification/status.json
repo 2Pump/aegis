@@ -1,8 +1,8 @@
 {
-  "verified": false,
+  "verified": true,
   "venues": {
     "tydro": true,
-    "nado": false
+    "nado": true
   },
   "note": "Changed ONLY by `pnpm prove <address>`: a venue flips to true when every machine check passes AND a human matched every field against that venue's official UI (app.tydro.com / app.nado.xyz). verified = both venues. Do not hand-edit.",
   "proofs": [
@@ -15,6 +15,19 @@
       "venues": [
         "tydro"
       ]
+    },
+    {
+      "address": "0x24d0…C869",
+      "at": "2026-09-29T01:43:02.040Z",
+      "block": 57147765,
+      "fields": 5,
+      "rulesVersion": "v1.1.0",
+      "venues": [
+        "nado"
+      ],
+      "sources": {
+        "nado": "api"
+      }
     }
   ]
 }
