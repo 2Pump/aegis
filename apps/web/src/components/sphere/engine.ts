@@ -125,6 +125,8 @@ export class SphereEngine {
   private luneLabels: THREE.Sprite[] = [];
   private shellLabels: THREE.Sprite[] = [];
 
+  private onHostWheel = (e: WheelEvent) => e.preventDefault();
+
   constructor(
     private host: HTMLElement,
     private cb: SphereCallbacks,
@@ -173,14 +175,10 @@ export class SphereEngine {
     this.scene.add(this.world, this.focusGroup);
 
     const el = this.renderer.domElement;
-    // at full zoom-out, scrolling down scrolls the page instead of doing nothing
-    el.addEventListener(
-      'wheel',
-      (e) => {
-        if (e.deltaY > 0 && this.camera.position.distanceTo(this.controls.target) >= this.controls.maxDistance * 0.98) e.stopImmediatePropagation();
-      },
-      { capture: true },
-    );
+    // the wheel belongs to the well while the pointer is over it: never scroll the page, even fully zoomed out
+    // or mid-drag (OrbitControls skips preventDefault in those cases)
+    // on the host box, so the HUD, zoom buttons and plate count as "over the well" too
+    host.addEventListener('wheel', this.onHostWheel, { passive: false });
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
     el.addEventListener('pointerup', this.onUp);
@@ -896,6 +894,7 @@ export class SphereEngine {
     cancelAnimationFrame(this.raf);
     if (this.settleTimer) clearTimeout(this.settleTimer);
     document.removeEventListener('visibilitychange', this.onVis);
+    this.host.removeEventListener('wheel', this.onHostWheel);
     this.controls.dispose();
     this.clearWorld();
     this.scene.traverse((o) => {

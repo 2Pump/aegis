@@ -60,7 +60,7 @@ Glyphs shrink as you close in, so they stay beads.
 - **Keys:** ← → orbit, + − zoom, 0 or Esc resets, F frames.
 - **Phone:** one finger orbits; pinch zooms, and two fingers also pan.
 - **Find** eases to the hull with no overshoot, and changing a filter sends the camera home.
-- **Scrolling out:** at full zoom-out, scrolling down scrolls the page.
+- **Scrolling:** while the pointer is over the well, the wheel only zooms the well; the page never scrolls (even fully zoomed out). Scroll the page from outside the well.
 - **Nothing moves on its own:** no auto-spin.
 
 **Motion:**
@@ -140,7 +140,7 @@ The same address gets the same seat on every load, until the rules version or th
 
 ## Controls
 
-- **Zoom:** wheel or pinch. At full view, scrolling down or scrolling over the bezel scrolls the page instead.
+- **Zoom:** wheel or pinch. While the pointer is over the well the page never scrolls; over the bezel the wheel does nothing.
 - **Pan:** drag, once zoomed.
 - **Close in:** double-click.
 - **Keys:** + / − / 0, and the arrow keys.

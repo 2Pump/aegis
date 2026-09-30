@@ -257,7 +257,7 @@ export function Well({
   };
   const pick = (x: number, y: number) => hitGlass(grid, geomRef.current, camRef.current, x, y, foundSeat) as Seat | null;
 
-  // wheel must be non-passive to keep the page still while zooming
+  // wheel must be non-passive: the wheel belongs to the well while the pointer is over it, the page never scrolls
   useEffect(() => {
     const el = overC.current;
     if (!el) return;
@@ -265,16 +265,23 @@ export function Well({
       const g = geomRef.current;
       const c = camRef.current;
       const [x, y] = local(e);
-      if (Math.hypot(x - g.cx, y - g.cy) > g.R) return; // bezel and corners scroll the page
-      if (c.zoom <= 1 && e.deltaY > 0) return; // already home: let the page scroll on
       e.preventDefault();
+      if (Math.hypot(x - g.cx, y - g.cy) > g.R) return; // bezel and corners: page stays still, no zoom
+      if (c.zoom <= 1 && e.deltaY > 0) return; // already home: nothing to do, page stays still
       const unitDelta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       gestureTick();
       setCam(zoomAt(g, c, x, y, Math.exp(-unitDelta * 0.0018)));
       setHover(null);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    // the rest of the well box (HUD, zoom buttons, frame) keeps the page still too
+    const box = wrap.current;
+    const still = (e: WheelEvent) => e.preventDefault();
+    box?.addEventListener('wheel', still, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      box?.removeEventListener('wheel', still);
+    };
   }, [w]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
