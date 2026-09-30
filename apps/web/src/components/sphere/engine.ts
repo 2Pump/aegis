@@ -89,6 +89,8 @@ export class SphereEngine {
   private hudLast = '';
   private lodLast: SphereLod | null = null;
   private pivotLast: 'CORE' | 'HULL' | 'POINT' | null = null;
+  /** after a framing ends: the pivot slides back to the core. Not a cancellable tween — wheel/drag can't stop it half-way. */
+  private recentering = false;
   private tween: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t0: number; ms: number } | null = null;
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
   private fpsT0 = 0;
@@ -514,6 +516,7 @@ export class SphereEngine {
   }
 
   private moveTo(pos: THREE.Vector3, target: THREE.Vector3, animate: boolean) {
+    this.recentering = false;
     if (!animate || this.opts.reduceMotion) {
       this.tween = null;
       this.camera.position.copy(pos);
@@ -756,6 +759,25 @@ export class SphereEngine {
       }
       this.dirty = true;
     }
+    if (this.recentering && !this.tween) {
+      // slide the pivot (and the camera with it) back to the core: the view doesn't swing, the sphere re-centres,
+      // and from then on orbit/zoom turn about the same axis as before the search
+      const t = this.controls.target;
+      if (t.lengthSq() < 1e-8) {
+        t.set(0, 0, 0);
+        this.recentering = false;
+      } else {
+        const k = this.opts.reduceMotion ? 1 : 0.2;
+        const step = t.clone().multiplyScalar(-k);
+        t.add(step);
+        this.camera.position.add(step);
+        if (t.lengthSq() < 1e-8) {
+          t.set(0, 0, 0);
+          this.recentering = false;
+        }
+      }
+      this.dirty = true;
+    }
     if (this.controls.update()) this.dirty = true;
     if (this.embers) {
       const k = (now - this.embers.t0) / EMBER_MS;
@@ -791,7 +813,7 @@ export class SphereEngine {
       // zoomed back out of a framed hull: end the framing and glide the pivot back to the core,
       // so orbit and zoom feel exactly as they did before the search
       this.setFramed(null);
-      this.moveTo(this.camera.position.clone(), new THREE.Vector3(), true);
+      this.recentering = true;
     }
     const zoom = this.zoom();
     const lod = sphereLod(zoom, this.framed !== null);
