@@ -1,5 +1,5 @@
 import type { HullTemp, PriceSource, Tag } from '@aegis/pose';
-import { tagColor } from '@aegis/glyphs';
+import { NO_TYPE_MEANING, TAG_MEANING, tagColor, tagLabel } from '@aegis/glyphs';
 import { fmtUsd, SRC_LABEL } from '../lib/fmt';
 
 export function TagChip({ tag, primary = false, filled = false }: { tag: Tag | null; primary?: boolean; filled?: boolean }) {
@@ -9,8 +9,9 @@ export function TagChip({ tag, primary = false, filled = false }: { tag: Tag | n
       className={`tag${primary ? ' primary' : ''}${filled ? ' filled' : ''}`}
       style={{ color, background: filled ? color : 'transparent' }}
       data-testid={primary ? 'primary-tag' : undefined}
+      title={tag ? TAG_MEANING[tag] : NO_TYPE_MEANING}
     >
-      {tag ?? 'NO RULE FIRED'}
+      {tagLabel(tag)}
     </span>
   );
 }

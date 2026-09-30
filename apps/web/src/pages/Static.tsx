@@ -10,7 +10,7 @@ import { RulesContent } from '../components/RulesContent';
 export function RulesPage() {
   return (
     <div className="stack">
-      <h2 className="page">Rules — how a pose is decided</h2>
+      <h2 className="page">Rules — how a position type is decided</h2>
       <Panel title="Classifier" rail="var(--cyan)">
         <RulesContent />
       </Panel>
@@ -24,44 +24,44 @@ export function CensusPage() {
   if (!WELL_ON) {
     return (
       <div className="stack">
-        <h2 className="page">Census</h2>
-        <div className="banner red">Locked with the well until sensors are verified against the official UIs.</div>
+        <h2 className="page">Scan</h2>
+        <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>
       </div>
     );
   }
   return (
     <div className="stack">
-      <h2 className="page">Census</h2>
+      <h2 className="page">Scan — every wallet AEGIS has found</h2>
       {WELL_PREVIEW ? <div className="banner">PREVIEW — {verificationText()}.</div> : null}
-      {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
+      {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
       {census.status === 'missing' || census.status === 'error' ? <div className="banner">{census.message}</div> : null}
       {census.status === 'ok' ? (
         <>
-          <Panel title="Pose mix" rail="var(--cyan)" testId="census-panel">
+          <Panel title="Position types" rail="var(--cyan)" testId="census-panel">
             <MixBar mix={census.snap.mix} label={COPY.censusFull} />
           </Panel>
           <div className="grid two">
             <Panel title="Coverage" rail="var(--slate)">
               <dl className="kv">
-                <dt>wallets known</dt><dd className="num">{census.snap.counts.known.toLocaleString('en-US')}</dd>
-                <dt>drawn (non-empty)</dt><dd className="num">{census.snap.counts.drawn.toLocaleString('en-US')}</dd>
+                <dt>wallets found</dt><dd className="num">{census.snap.counts.known.toLocaleString('en-US')}</dd>
+                <dt>with a position</dt><dd className="num">{census.snap.counts.drawn.toLocaleString('en-US')}</dd>
                 <dt>empty</dt><dd className="num">{census.snap.counts.empty.toLocaleString('en-US')}</dd>
                 <dt>on Tydro</dt><dd className="num">{census.snap.counts.tydro.toLocaleString('en-US')}</dd>
                 <dt>on Nado</dt><dd className="num">{census.snap.counts.nado.toLocaleString('en-US')}</dd>
-                <dt>wounded</dt><dd className="num">{census.snap.counts.wounded.toLocaleString('en-US')}</dd>
-                <dt>dark</dt><dd className="num">{census.snap.counts.dark.toLocaleString('en-US')}</dd>
+                <dt>near liquidation</dt><dd className="num">{census.snap.counts.wounded.toLocaleString('en-US')}</dd>
+                <dt>couldn't read</dt><dd className="num">{census.snap.counts.dark.toLocaleString('en-US')}</dd>
               </dl>
               <CoverageShares snap={census.snap} now={now} />
             </Panel>
-            <Panel title="Snapshot" rail="var(--slate)">
+            <Panel title="Last scan" rail="var(--slate)">
               <dl className="kv">
                 <dt>block</dt><dd className="num">{census.snap.block.toLocaleString('en-US')}</dd>
-                <dt>generated</dt><dd className="mono">{fmtAge(Date.parse(census.snap.generatedAt), now)} ago</dd>
-                <dt>sweep</dt><dd className="mono">{census.snap.sweep.kind}{census.snap.sweep.complete === false ? ' (partial — continues next run)' : ''} · {census.snap.sweep.reread.toLocaleString('en-US')} re-read · {census.snap.sweep.carried.toLocaleString('en-US')} carried · {Math.round(census.snap.sweep.ms / 1000)}s</dd>
+                <dt>age</dt><dd className="mono">{fmtAge(Date.parse(census.snap.generatedAt), now)} ago</dd>
+                <dt>type</dt><dd className="mono">{census.snap.sweep.kind === 'full' ? 'full re-read' : 'hourly'}{census.snap.sweep.complete === false ? ' (partial — continues next run)' : ''} · {census.snap.sweep.reread.toLocaleString('en-US')} wallets re-read · {census.snap.sweep.carried.toLocaleString('en-US')} kept from earlier · {Math.round(census.snap.sweep.ms / 1000)}s</dd>
                 <dt>history</dt>
                 <dd className="mono">
                   {census.snap.discovery.backfillComplete
-                    ? 'complete — every Tydro and Nado account since launch'
+                    ? 'complete — every Tydro and Nado wallet since launch'
                     : `backfilling — Tydro to ${census.snap.discovery.tydroScannedTo.toLocaleString('en-US')}, Nado to ${census.snap.discovery.nadoScannedTo.toLocaleString('en-US')} of ${census.snap.discovery.head.toLocaleString('en-US')}`}
                 </dd>
                 <dt>rules</dt><dd className="mono">{census.snap.rulesVersion}</dd>
@@ -71,8 +71,8 @@ export function CensusPage() {
           <Panel title="Limits" rail="var(--slate)">
             <ul className="dim" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
               <li>Counts wallets, not money. A $5 account and a $5M account each count once.</li>
-              <li>Nado isolated subaccounts are found from recent trades; old, quiet isolated positions may be missing until they trade.</li>
-              <li>Quiet, healthy Nado accounts are re-read weekly in full; everything else hourly, and live while the well is open.</li>
+              <li>Nado isolated-margin positions are found from every trade since launch.</li>
+              <li>Wallets near danger, Tydro borrowers and anything that moved are re-read every hour, and live while the well is open. Quiet, healthy wallets are re-read in the weekly full scan.</li>
             </ul>
           </Panel>
         </>
@@ -84,9 +84,9 @@ export function CensusPage() {
 export function WatchPage() {
   return (
     <div className="stack">
-      <h2 className="page">Watch</h2>
+      <h2 className="page">Alerts</h2>
       <Panel title="Phase 3 — not built" rail="var(--slate)">
-        <p className="dim">Telegram pings (/watch 0x…, /hf 1.4, /wounded). No writes to venues, ever. Held until Phases 1–2 ship.</p>
+        <p className="dim">Telegram alerts for wallets you choose (for example, when one moves near liquidation). No writes to venues, ever. Held until Phases 1–2 ship.</p>
       </Panel>
     </div>
   );

@@ -34,7 +34,7 @@ export function PasteBar({ autoFocus = false }: { autoFocus?: boolean }) {
         value={v}
         onChange={(e) => setV(e.target.value)}
       />
-      <button className="pill-btn amber" type="submit" data-testid="paste-go">Read hull</button>
+      <button className="pill-btn amber" type="submit" data-testid="paste-go">Read wallet</button>
       {err ? <div className="err" role="alert" data-testid="paste-error">{err}</div> : null}
     </form>
   );

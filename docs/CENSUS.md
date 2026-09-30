@@ -1,5 +1,7 @@
 # CENSUS — every Tydro and Nado account, drawn live
 
+On the site this is called **the scan** (nav: Scan). "Hourly update" = an incremental run; "full re-read" = a full sweep.
+
 ## What it is
 
 **Step A: the census job**, hourly (`pnpm census`, `.github/workflows/census.yml`)
@@ -10,13 +12,13 @@
    - **Tydro:** `Pool.getUserAccountData` plus aToken/vToken `balanceOf`, priced by the AaveOracle.
    - **Nado:** `Clearinghouse.getHealth` filters out empty accounts cheaply. Active ones get the exact `FQuerier.getSubaccountInfo`.
 3. **Classify** each wallet with `@aegis/pose`, the same rules as everywhere else.
-4. **Publish** `census.json` (the ships) and `known.json` (the job's address book and cursors).
+4. **Publish** `census.json` (the wallets) and `known.json` (the job's address book and cursors).
 
 **Step B: the live layer**, which runs in the viewer's browser while the well is open (`LiveEngine`)
 - **Starts from** the snapshot.
 - **Catches up** to ~4 hours of blocks (14,400) if the snapshot is old; anything older arrives with the next census.
 - **Every ~4 s:** it scans new blocks for Tydro and Nado events and re-reads any wallet that acted. Changes show within seconds.
-- **Every ~15 s:** it re-reads the next few at-risk ships, because price alone can hurt them.
+- **Every ~15 s:** it re-reads the next few at-risk wallets, because price alone can hurt them.
 - **Pauses** when the tab is hidden, or when you click "Pause live".
 
 **Every update is a real chain read.** Nothing is estimated between reads. A failed read keeps the last good reading, and its age shows.
@@ -47,7 +49,7 @@ The first hourly run on this rule (2026-09-29, run #13) read 4,609 wallets in ab
 2. **Copy the token.** In the Blob store, open the `.env.local` tab and copy `BLOB_READ_WRITE_TOKEN`.
 3. **Add the GitHub secret.** github.com/2Pump/aegis → **Settings → Secrets and variables → Actions → New repository secret**: name `BLOB_READ_WRITE_TOKEN`, then paste the value.
 4. **Optional: private RPC.** Add a second secret, `INK_RPC`, with a private Ink RPC URL, or several separated by commas. Without it, the job rotates over Ink's four public RPCs (Gelato, QuickNode, Tenderly, dRPC). Before using any of them it checks that each one is chain 57073 and not lagging, and it rests an endpoint for 20 s when that endpoint throttles. The end of the log shows how many requests each endpoint answered.
-5. **First run.** In GitHub **Actions** → **census** → **Run workflow**. The log shows discovery progress, then "published N ships … → https://….public.blob.vercel-storage.com/census/census.json". **Copy that URL.**
+5. **First run.** In GitHub **Actions** → **census** → **Run workflow**. The log shows discovery progress, then "published N wallets … → https://….public.blob.vercel-storage.com/census/census.json". **Copy that URL.**
 6. **Point the site at it.** Vercel → project → **Settings → Environment Variables**: `VITE_CENSUS_URL` = that URL. Then redeploy.
    Use the **Config** type, not Secret. `VITE_` values are built into the public site anyway.
 7. **Hourly start.** Set up the outside timer (see "Hourly start" at the end).
@@ -92,7 +94,7 @@ Fix (census v1.1):
 ## Empty wallets
 
 Most wallets the explorer lists hold nothing, or only dust. On the first backfill run, 22,991 of 32,499 were empty. So:
-- `census.json` carries only ships worth drawing. It stays small enough for phones.
+- `census.json` carries only wallets worth drawing. It stays small enough for phones.
 - The empty ones are remembered in `known.json` as address → the block they were read at.
 - Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The weekly full sweep re-reads them anyway.
 
@@ -162,7 +164,7 @@ The production well stays locked until `verification/status.json` is proven (see
   - Skipped duplicate runs cost 1 minute each.
   - Paying for extra minutes needs a payment method on file. Without one, runs are blocked once the included minutes are used.
   - An **Actions budget** (github.com/settings/billing → Budgets) caps it. It's a ceiling with email alerts, not a prepayment: GitHub charges only what was used, once a month. We use **$15**. With "stop usage when budget limit is reached" ticked, the census pauses at the cap instead of overspending, and the live site keeps working.
-- **Vercel Blob:** each well visit downloads the snapshot, about 210 KB compressed per 15,000 ships. Check Vercel → Usage.
+- **Vercel Blob:** each well visit downloads the snapshot, about 210 KB compressed per 15,000 wallets. Check Vercel → Usage.
 - **RPC:** each open well tab makes a few small calls every 4 s and one heavier Nado read every ~15 s. Fine for testing on the public RPC. Use a private RPC key before announcing publicly.
 
 ## Privacy

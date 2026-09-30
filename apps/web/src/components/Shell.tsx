@@ -23,9 +23,9 @@ export function Shell() {
         <nav className="nav" aria-label="Primary">
           <NavLink to="/" end>Well</NavLink>
           <NavLink to="/rules">Rules</NavLink>
-          <NavLink to="/census">Census</NavLink>
-          <NavLink to="/watch">Watch</NavLink>
-          <NavLink to="/calibration">Calibration</NavLink>
+          <NavLink to="/census">Scan</NavLink>
+          <NavLink to="/watch">Alerts</NavLink>
+          <NavLink to="/calibration">Checks</NavLink>
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules drawer</button>
         </nav>
         <FocusMyShip />
@@ -50,7 +50,7 @@ export function Shell() {
   );
 }
 
-/** Optional connect — read-only. Only purpose: jump to your own hull. */
+/** Optional connect — read-only. Only purpose: jump to your own wallet page. */
 function FocusMyShip() {
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending, error } = useConnect();
@@ -68,7 +68,7 @@ function FocusMyShip() {
     return (
       <div className="row" style={{ gap: 6 }}>
         <button className="pill-btn" onClick={() => nav(`/hull/${address.toLowerCase()}`)} title="Read-only. No signing, no transactions.">
-          My ship {address.slice(0, 6)}…{address.slice(-4)}
+          My wallet {address.slice(0, 6)}…{address.slice(-4)}
         </button>
         <button className="pill-btn" onClick={() => disconnect()}>Disconnect</button>
       </div>
@@ -86,7 +86,7 @@ function FocusMyShip() {
           connect({ connector: injectedConn });
         }}
       >
-        {isPending ? 'Connecting…' : 'Focus my ship'}
+        {isPending ? 'Connecting…' : 'Open my wallet'}
       </button>
       {error ? <span className="mono" style={{ color: 'var(--red)', fontSize: 11 }}>{error.message.split('\n')[0]}</span> : null}
     </div>
@@ -106,7 +106,7 @@ function Footer() {
     <footer className="footer" data-testid="footer">
       <span>chain {INK_CHAIN_ID}</span>
       <span className="sep">·</span>
-      <span>block {head ? <span className="num">{head.block.toLocaleString('en-US')}</span> : error ? <span style={{ color: 'var(--red)' }}>DARK</span> : '…'}</span>
+      <span>block {head ? <span className="num">{head.block.toLocaleString('en-US')}</span> : error ? <span style={{ color: 'var(--red)' }}>couldn't read</span> : '…'}</span>
       <span className="sep">·</span>
       <span>rpc age {head ? fmtAge(head.readAt, now) : '—'} <span className="faint">({rpcHost})</span></span>
       {error ? (

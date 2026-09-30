@@ -1,9 +1,11 @@
 import { TAG_COLORS, type HullTemp, type Pose, type Tag } from '@aegis/pose';
 import { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
+import { NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from './labels.js';
 
 export { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
 export * from './glass.js';
 export * from './sphere.js';
+export * from './labels.js';
 
 /* ───────────────────────── size bands (privacy default) ───────────────────────── */
 
@@ -301,7 +303,7 @@ export function hullSigilSvg(address: string, pose: Pick<Pose, 'primary' | 'tags
       return `<circle cx="${(c + Math.cos(a) * c * 0.94).toFixed(1)}" cy="${(c + Math.sin(a) * c * 0.94).toFixed(1)}" r="${(size / 40).toFixed(1)}" fill="${tagColor(t)}"/>`;
     })
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="hull sigil ${pose.primary ?? 'no rule'}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="wallet sigil ${pose.primary ? TAG_LABEL[pose.primary] : NO_TYPE_LABEL}">
 <circle cx="${c}" cy="${c}" r="${c - 1}" fill="#05080C" stroke="#1F2937"/>
 <polygon points="${pts.join(' ')}" fill="${hollow ? 'none' : hexA(color, 0.18)}" stroke="${color}" stroke-width="${hollow ? 1.5 : 2}" ${hollow ? 'stroke-dasharray="3 3"' : ''}/>
 <circle cx="${c}" cy="${c}" r="${(size / 16).toFixed(1)}" fill="${color}"/>
@@ -311,28 +313,29 @@ ${ticks}
 
 /* ───────────────────────── copy deck ───────────────────────── */
 
+/** One line under the risk level on the wallet page. */
 export const HULL_COPY: Record<HullTemp, string> = {
-  NOMINAL: 'Sensors below warn lines.',
-  ELEVATED: 'Inside the warn band.',
-  CRITICAL: 'Liquidation range on at least one venue.',
-  UNKNOWN: 'A sensor is dark.',
+  NOMINAL: 'Below every warning line.',
+  ELEVATED: 'Inside a warning band.',
+  CRITICAL: 'In liquidation range on at least one venue.',
+  UNKNOWN: "A data source couldn't be read.",
 };
 
 export const COPY = {
   footer: 'AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
-  wellEmpty: 'No ships in sample. Paste an address to light the first hull.',
-  census: 'Mix of the current readable sample. Not TVL. Not advice.',
-  censusFull: 'Every Tydro and Nado account AEGIS has found on-chain. Mix by count, not TVL. Not advice.',
-  share: 'Pose per AEGIS rules. Rules are public. Camera, not a broker.',
-  woundedTape: 'Wounded in sample — not a hit list.',
-  oneLiner: 'A camera on how Ink books are aimed.',
+  wellEmpty: 'No wallets yet. Paste an address to read the first one.',
+  census: 'Mix of the wallets read so far. Counts wallets, not money. Not advice.',
+  censusFull: 'Every Tydro and Nado wallet AEGIS has found on-chain. Counts wallets, not money. Not advice.',
+  share: 'Position type per AEGIS rules. Rules are public. Camera, not a broker.',
+  woundedTape: 'Near liquidation — not a hit list.',
+  oneLiner: 'A camera on what every Ink wallet is doing.',
 } as const;
 
 /** Share text — no balances, ever. */
 export function summaryText(address: string, pose: Pose, sensors: { tydro: boolean; nado: boolean }, url: string): string {
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const tags = pose.tags.length ? pose.tags.join(' + ') : 'NO RULE FIRED';
-  const ok = [sensors.tydro ? 'Tydro' : null, sensors.nado ? 'Nado' : null].filter(Boolean).join('+');
-  const sensorTxt = ok === 'Tydro+Nado' ? 'sensors Tydro+Nado OK' : ok ? `sensors ${ok} OK, others DARK` : 'sensors DARK';
-  return `AEGIS hull ${short}  ${tags}  HULL ${pose.hullTemp}  ${sensorTxt}\n${url}`;
+  const types = pose.tags.length ? pose.tags.map((t) => TAG_LABEL[t]).join(' + ') : NO_TYPE_LABEL;
+  const data =
+    sensors.tydro && sensors.nado ? 'data Tydro+Nado OK' : sensors.tydro ? "data Tydro OK, Nado couldn't be read" : sensors.nado ? "data Nado OK, Tydro couldn't be read" : "data couldn't be read";
+  return `AEGIS wallet ${short}  ${types}  risk: ${RISK_LABEL[pose.hullTemp]}  ${data}\n${url}`;
 }

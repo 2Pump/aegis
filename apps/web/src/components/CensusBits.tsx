@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats } from '@aegis/census';
-import { COPY, tagColor } from '@aegis/glyphs';
+import { COPY, NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL, tagColor } from '@aegis/glyphs';
 import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
 import { TagChip } from './bits';
@@ -41,7 +41,7 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
   const parts = MIX_ORDER.filter((k) => mix[k]).map((k) => ({ k, n: mix[k]!, color: k === 'NONE' ? '#6B7280' : tagColor(k as Tag) }));
   return (
     <div data-testid="mixbar">
-      <div className="mixbar" role="img" aria-label={`Pose mix: ${parts.map((p) => `${p.k} ${p.n}`).join(', ')}`}>
+      <div className="mixbar" role="img" aria-label={`Position types: ${parts.map((p) => `${p.k === 'NONE' ? NO_TYPE_LABEL : TAG_LABEL[p.k as Tag]} ${p.n}`).join(', ')}`}>
         {parts.map((p) => (
           <span key={p.k} style={{ width: `${(p.n / Math.max(total, 1)) * 100}%`, background: p.k === 'DARK' ? 'repeating-linear-gradient(45deg,#374151 0 4px,#1f2937 4px 8px)' : p.color }} />
         ))}
@@ -50,7 +50,7 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
         {parts.map((p) => (
           <span key={p.k}>
             <i style={{ background: p.color }} />
-            {p.k === 'NONE' ? 'NO RULE' : p.k} {p.n.toLocaleString('en-US')} ({((p.n / Math.max(total, 1)) * 100).toFixed(1)}%)
+            {p.k === 'NONE' ? NO_TYPE_LABEL : TAG_LABEL[p.k as Tag]} {p.n.toLocaleString('en-US')} ({((p.n / Math.max(total, 1)) * 100).toFixed(1)}%)
           </span>
         ))}
       </div>
@@ -70,16 +70,16 @@ export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: C
     <div className="tele" data-testid="census-status">
       {snap ? (
         <>
-          {cell('SNAP', snap.block.toLocaleString('en-US'))}
+          {cell('LAST SCAN', snap.block.toLocaleString('en-US'))}
           {cell('AGE', fmtAge(Date.parse(snap.generatedAt), now).toUpperCase())}
-          {cell('SWEEP', snap.sweep.kind === 'full' ? (snap.sweep.complete === false ? 'FULL · PARTIAL' : 'FULL') : 'INCR')}
-          {cell('N', snap.counts.drawn.toLocaleString('en-US'))}
-          {cell('KNOWN', snap.counts.known.toLocaleString('en-US'))}
+          {cell('TYPE', snap.sweep.kind === 'full' ? (snap.sweep.complete === false ? 'FULL · PARTIAL' : 'FULL') : 'HOURLY')}
+          {cell('WALLETS', snap.counts.drawn.toLocaleString('en-US'))}
+          {cell('FOUND', snap.counts.known.toLocaleString('en-US'))}
           {cell('RULES', snap.rulesVersion.toUpperCase())}
           {!snap.discovery.backfillComplete ? <div className="tele-cell amber">HISTORY BACKFILL IN PROGRESS</div> : null}
         </>
       ) : (
-        <div className="tele-cell">NO CENSUS SNAPSHOT · LIVE LAYER ONLY</div>
+        <div className="tele-cell">NO SCAN YET · LIVE UPDATES ONLY</div>
       )}
       <div className={`tele-live${stats.running ? '' : ' off'}`}>
         <i aria-hidden />
@@ -103,7 +103,7 @@ export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: C
 export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: number }) {
   const c = snap.coverage;
   if (!c) {
-    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">Share of protocol totals: measured on the next full sweep (weekly, or “Run workflow” with full ticked).</div>;
+    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">How much of each protocol the found wallets cover: measured on the next full scan (weekly).</div>;
   }
   const row = (label: string, x: number | null) => (
     <>
@@ -114,15 +114,15 @@ export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: numbe
   return (
     <div style={{ marginTop: 10 }} data-testid="coverage-shares">
       <div className="faint" style={{ fontSize: 12, marginBottom: 4 }}>
-        Known wallets vs each protocol's own on-chain totals · full sweep at block {c.block.toLocaleString('en-US')} ({fmtAge(Date.parse(c.at), now)} ago)
+        How much of each protocol's own on-chain totals the found wallets add up to · full scan at block {c.block.toLocaleString('en-US')} ({fmtAge(Date.parse(c.at), now)} ago)
         {c.darkWallets ? ` · ${c.darkWallets} unreadable` : ''}
       </div>
       <dl className="kv">
         {row('Tydro supplied', c.share.tydroSupply)}
         {row('Tydro borrowed', c.share.tydroDebt)}
         {row('Nado deposits', c.share.nadoDeposits)}
-        {row('Nado OI — longs seen', c.share.nadoOpenInterestLongs)}
-        {row('Nado OI — shorts seen', c.share.nadoOpenInterestShorts)}
+        {row('Nado open longs', c.share.nadoOpenInterestLongs)}
+        {row('Nado open shorts', c.share.nadoOpenInterestShorts)}
       </dl>
     </div>
   );
@@ -130,14 +130,14 @@ export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: numbe
 
 /** Which rule tripped — thresholds only, never the wallet's actual number (no liquidation math on the tape). */
 export function woundText(s: CensusShip): string {
-  const t = s.correlatedLoop ? `Tydro HF < ${RULES.WOUNDED_HF_CORRELATED} (same-family loop)` : `Tydro HF < ${RULES.WOUNDED_HF}`;
+  const t = s.correlatedLoop ? `Tydro health factor < ${RULES.WOUNDED_HF_CORRELATED} (same-asset loop)` : `Tydro health factor < ${RULES.WOUNDED_HF}`;
   const n = s.correlatedNado
-    ? `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT_CORRELATED * 100)}% (same-family loop)`
-    : `Nado buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
+    ? `Nado margin buffer < ${Math.round(RULES.NADO_BUFFER_CRIT_CORRELATED * 100)}% (same-asset loop)`
+    : `Nado margin buffer < ${Math.round(RULES.NADO_BUFFER_CRIT * 100)}%`;
   if (s.wound.tydro && s.wound.nado) return `${t} + ${n}`;
   if (s.wound.tydro) return t;
   if (s.wound.nado) return n;
-  return 'venue shown after next hourly run';
+  return 'venue shown after the next hourly scan';
 }
 
 export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; head: number | null }) {
@@ -149,11 +149,11 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
     <div data-testid="wounded-tape">
       <div className="panel-title" style={{ marginBottom: 6 }}>{COPY.woundedTape}</div>
       {wounded.length === 0 ? (
-        <div className="dim">No wounded books right now.</div>
+        <div className="dim">No wallets near liquidation right now.</div>
       ) : (
         <>
           <div className="faint" style={{ fontSize: 12, marginBottom: 8 }} data-testid="wounded-explain">
-            {all.length} {all.length === 1 ? 'book' : 'books'} tripped the WOUNDED rule · {asMain} {asMain === 1 ? 'has' : 'have'} it as their main pose (the mix bar counts only those). Badge = main pose. Newest first
+            {all.length} {all.length === 1 ? 'wallet is' : 'wallets are'} near liquidation · for {asMain} it's the only type that applies (the mix bar counts only those). The badge is each wallet's position type. Newest first
             {all.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
           </div>
           <ul className="tape">
@@ -163,7 +163,7 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
                 <Link className="mono" to={`/hull/${s.address}`}>{s.address.slice(0, 6)}…{s.address.slice(-4)}</Link>
                 <TagChip tag={s.primary} />
                 <span className="faint">{woundText(s)}</span>
-                <span className="faint">band {s.band}</span>
+                <span className="faint">size {SIZE_LABEL[s.band]}</span>
               </li>
             ))}
           </ul>
@@ -173,7 +173,7 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
   );
 }
 
-const KIND_TEXT: Record<LiveChange['kind'], string> = { new: 'new ship', flip: 'pose flip', temp: 'temp change', wounded: 'went WOUNDED', healed: 'recovered' };
+const KIND_TEXT: Record<LiveChange['kind'], string> = { new: 'new wallet', flip: 'type changed', temp: 'risk changed', wounded: 'now near liquidation', healed: 'recovered' };
 
 export function ActivityTape({ changes, now }: { changes: readonly LiveChange[]; now: number }) {
   return (
@@ -188,9 +188,9 @@ export function ActivityTape({ changes, now }: { changes: readonly LiveChange[];
               <span className="when">{fmtAge(c.at, now)} ago</span>
               <Link className="mono" to={`/hull/${c.address}`}>{c.address.slice(0, 6)}…{c.address.slice(-4)}</Link>
               <span>{KIND_TEXT[c.kind]}</span>
-              {c.from ? <span className="faint">{c.from.primary ?? '—'}/{c.from.hullTemp} →</span> : null}
+              {c.from ? <span className="faint">{c.from.primary ? TAG_LABEL[c.from.primary] : NO_TYPE_LABEL} · {RISK_LABEL[c.from.hullTemp]} →</span> : null}
               <TagChip tag={c.to.primary} />
-              <span className="faint">{c.to.hullTemp}</span>
+              <span className="faint">{RISK_LABEL[c.to.hullTemp]}</span>
             </li>
           ))}
         </ul>
@@ -203,14 +203,14 @@ export function LivePanel({ stats }: { stats: LiveStats }) {
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="statline">
-        <span>head <b>{stats.head?.toLocaleString('en-US') ?? '—'}</b></span>
-        <span>scanned to <b>{stats.cursor?.toLocaleString('en-US') ?? '—'}</b></span>
+        <span>latest block <b>{stats.head?.toLocaleString('en-US') ?? '—'}</b></span>
+        <span>watched up to <b>{stats.cursor?.toLocaleString('en-US') ?? '—'}</b></span>
         <span>events <b>{stats.logsSeen}</b></span>
         <span>wallets touched <b>{stats.touched}</b></span>
         <span>re-reads <b>{stats.reads}</b></span>
         <span>queue <b>{stats.queue}</b></span>
         <span>errors <b style={{ color: stats.errors ? 'var(--red)' : undefined }}>{stats.errors}</b></span>
-        {stats.gap ? <span style={{ color: 'var(--amber)' }}>skipped ahead (snapshot was old)</span> : null}
+        {stats.gap ? <span style={{ color: 'var(--amber)' }}>skipped ahead (the last scan was old)</span> : null}
       </div>
       {stats.lastError ? <div className="banner red">{stats.lastError}</div> : null}
       <SensorLog scope="live" />

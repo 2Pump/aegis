@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TAG_COLORS } from '@aegis/pose';
+import { NO_TYPE_LABEL, NO_TYPE_MEANING, RISK_LABEL, SIZE_LABEL, TAG_LABEL, TAG_MEANING } from '@aegis/glyphs';
 import { POSE_CHIPS, isFilterActive, type MinBand, type PoseKey, type VenueFilter, type WellFilter } from '../lib/wellFilter';
 import { TagChip } from './bits';
 import type { WellShip } from './Well';
@@ -55,7 +56,7 @@ export function WellFilters({
 
   return (
     <div className="stack well-filters" style={{ gap: 8 }} data-testid="well-filters">
-      <div className="chips" role="group" aria-label="Filter by pose">
+      <div className="chips" role="group" aria-label="Filter by position type">
         {POSE_CHIPS.map((p) => {
           const on = filter.poses.includes(p);
           const color = p === 'NONE' ? '#6B7280' : TAG_COLORS[p] ?? '#9CA3AF';
@@ -66,10 +67,11 @@ export function WellFilters({
               className={`chip-btn${on ? ' on' : ''}`}
               aria-pressed={on}
               onClick={() => togglePose(p)}
+              title={p === 'NONE' ? NO_TYPE_MEANING : TAG_MEANING[p]}
               style={{ ['--chip' as string]: color }}
             >
               <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
-              {p === 'NONE' ? 'NO RULE' : p === 'WOUNDED' ? 'WOUNDED (main pose)' : p}
+              {p === 'NONE' ? NO_TYPE_LABEL : p === 'WOUNDED' ? `${TAG_LABEL.WOUNDED} (only type)` : TAG_LABEL[p]}
               <span className="faint"> {(counts.get(p) ?? 0).toLocaleString('en-US')}</span>
             </button>
           );
@@ -88,12 +90,12 @@ export function WellFilters({
         </select>
         <label className="toggle">
           <input type="checkbox" checked={filter.woundedOnly} onChange={(e) => onChange({ ...filter, woundedOnly: e.target.checked })} />
-          wounded only <span className="faint">({woundedCount.toLocaleString('en-US')})</span>
+          near liquidation only <span className="faint">({woundedCount.toLocaleString('en-US')})</span>
         </label>
         <form className="find" onSubmit={submitFind}>
           <input
-            aria-label="Find a ship by address"
-            placeholder="Find ship — 0x…"
+            aria-label="Find a wallet by address"
+            placeholder="Find wallet — 0x…"
             value={findText}
             onChange={(e) => setFindText(e.target.value)}
             spellCheck={false}
@@ -114,14 +116,14 @@ export function WellFilters({
           </button>
         ) : null}
         <span className="mono dim" style={{ fontSize: 12 }} data-testid="well-shown">
-          showing {shown.toLocaleString('en-US')} of {all.length.toLocaleString('en-US')} ships
+          showing {shown.toLocaleString('en-US')} of {all.length.toLocaleString('en-US')} wallets
         </span>
       </div>
       {findErr ? <div className="banner" style={{ padding: '6px 10px' }}>{findErr}</div> : null}
       {filter.find && !found ? (
         <div className="banner cyan" style={{ padding: '6px 10px' }} data-testid="find-missing">
-          {filter.find.slice(0, 6)}…{filter.find.slice(-4)} isn’t in the well (no Tydro/Nado position found in the census, or it’s empty).{' '}
-          <Link to={`/hull/${filter.find}`}>Read this hull live →</Link>
+          {filter.find.slice(0, 6)}…{filter.find.slice(-4)} isn’t in the well (no Tydro or Nado position found in the last scan, or it’s empty).{' '}
+          <Link to={`/hull/${filter.find}`}>Read this wallet live →</Link>
         </div>
       ) : null}
       {found ? (
@@ -129,8 +131,8 @@ export function WellFilters({
           <span className="mono">{found.address.slice(0, 6)}…{found.address.slice(-4)}</span>
           <TagChip tag={found.primary} />
           {found.tags.includes('WOUNDED') && found.primary !== 'WOUNDED' ? <TagChip tag="WOUNDED" /> : null}
-          <span className="faint">hull {found.hullTemp} · band {found.band}{found.meta ? ` · ${found.meta}` : ''}</span>
-          <Link to={found.href}>Open hull →</Link>
+          <span className="faint">risk {RISK_LABEL[found.hullTemp]} · size {SIZE_LABEL[found.band]}{found.meta ? ` · ${found.meta}` : ''}</span>
+          <Link to={found.href}>Open wallet →</Link>
         </div>
       ) : null}
     </div>

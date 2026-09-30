@@ -27,8 +27,8 @@ export function HullPage() {
   if (!state) {
     return (
       <div className="stack">
-        <h2 className="page">Hull {parsed.value.checksum}</h2>
-        <div className="banner cyan" data-testid="hull-loading">Reading sensors… Tydro and Nado, both straight from the Ink chain.</div>
+        <h2 className="page">Wallet {parsed.value.checksum}</h2>
+        <div className="banner cyan" data-testid="hull-loading">Reading the wallet… Tydro and Nado, both straight from the Ink chain.</div>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export function FixturePage() {
   const now = useNow();
   const pose = useMemo(() => (book ? classify(book) : null), [book]);
   if (!book || !pose) {
-    return <div className="banner red">Unknown fixture “{name}”. Known: {FIXTURE_NAMES.join(', ')}</div>;
+    return <div className="banner red">Unknown test wallet “{name}”. Known: {FIXTURE_NAMES.join(', ')}</div>;
   }
   return (
     <HullPlate

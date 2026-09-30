@@ -139,8 +139,8 @@ describe('well glass — camera', () => {
   });
 
   it('HUD is an instrument line with no dollar figure', () => {
-    expect(hudText({ deg: 214.2, r: 0.6234 }, 3.4)).toBe('AZ 214°  R 0.62  ZOOM 3.4×');
-    expect(hudText(null, 1)).toBe('AZ ---°  R -.--  ZOOM 1.0×');
+    expect(hudText({ deg: 214.2, r: 0.6234 }, 3.4)).toBe('AZ 214°  DEPTH 0.62  ZOOM 3.4×');
+    expect(hudText(null, 1)).toBe('AZ ---°  DEPTH -.--  ZOOM 1.0×');
   });
 
   it('hit-test among 20,000 seats finds the right hull, fast, zoomed in', () => {

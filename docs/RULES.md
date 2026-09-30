@@ -54,14 +54,14 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 **Tag order on a plate:** primary, then WOUNDED, then the rest in priority order.
 
-## 3. Hull temperature
+## 3. Hull temperature (shown on the site as Risk)
 
 | Temp | Condition | Copy |
 |---|---|---|
-| CRITICAL | WOUNDED | “Liquidation range on at least one venue.” |
-| ELEVATED | `hf < ELEVATED_HF` (same-family loop: `hf < ELEVATED_HF_CORRELATED`) OR `nadoBuffer < NADO_BUFFER_WARN` (same-family Nado loop: `< NADO_BUFFER_WARN_CORRELATED`) | “Inside the warn band.” |
-| UNKNOWN | any sensor DARK (and no readable wound) | “A sensor is dark.” |
-| NOMINAL | otherwise | “Sensors below warn lines.” |
+| CRITICAL | WOUNDED | “In liquidation range on at least one venue.” (Near liquidation) |
+| ELEVATED | `hf < ELEVATED_HF` (same-family loop: `hf < ELEVATED_HF_CORRELATED`) OR `nadoBuffer < NADO_BUFFER_WARN` (same-family Nado loop: `< NADO_BUFFER_WARN_CORRELATED`) | “Inside a warning band.” (Watch) |
+| UNKNOWN | any sensor DARK (and no readable wound) | “A data source couldn't be read.” (Couldn't read) |
+| NOMINAL | otherwise | “Below every warning line.” (Safe) |
 
 ## 4. Constants (tested)
 
@@ -100,7 +100,28 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 - A same-family loop is judged by family, not by Tydro's e-mode setting. A USDe → USDT loop counts as a loop even outside e-mode (its HF is simply higher). sUSDe and USDT are both `USD` family, so a sUSDe depeg is exactly the risk the 1.03 line measures.
 - Anything that still fires no rule is below every rule's minimum size (e.g. perps under $200 gross) or mixes stables and non-stables with some debt below the LOCKED/STABLE lines.
 
-## 6. Changelog
+## 6. Display names
+
+Approved by the project owner on 2026-09-29. **Display only — not a rule change.** The rule tags above stay the names in the classifier, `census.json`, share links (`?pose=CARRY`) and tests, so nothing underneath moves and `RULES_VERSION` is unchanged. The site shows the plain name; `/rules` shows both. The single source is `packages/glyphs/src/labels.ts`.
+
+| Rule tag | Shown as | Meaning |
+|---|---|---|
+| CARRY | Hedged | Holds a coin and is short the same coin on perps, roughly equal, so price moves mostly cancel out. |
+| NAKED | Unhedged bet | Perp positions pointing one way, with nothing on the other side. |
+| LEVERED | High leverage | Positions many times bigger than the money in the account. |
+| EQUITY-MARGIN | Stocks as collateral | Tokenized stocks posted as margin on Nado. |
+| KBTC-CORE | Bitcoin-backed | Mostly kBTC underneath everything. |
+| STABLE-BALLAST | Mostly stablecoins | Mostly dollar-pegged coins. |
+| LOCKED | Lending only | Money parked in Tydro lending, no trading on Nado. |
+| HOLD | Just holding | Owns coins outright; no perps, no borrowing. |
+| WOUNDED | Near liquidation | Close to being force-closed on at least one venue. |
+| DARK | Couldn't read | A data source failed; the last good reading is kept. |
+| EMPTY | Empty | Nothing worth drawing. |
+| (no rule fired) | Unclassified | Doesn't match any pattern. |
+
+Risk level (hull temperature, section 3): NOMINAL → **Safe**, ELEVATED → **Watch**, CRITICAL → **Near liquidation**, UNKNOWN → **Couldn't read**.
+
+## 7. Changelog
 
 - **v1.2.0 (2026-09-29)** — The same depeg logic now applies to Nado. A Nado book that only holds and borrows one family (e.g. USDC deposited, USDT0 borrowed; no perps) is WOUNDED below a 3% maintenance buffer (warn 8%) instead of 10%. This was found by checking two real wounded wallets (1.7% and 2.0% buffers, which stay wounded) and approved by the project owner.
 - **v1.1.0 (2026-09-28)** — Same-family Tydro loops get their own WOUNDED line (HF 1.03, warn 1.08) instead of 1.25 / 8% distance. New last-priority pose **HOLD** for wallets that simply own non-stable assets (no perps, no debt). Both approved by the project owner.

@@ -46,28 +46,29 @@ export const SECTOR_COLORS: Readonly<Record<SectorKey, string>> = {
   'STABLE-BALLAST': TAG_COLORS['STABLE-BALLAST']!,
   OTHER: '#6B7280',
 };
+/** Plain position-type names on the rim (same words as TAG_LABEL in labels.ts, upper-cased for the instrument). */
 export const SECTOR_LABEL: Readonly<Record<SectorKey, string>> = {
-  CARRY: 'CARRY',
-  'EQUITY-MARGIN': 'EQUITY-MARGIN',
-  NAKED: 'NAKED',
-  'KBTC-CORE': 'KBTC-CORE',
-  LEVERED: 'LEVERED',
-  HOLD: 'HOLD',
-  LOCKED: 'LOCKED',
-  'STABLE-BALLAST': 'STABLE-BALLAST',
-  OTHER: 'DARK · NO RULE',
+  CARRY: 'HEDGED',
+  'EQUITY-MARGIN': 'STOCKS AS COLLATERAL',
+  NAKED: 'UNHEDGED BET',
+  'KBTC-CORE': 'BITCOIN-BACKED',
+  LEVERED: 'HIGH LEVERAGE',
+  HOLD: 'JUST HOLDING',
+  LOCKED: 'LENDING ONLY',
+  'STABLE-BALLAST': 'MOSTLY STABLECOINS',
+  OTHER: 'OTHER · UNCLASSIFIED',
 };
 /** Rim labels for narrow sectors at full zoom-out. */
 export const SECTOR_ABBR: Readonly<Record<SectorKey, string>> = {
-  CARRY: 'CRY',
-  'EQUITY-MARGIN': 'EQ',
-  NAKED: 'NKD',
-  'KBTC-CORE': 'KBTC',
-  LEVERED: 'LEV',
-  HOLD: 'HOLD',
-  LOCKED: 'LOCKED',
-  'STABLE-BALLAST': 'STABLE',
-  OTHER: 'DARK',
+  CARRY: 'HEDGED',
+  'EQUITY-MARGIN': 'STOCKS',
+  NAKED: 'UNHEDGED',
+  'KBTC-CORE': 'BTC',
+  LEVERED: 'LEVERAGE',
+  HOLD: 'HOLDING',
+  LOCKED: 'LENDING',
+  'STABLE-BALLAST': 'STABLES',
+  OTHER: 'OTHER',
 };
 
 /** Bearings in degrees, 0 = 12 o'clock, clockwise. Width = min arc + a √count share of the rest. */
@@ -248,7 +249,7 @@ export function frameShip(s: Pick<GlassShip, 'ux' | 'uy'>, zoom = 3.2): GlassCam
 export function hudText(p: { deg: number; r: number } | null, zoom: number): string {
   const az = p ? `${String(Math.round(p.deg) % 360).padStart(3, '0')}°` : '---°';
   const r = p ? p.r.toFixed(2) : '-.--';
-  return `AZ ${az}  R ${r}  ZOOM ${zoom.toFixed(1)}×`;
+  return `AZ ${az}  DEPTH ${r}  ZOOM ${zoom.toFixed(1)}×`;
 }
 
 /** 0 at full view → 1 once every ship is drawn. */
@@ -260,8 +261,8 @@ export function lodMix(zoom: number): number {
 
 export function lodText(zoom: number, phone: boolean): string {
   const m = lodMix(zoom);
-  if (m >= 1) return 'LOD: ALL SHIPS';
-  return phone ? 'LOD: HAZE + ≥$10K' : 'LOD: HAZE + ≥$10K · WOUNDED · WARN';
+  if (m >= 1) return 'SHOWING: EVERY WALLET';
+  return phone ? 'SHOWING: WALLETS ≥$10K' : 'SHOWING: ≥$10K · NEAR LIQUIDATION · WATCH';
 }
 
 /* ───────────────────────── hit testing (unit-disc grid; O(1) per pointer move) ───────────────────────── */
@@ -322,9 +323,9 @@ export function hitGlass(grid: GlassGrid, g: GlassGeom, c: GlassCamera, sx: numb
 const MONO = '"IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace';
 const RED = TAG_COLORS.WOUNDED!;
 const CONTOURS: ReadonlyArray<{ f: number; label: string; stroke: string; text: string; dash: number[]; temp: HullTemp }> = [
-  { f: 0.84, label: 'N O M I N A L', stroke: 'rgba(76,224,210,0.22)', text: 'rgba(76,224,210,0.85)', dash: [2, 6], temp: 'NOMINAL' },
-  { f: 0.54, label: 'W A R N', stroke: 'rgba(245,193,74,0.32)', text: 'rgba(245,193,74,0.9)', dash: [2, 5], temp: 'ELEVATED' },
-  { f: 0.32, label: 'L I Q   Z O N E', stroke: 'rgba(255,77,77,0.45)', text: 'rgba(255,77,77,0.95)', dash: [2, 4], temp: 'CRITICAL' },
+  { f: 0.84, label: 'S A F E', stroke: 'rgba(76,224,210,0.22)', text: 'rgba(76,224,210,0.85)', dash: [2, 6], temp: 'NOMINAL' },
+  { f: 0.54, label: 'W A T C H', stroke: 'rgba(245,193,74,0.32)', text: 'rgba(245,193,74,0.9)', dash: [2, 5], temp: 'ELEVATED' },
+  { f: 0.32, label: 'N E A R   L I Q U I D A T I O N', stroke: 'rgba(255,77,77,0.45)', text: 'rgba(255,77,77,0.95)', dash: [2, 4], temp: 'CRITICAL' },
 ];
 
 type CanvasFactory = (w: number, h: number) => HTMLCanvasElement;

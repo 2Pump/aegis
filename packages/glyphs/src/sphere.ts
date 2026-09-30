@@ -16,9 +16,9 @@ export const SPHERE_LAT_LIMIT = 0.9;
 export const SPHERE_BAND_W: Readonly<Record<keyof typeof GLASS_BAND_R, number>> = { dust: 0.004, '<1k': 0.0055, '1–10k': 0.0075, '10–100k': 0.0105, '100k+': 0.014 };
 /** Nested glass shells (contour labels): same fractions as the 2D contour rings. */
 export const SPHERE_SHELLS = [
-  { r: 0.84, label: 'NOMINAL', color: '#4ce0d2' },
-  { r: 0.54, label: 'WARN', color: '#f5c14a' },
-  { r: 0.32, label: 'LIQ ZONE', color: '#ff6b6b' },
+  { r: 0.84, label: 'SAFE', color: '#4ce0d2' },
+  { r: 0.54, label: 'WATCH', color: '#f5c14a' },
+  { r: 0.32, label: 'NEAR LIQUIDATION', color: '#ff6b6b' },
 ] as const;
 
 const BAND_IDX = { dust: 0, '<1k': 1, '1–10k': 2, '10–100k': 3, '100k+': 4 } as const;
@@ -116,7 +116,7 @@ export function sphereFitDistance(fovDeg: number, aspect: number, fill: number):
 export function sphereHud(p: { az: number; el: number; r: number | null; zoom: number; lod: SphereLod }): string {
   const az = String(Math.round(((p.az % 360) + 360) % 360)).padStart(3, '0');
   const el = `${p.el < 0 ? '-' : ''}${String(Math.round(Math.abs(p.el))).padStart(2, '0')}`;
-  return `AZ ${az}°  EL ${el}°  R ${p.r === null ? '-.--' : p.r.toFixed(2)}  ZOOM ${p.zoom.toFixed(1)}×`;
+  return `AZ ${az}°  EL ${el}°  DEPTH ${p.r === null ? '-.--' : p.r.toFixed(2)}  ZOOM ${p.zoom.toFixed(1)}×`;
 }
 
 /* ───────────────────────── filaments ───────────────────────── */

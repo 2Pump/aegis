@@ -1,6 +1,6 @@
 # AEGIS — THE WELL MAP
 
-A camera on how Ink books are aimed. Paste an Ink address and AEGIS reads Tydro (Aave v3 on Ink) and Nado.
+A camera on what every Ink wallet is doing. Paste an Ink address and AEGIS reads Tydro (Aave v3 on Ink) and Nado.
 It classifies the pose (CARRY, NAKED, EQUITY-MARGIN, …) with public rules and draws it as a ship in a gravity well.
 
 > **AEGIS is a camera. It cannot move your funds. Classifications can be wrong.**

@@ -24,6 +24,8 @@ import {
   type GlassCamera,
   type GlassShip,
   type ShipLite,
+  RISK_LABEL,
+  SIZE_LABEL,
 } from '@aegis/glyphs';
 import { TagChip } from './bits';
 
@@ -379,8 +381,8 @@ export function Well({
   const zoomed = cam.zoom > 1.001;
 
   const sizeKey = (
-    <div className="wg-key" aria-label="Size key: dot size is the size band">
-      <div className="wg-key-h">SIZE BAND</div>
+    <div className="wg-key" aria-label="Size key: dot size is the wallet's size">
+      <div className="wg-key-h">WALLET SIZE</div>
       {SIZE_KEY.map(([b, t]) => (
         <div key={b} className="wg-key-row">
           <i style={{ width: GLASS_BAND_R[b] * 2 * geom.k, height: GLASS_BAND_R[b] * 2 * geom.k }} />
@@ -389,7 +391,7 @@ export function Well({
       ))}
       <div className="wg-key-row">
         <i className="ring" />
-        <span>WOUNDED</span>
+        <span>NEAR LIQUIDATION</span>
       </div>
     </div>
   );
@@ -402,7 +404,7 @@ export function Well({
         style={{ height: h || undefined }}
         tabIndex={0}
         role="application"
-        aria-label={`Well glass. ${ships.length} ships. Plus and minus to zoom, 0 to reset, arrows to pan.`}
+        aria-label={`Well, 2D view. ${ships.length} wallets. Plus and minus to zoom, 0 to reset, arrows to pan.`}
         onKeyDown={onKey}
         data-testid="well-glass"
       >
@@ -446,7 +448,7 @@ export function Well({
               {hover.s.tags.includes('WOUNDED') && hover.s.primary !== 'WOUNDED' ? <TagChip tag="WOUNDED" /> : null}
             </div>
             <div style={{ marginTop: 6 }}>{hover.s.label ?? `${hover.s.address.slice(0, 6)}…${hover.s.address.slice(-4)}`}</div>
-            <div className="dim">size band {hover.s.band} · hull {hover.s.hullTemp}</div>
+            <div className="dim">size {SIZE_LABEL[hover.s.band]} · risk {RISK_LABEL[hover.s.hullTemp]}</div>
             {hover.s.meta ? <div className="faint">{hover.s.meta}</div> : null}
             {geom.phone ? <div className="faint">tap again to open</div> : null}
           </div>
@@ -460,10 +462,10 @@ export function Well({
         </div>
       ) : null}
       <div className="legend wg-legend" aria-hidden>
-        <span>BEARING = MAIN POSE</span>
-        <span>RADIUS = RISK · NOMINAL / WARN / LIQ ZONE</span>
-        <span>DOT = SIZE BAND</span>
-        <span className="red">RED RING = WOUNDED</span>
+        <span>DIRECTION = POSITION TYPE</span>
+        <span>DISTANCE FROM CENTRE = RISK · SAFE / WATCH / NEAR LIQUIDATION</span>
+        <span>DOT SIZE = WALLET SIZE</span>
+        <span className="red">RED RING = NEAR LIQUIDATION</span>
         <span className="faint">WHEEL / PINCH ZOOM · DRAG PAN · + − 0</span>
       </div>
       <ShipList ships={seats} onOpen={onOpen} />
@@ -490,18 +492,18 @@ export function ShipList({ ships, onOpen, defaultOpen = false }: { ships: readon
   return (
     <details className="ship-list" open={defaultOpen || undefined} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="mono dim" style={{ fontSize: 12, cursor: 'pointer' }}>
-        List view ({ships.length.toLocaleString('en-US')} ships) — for screen readers and scanning
+        List view ({ships.length.toLocaleString('en-US')} wallets) — for screen readers and scanning
       </summary>
       <div className="table-wrap" style={{ marginTop: 8 }}>
         <table className="t" data-testid="ship-list">
-          <caption className="sr-only">Ships in the well</caption>
+          <caption className="sr-only">Wallets in the well</caption>
           <thead>
             <tr>
-              <th>Hull</th>
-              <th>Tags</th>
-              <th>Temp</th>
-              <th>Size band</th>
-              <th>Read</th>
+              <th>Wallet</th>
+              <th>Position type</th>
+              <th>Risk</th>
+              <th>Size</th>
+              <th>Last read</th>
             </tr>
           </thead>
           <tbody>
@@ -521,8 +523,8 @@ export function ShipList({ ships, onOpen, defaultOpen = false }: { ships: readon
                 <td>
                   <div className="tags">{s.tags.length ? s.tags.map((t) => <TagChip key={t} tag={t} />) : <TagChip tag={null} />}</div>
                 </td>
-                <td className="mono">{s.hullTemp}</td>
-                <td className="mono">{s.band}</td>
+                <td className="mono">{RISK_LABEL[s.hullTemp]}</td>
+                <td className="mono">{SIZE_LABEL[s.band]}</td>
                 <td className="mono faint">{s.meta ?? ''}</td>
               </tr>
             ))}

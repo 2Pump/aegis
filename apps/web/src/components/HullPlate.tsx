@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Book, NadoBook, Pose, TydroBook } from '@aegis/pose';
-import { COPY, HULL_COPY, hullSigilSvg, summaryText } from '@aegis/glyphs';
+import { COPY, HULL_COPY, RISK_LABEL, TAG_LABEL, darkReasonText, hullSigilSvg, reasonParts, summaryText } from '@aegis/glyphs';
 import { INK_EXPLORER, parseAddress, TYDRO_FETCHED } from '@aegis/ink-io';
 import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
 import { Lamp, Panel, TagChip, TEMP_RAIL, Usd } from './bits';
@@ -30,13 +30,13 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
     <div className="stack" data-testid="hull-plate">
       {isFixture ? (
         <div className="banner cyan" data-testid="fixture-banner">
-          FIXTURE — synthetic book “{book.label}”. Not a real account. Prices are hand-written test values.
+          TEST WALLET — made-up example “{book.label}”. Not a real account. Prices are hand-written test values.
         </div>
       ) : !VERIFIED ? (
         <div className="banner" data-testid="unverified-plate">
           {VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado
-            ? `PARTLY VERIFIED — ${verificationText()}. Numbers from the unverified venue are provisional.`
-            : 'SENSORS UNVERIFIED — these numbers have not yet been matched against app.tydro.com / app.nado.xyz for any real address. Treat as provisional.'}
+            ? `PARTLY CHECKED — ${verificationText()}. Numbers from the unchecked venue may be off.`
+            : 'READINGS NOT YET CHECKED — these numbers have not yet been matched against app.tydro.com / app.nado.xyz for a real wallet. Treat them as provisional.'}
         </div>
       ) : null}
 
@@ -52,8 +52,8 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
           </div>
           <div className="mono dim" style={{ overflowWrap: 'anywhere' }}>{checksum}</div>
           <div className="row">
-            <Lamp state={book.tydro.status === 'OK' ? 'ok' : 'dark'} label={`TYDRO ${book.tydro.status}`} />
-            <Lamp state={book.nado.status === 'OK' ? 'ok' : 'dark'} label={`NADO ${book.nado.status}`} />
+            <Lamp state={book.tydro.status === 'OK' ? 'ok' : 'dark'} label={book.tydro.status === 'OK' ? 'TYDRO OK' : "TYDRO COULDN'T READ"} />
+            <Lamp state={book.nado.status === 'OK' ? 'ok' : 'dark'} label={book.nado.status === 'OK' ? 'NADO OK' : "NADO COULDN'T READ"} />
             {!isFixture ? (
               <span className="faint mono" style={{ fontSize: 11 }}>
                 {loading ? 'reading…' : nextInMs !== null && nextInMs !== undefined ? `next read ${Math.ceil(nextInMs / 1000)}s` : ''}
@@ -69,8 +69,8 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
       </div>
 
       <div className="grid two">
-        {/* 1 REGISTRY */}
-        <Panel idx="01" title="Registry">
+        {/* 1 WALLET */}
+        <Panel idx="01" title="Wallet">
           <dl className="kv">
             <dt>address</dt>
             <dd className="mono">
@@ -80,70 +80,70 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
             <dd className="faint">not wired (later)</dd>
             <dt>first seen</dt>
             <dd className="mono">{new Date(firstSeen).toISOString().replace('T', ' ').slice(0, 19)} UTC <span className="faint">(this browser session)</span></dd>
-            <dt>tydro ok</dt>
+            <dt>tydro last read</dt>
             <dd className="mono">{lastOk.tydro ? `${fmtAge(lastOk.tydro, now)} ago` : 'never'}{book.asOfBlock ? ` · block ${book.asOfBlock.toLocaleString('en-US')}` : ''}</dd>
-            <dt>nado ok</dt>
+            <dt>nado last read</dt>
             <dd className="mono">{lastOk.nado ? `${fmtAge(lastOk.nado, now)} ago` : 'never'}</dd>
             <dt>source</dt>
-            <dd className="mono">{book.source}</dd>
+            <dd className="mono">{book.source === 'FIXTURE' ? 'test wallet' : 'read live from chain'}</dd>
           </dl>
         </Panel>
 
-        {/* 2 HULL TEMP */}
-        <Panel idx="02" title="Hull temp" rail={rail} testId="hull-temp">
-          <div className={`temp ${pose.hullTemp}`}>HULL {pose.hullTemp}</div>
+        {/* 2 RISK */}
+        <Panel idx="02" title="Risk" rail={rail} testId="hull-temp">
+          <div className={`temp ${pose.hullTemp}`}>{RISK_LABEL[pose.hullTemp].toUpperCase()}</div>
           <div className="dim" style={{ marginTop: 4 }}>{HULL_COPY[pose.hullTemp]}</div>
           <dl className="kv" style={{ marginTop: 12 }}>
-            <dt>tydro hf</dt>
-            <dd className="num">{pose.metrics.hf === null ? (book.tydro.status === 'OK' ? '∞ (no debt)' : '— dark') : pose.metrics.hf.toFixed(3)}</dd>
-            <dt>tydro liq dist</dt>
+            <dt>tydro health factor</dt>
+            <dd className="num">{pose.metrics.hf === null ? (book.tydro.status === 'OK' ? '∞ (no debt)' : "— couldn't read") : pose.metrics.hf.toFixed(3)}</dd>
+            <dt>tydro distance to liquidation</dt>
             <dd className="num">{pose.liqDistanceBps === null ? '—' : fmtPct(pose.liqDistanceBps / 10_000)}</dd>
-            <dt>nado buffer</dt>
+            <dt>nado margin buffer</dt>
             <dd className="num">{fmtPct(pose.metrics.nadoBuffer)}</dd>
           </dl>
         </Panel>
       </div>
 
-      {/* 3 POSE */}
-      <Panel idx="03" title="Pose — why" rail={rail} right={<span className="mono">rules {pose.rulesVersion} · <Link to="/rules">read rules</Link></span>} testId="pose-panel">
+      {/* 3 POSITION TYPE */}
+      <Panel idx="03" title="Position type — why" rail={rail} right={<span className="mono">rules {pose.rulesVersion} · <Link to="/rules">read rules</Link></span>} testId="pose-panel">
         <ul className="reasons" data-testid="reasons">
           {pose.reasons.map((r, i) => (
-            <li key={i}>{r}</li>
+            <li key={i}><Reason r={r} /></li>
           ))}
         </ul>
         {pose.darkReasons.length ? (
           <ul className="reasons" style={{ marginTop: 8, ['--rail' as string]: 'var(--red)' }} data-testid="dark-reasons">
             {pose.darkReasons.map((r, i) => (
-              <li key={i}>{r}</li>
+              <li key={i}>{darkReasonText(r)}</li>
             ))}
           </ul>
         ) : null}
       </Panel>
 
       <div className="grid two">
-        {/* 4 LOCKER */}
-        <Panel idx="04" title="Locker · Tydro" rail="var(--slate)" right={<span className="mono">registry {TYDRO_FETCHED}</span>}>
+        {/* 4 TYDRO */}
+        <Panel idx="04" title="Tydro lending" rail="var(--slate)" right={<span className="mono">market list {TYDRO_FETCHED}</span>}>
           {book.tydro.status === 'OK' ? <Locker t={book.tydro.data} fixture={isFixture} /> : <Dark code={book.tydro.code} msg={book.tydro.message} />}
         </Panel>
 
-        {/* 5 BOOK */}
-        <Panel idx="05" title="Book · Nado" rail="var(--violet)">
+        {/* 5 NADO */}
+        <Panel idx="05" title="Nado account" rail="var(--violet)">
           {book.nado.status === 'OK' ? <NadoTable n={book.nado.data} /> : <Dark code={book.nado.code} msg={book.nado.message} />}
         </Panel>
       </div>
 
-      {/* 6 VECTOR */}
-      <Panel idx="06" title="Vector" rail="var(--cyan)">
+      {/* 6 EXPOSURE */}
+      <Panel idx="06" title="Exposure" rail="var(--cyan)">
         {pose.residualDeltaUsd === null ? (
-          <div className="dim">Not computable — a sensor is dark. We do not guess S or P from half a book.</div>
+          <div className="dim">Can't be worked out — one venue couldn't be read, and AEGIS does not guess from half the picture.</div>
         ) : (
           <>
             <dl className="kv">
-              <dt>residual Δ</dt>
-              <dd className="num">{fmtUsd(pose.residualDeltaUsd)} <span className="faint">({fmtPct(pose.residualDeltaFrac)} of exposure)</span></dd>
-              <dt>equity E</dt>
+              <dt>net price exposure</dt>
+              <dd className="num">{fmtUsd(pose.residualDeltaUsd)} <span className="faint">({fmtPct(pose.residualDeltaFrac)} of total)</span></dd>
+              <dt>equity</dt>
               <dd className="num">{fmtUsd(pose.metrics.E)}</dd>
-              <dt>gross perp</dt>
+              <dt>total perp size</dt>
               <dd className="num">{fmtUsd(pose.metrics.grossPerpUsd)}</dd>
               <dt>total margin</dt>
               <dd className="num">{fmtUsd(pose.metrics.totalMarginUsd)}</dd>
@@ -153,13 +153,13 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
                 <table className="t">
                   <thead>
                     <tr>
-                      <th>Family</th>
-                      <th className="r">S (spot-like)</th>
-                      <th className="r">L (long perp)</th>
-                      <th className="r">P (short perp)</th>
+                      <th>Coin</th>
+                      <th className="r">Held</th>
+                      <th className="r">Perp long</th>
+                      <th className="r">Perp short</th>
                       <th className="r">gap</th>
-                      <th className="r">residual</th>
-                      <th>verdict</th>
+                      <th className="r">net</th>
+                      <th>type</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -171,7 +171,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
                         <td className="r num">{fmtUsd(f.P)}</td>
                         <td className="r num">{fmtPct(f.carryGap)}</td>
                         <td className={`r num ${f.residualUsd >= 0 ? 'pos' : 'neg'}`}>{fmtUsd(f.residualUsd)}</td>
-                        <td className="mono">{f.carry ? 'CARRY' : f.naked ? 'NAKED' : '—'}</td>
+                        <td className="mono">{f.carry ? TAG_LABEL.CARRY : f.naked ? TAG_LABEL.NAKED : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -185,17 +185,27 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
       {/* 7 SHARE */}
       <Share book={book} pose={pose} checksum={checksum} />
 
-      <Panel idx="··" title="Sensor log" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
-        {isFixture ? <div className="dim">Fixture — no network reads.</div> : <SensorLog scope={book.address} />}
+      <Panel idx="··" title="Data log" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
+        {isFixture ? <div className="dim">Test wallet — no network reads.</div> : <SensorLog scope={book.address} />}
       </Panel>
     </div>
+  );
+}
+
+function Reason({ r }: { r: string }) {
+  const p = reasonParts(r);
+  if (!p.label) return <>{r}</>;
+  return (
+    <>
+      <b>{p.label}</b> <span className="faint mono" style={{ fontSize: 11 }}>{p.tag}</span> · {p.rest}
+    </>
   );
 }
 
 function Dark({ code, msg }: { code: string; msg: string }) {
   return (
     <div className="stack" style={{ gap: 6 }} data-testid="sensor-dark">
-      <Lamp state="dark" label={`DARK · ${code}`} />
+      <Lamp state="dark" label={`COULDN'T READ · ${code}`} />
       <div className="mono dim" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>{msg}</div>
     </div>
   );
@@ -213,7 +223,7 @@ function Locker({ t, fixture }: { t: TydroBook; fixture: boolean }) {
         <dd><Usd n={t.totalCollateralUsd} src={src} /></dd>
         <dt>debt</dt>
         <dd><Usd n={t.totalDebtUsd} src={src} /></dd>
-        <dt>liq threshold</dt>
+        <dt>liquidation threshold</dt>
         <dd className="num">{fmtPct(t.liquidationThreshold)}</dd>
       </dl>
       {rows.length ? (
@@ -250,7 +260,7 @@ function NadoTable({ n }: { n: NadoBook }) {
       <dl className="kv">
         <dt>equity</dt>
         <dd><Usd n={n.equityUsd} src={n.spots[0]?.priceSource ?? n.perps[0]?.priceSource ?? 'NADO_ONCHAIN'} /></dd>
-        <dt>maint health</dt>
+        <dt>margin health</dt>
         <dd className="num">{n.maintenance ? `${fmtUsd(n.maintenance.healthUsd)} of ${fmtUsd(n.maintenance.assetsUsd)} weighted assets` : '—'}</dd>
         <dt>subaccounts</dt>
         <dd className="mono" style={{ fontSize: 11 }}>{n.subaccounts.length ? n.subaccounts.map(subName).join(', ') : 'none with balances'}</dd>

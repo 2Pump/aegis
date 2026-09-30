@@ -22,17 +22,17 @@ test('paste empty / junk address → error, no navigation', async ({ page }) => 
 test('fixture CARRY renders plate with reasons', async ({ page }) => {
   await page.goto('/fixture/carry');
   await expect(page.getByTestId('fixture-banner')).toBeVisible();
-  await expect(page.getByTestId('primary-tag')).toHaveText('CARRY');
-  await expect(page.getByTestId('hull-temp')).toContainText('HULL NOMINAL');
+  await expect(page.getByTestId('primary-tag')).toHaveText('Hedged');
+  await expect(page.getByTestId('hull-temp')).toContainText('SAFE');
   await expect(page.getByTestId('reasons')).toContainText('CARRY · BTC');
 });
 
 test('fixture WOUNDED is CRITICAL; fixture DARK renders without crashing', async ({ page }) => {
   await page.goto('/fixture/wounded');
-  await expect(page.getByTestId('hull-temp')).toContainText('HULL CRITICAL');
+  await expect(page.getByTestId('hull-temp')).toContainText('NEAR LIQUIDATION');
   await page.goto('/fixture/dark');
-  await expect(page.getByTestId('primary-tag')).toHaveText('DARK');
-  await expect(page.getByTestId('dark-reasons')).toContainText('NADO_SENSOR');
+  await expect(page.getByTestId('primary-tag')).toHaveText("Couldn't read");
+  await expect(page.getByTestId('dark-reasons')).toContainText("Nado couldn't be read");
   await expect(page.getByTestId('sensor-dark')).toBeVisible();
 });
 
@@ -49,13 +49,14 @@ test('paste a real-format address → hull page renders (DARK if sensors unreach
 test('rules page and drawer render constants', async ({ page }) => {
   await page.goto('/rules');
   await expect(page.getByText('CARRY_BAND')).toBeVisible();
+  await expect(page.getByTestId('display-names')).toContainText('Unhedged bet');
   await page.getByTestId('rules-drawer-btn').click();
   await expect(page.getByTestId('rules-drawer')).toContainText('WOUNDED_HF');
 });
 
-test('calibration page lists fixtures and shows UNVERIFIED proof status', async ({ page }) => {
+test('calibration page lists fixtures and shows not-yet-checked status', async ({ page }) => {
   await page.goto('/calibration');
-  await expect(page.getByTestId('proof-panel')).toContainText('UNVERIFIED');
+  await expect(page.getByTestId('proof-panel')).toContainText('NOT YET CHECKED');
   await expect(page.getByTestId('fixture-list')).toContainText('EX1 CARRY');
 });
 

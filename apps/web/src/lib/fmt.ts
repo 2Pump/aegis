@@ -27,9 +27,9 @@ export function fmtAge(ms: number | null, now: number): string {
 }
 
 export const SRC_LABEL: Record<PriceSource, string> = {
-  TYDRO_ORACLE: 'TYDRO ORACLE',
-  NADO_ORACLE: 'NADO ORACLE',
+  TYDRO_ORACLE: 'TYDRO PRICE',
+  NADO_ORACLE: 'NADO PRICE',
   NADO_ONCHAIN: 'NADO ON-CHAIN',
-  FIXTURE: 'FIXTURE',
-  OFFCHAIN_DISPLAY_ONLY: 'DISPLAY ONLY — NOT VENUE MARK',
+  FIXTURE: 'TEST PRICE',
+  OFFCHAIN_DISPLAY_ONLY: 'DISPLAY ONLY — NOT THE VENUE PRICE',
 };

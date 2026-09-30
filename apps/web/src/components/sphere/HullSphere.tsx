@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { SPHERE_BAND_W, seatSphere, type SphereLod, type SphereSeat } from '@aegis/glyphs';
+import { CENTRE_LABEL, RISK_LABEL, SIZE_LABEL, SPHERE_BAND_W, VIEW_LABEL, seatSphere, type SphereLod, type SphereSeat } from '@aegis/glyphs';
 import { TagChip } from '../bits';
 import { ShipList, type WellShip } from '../Well';
 import type { SphereEngine } from './engine';
@@ -34,7 +34,7 @@ export default function HullSphere({
   const [w, setW] = useState(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-  const [hud, setHud] = useState<{ text: string; lod: SphereLod; pivot: 'CORE' | 'HULL' | 'POINT' }>({ text: 'AZ ---°  EL --°  R -.--  ZOOM 1.0×', lod: 'MANTLE', pivot: 'CORE' });
+  const [hud, setHud] = useState<{ text: string; lod: SphereLod; pivot: 'CORE' | 'HULL' | 'POINT' }>({ text: 'AZ ---°  EL --°  DEPTH -.--  ZOOM 1.0×', lod: 'MANTLE', pivot: 'CORE' });
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
   const [framed, setFramed] = useState<{ i: number; x: number; y: number } | null>(null);
   // ?fps=1: on-page frame counter for checking the budget on a real laptop / phone (counts frames actually drawn)
@@ -191,8 +191,8 @@ export default function HullSphere({
   const tipShip = hover ? world.refs[hover.i] : undefined;
   const plateShip = framed ? world.refs[framed.i] : undefined;
   const sizeKey = (
-    <div className="wg-key" aria-label="Size key: glyph size is the size band">
-      <div className="wg-key-h">SIZE BAND</div>
+    <div className="wg-key" aria-label="Size key: glyph size is the wallet's size">
+      <div className="wg-key-h">WALLET SIZE</div>
       {SIZE_KEY.map(([b, t]) => (
         <div key={b} className="wg-key-row">
           <i style={{ width: SPHERE_BAND_W[b] * 640, height: SPHERE_BAND_W[b] * 640 }} />
@@ -201,7 +201,7 @@ export default function HullSphere({
       ))}
       <div className="wg-key-row">
         <i className="ring" />
-        <span>WOUNDED</span>
+        <span>NEAR LIQUIDATION</span>
       </div>
     </div>
   );
@@ -209,7 +209,7 @@ export default function HullSphere({
   return (
     <div className="stack" style={{ gap: 10 }} ref={wrap}>
       {failed ? (
-        <div className="banner" data-testid="sphere-failed">HULL SPHERE could not start ({failed}). Showing the 2D well instead — pick 2D above.</div>
+        <div className="banner" data-testid="sphere-failed">The sphere could not start ({failed}). Pick 2D above to see the well.</div>
       ) : null}
       <div
         ref={host}
@@ -217,15 +217,15 @@ export default function HullSphere({
         style={{ height: h || undefined }}
         tabIndex={0}
         role="application"
-        aria-label={`Hull sphere. ${ships.length} ships. Drag to orbit, plus and minus to zoom, 0 to reset, F to frame.`}
+        aria-label={`Well, sphere view. ${ships.length} wallets. Drag to rotate, plus and minus to zoom, 0 to reset, F to focus a wallet.`}
         onKeyDown={onKey}
         data-testid="hull-sphere"
       >
-        {!ready && !failed ? <div className="hs-loading">LOADING HULL SPHERE…</div> : null}
+        {!ready && !failed ? <div className="hs-loading">LOADING THE SPHERE…</div> : null}
         <div className="wg-hud tl">
-          <span className="hs-title">HULL SPHERE</span>
-          {'\n'}LOD  {hud.lod}
-          {'\n'}PIVOT  {hud.pivot}
+          <span className="hs-title">THE WELL · SPHERE</span>
+          {'\n'}VIEW  {VIEW_LABEL[hud.lod]}
+          {'\n'}CENTRED ON  {CENTRE_LABEL[hud.pivot]}
           {fps ? `\nFPS  ${fps.fps}  ·  DRAW CALLS ${fps.calls}  ·  ${ships.length.toLocaleString('en-US')} SHIPS` : ''}
         </div>
         {!phone ? (
@@ -246,7 +246,7 @@ export default function HullSphere({
               {tipShip.tags.includes('WOUNDED') && tipShip.primary !== 'WOUNDED' ? <TagChip tag="WOUNDED" /> : null}
             </div>
             <div style={{ marginTop: 6 }}>{tipShip.label ?? `${tipShip.address.slice(0, 6)}…${tipShip.address.slice(-4)}`}</div>
-            <div className="dim">size band {tipShip.band} · hull {tipShip.hullTemp}</div>
+            <div className="dim">size {SIZE_LABEL[tipShip.band]} · risk {RISK_LABEL[tipShip.hullTemp]}</div>
             {tipShip.meta ? <div className="faint">{tipShip.meta}</div> : null}
             {phone ? <div className="faint">tap again to open</div> : null}
           </div>
@@ -258,9 +258,9 @@ export default function HullSphere({
               {plateShip.tags.includes('WOUNDED') && plateShip.primary !== 'WOUNDED' ? <TagChip tag="WOUNDED" /> : null}
             </div>
             <div style={{ marginTop: 6 }}>{plateShip.address.slice(0, 6)}…{plateShip.address.slice(-4)}</div>
-            <div className="dim">hull {plateShip.hullTemp} · band {plateShip.band}</div>
+            <div className="dim">risk {RISK_LABEL[plateShip.hullTemp]} · size {SIZE_LABEL[plateShip.band]}</div>
             <button type="button" className="sq-btn" style={{ marginTop: 8 }} onClick={() => onOpen(plateShip.href)}>
-              OPEN HULL →
+              OPEN WALLET →
             </button>
           </div>
         ) : null}
@@ -268,16 +268,16 @@ export default function HullSphere({
       {phone ? (
         <div className="wg-strip">
           <span data-testid="sphere-hud">{hud.text}</span>
-          <span>LOD {hud.lod} · PIVOT {hud.pivot}</span>
+          <span>VIEW {VIEW_LABEL[hud.lod]} · CENTRED ON {CENTRE_LABEL[hud.pivot]}</span>
           {sizeKey}
         </div>
       ) : null}
       <div className="legend wg-legend" aria-hidden>
-        <span>LUNE = MAIN POSE</span>
-        <span>DEPTH = RISK · NOMINAL / WARN / LIQ ZONE</span>
-        <span>SIZE = BAND</span>
-        <span className="red">RED RING = WOUNDED</span>
-        <span className="faint">THREADS = SAME POSE, NEARBY · DECORATION ONLY</span>
+        <span>COLOUR BAND = POSITION TYPE</span>
+        <span>DEPTH = RISK · SAFE (OUTSIDE) / WATCH / NEAR LIQUIDATION (CORE)</span>
+        <span>SIZE = WALLET SIZE</span>
+        <span className="red">RED RING = NEAR LIQUIDATION</span>
+        <span className="faint">THREADS = SAME TYPE, NEARBY · DECORATION ONLY</span>
         <span className="faint">DRAG ORBIT · WHEEL / PINCH ZOOM · RIGHT-DRAG PAN · F FRAME · 0 RESET</span>
       </div>
       <ShipList ships={ships} onOpen={onOpen} />

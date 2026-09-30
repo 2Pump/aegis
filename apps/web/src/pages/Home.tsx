@@ -1,7 +1,7 @@
 import { Suspense, lazy, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CensusShip } from '@aegis/census';
-import { COPY, shipLiteFromPose } from '@aegis/glyphs';
+import { COPY, RISK_LABEL, shipLiteFromPose } from '@aegis/glyphs';
 import { ActivityTape, CensusStatusLine, LivePanel, MixBar, WoundedTape, blocksAgo, mixOf } from '../components/CensusBits';
 import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
@@ -51,7 +51,7 @@ export function Home() {
     // hulls this viewer opened: ringed, and their fresher hull-page reading wins
     for (const [addr, h] of cache) {
       if (h.pose.primary === 'EMPTY') continue;
-      out.set(addr, { ...shipLiteFromPose(addr, h.pose), focused: true, href: `/hull/${addr}`, meta: 'opened by you · live hull read' });
+      out.set(addr, { ...shipLiteFromPose(addr, h.pose), focused: true, href: `/hull/${addr}`, meta: 'opened by you · read live' });
     }
     return [...out.values()];
     // lw.stats.reads changes whenever the live layer updates a ship
@@ -93,31 +93,31 @@ export function Home() {
         <h2 className="page">{COPY.oneLiner}</h2>
         <PasteBar autoFocus />
         <div className="faint mono" style={{ fontSize: 11 }}>
-          Read-only. No connect required. AEGIS reads Tydro and Nado straight from the Ink chain and classifies the pose.
+          Read-only. No connect required. AEGIS reads Tydro and Nado straight from the Ink chain and sorts each wallet into a position type.
         </div>
       </div>
 
       {!WELL_ON ? (
         <>
           <div className="banner red" data-testid="unverified-banner">
-            WELL LOCKED — SENSORS UNVERIFIED. No real Ink address has yet been matched against the official Tydro and Nado UIs.
-            Hull pages work; the well is not drawn until <code>pnpm prove &lt;address&gt;</code> passes.
+            WELL LOCKED — READINGS NOT YET VERIFIED. No real Ink address has yet been matched against the official Tydro and Nado apps.
+            Wallet pages work; the well is not drawn until <code>pnpm prove &lt;address&gt;</code> passes.
           </div>
-          <Panel title="Hulls read this session" rail="var(--slate)" right={<span className="mono">N={sessionList.length}</span>}>
+          <Panel title="Wallets read this session" rail="var(--slate)" right={<span className="mono">N={sessionList.length}</span>}>
             {sessionList.length === 0 ? (
               <div className="dim">{COPY.wellEmpty}</div>
             ) : (
               <div className="table-wrap">
                 <table className="t" data-testid="session-list">
                   <thead>
-                    <tr><th>Hull</th><th>Tags</th><th>Temp</th></tr>
+                    <tr><th>Wallet</th><th>Position type</th><th>Risk</th></tr>
                   </thead>
                   <tbody>
                     {sessionList.map(([addr, h]) => (
                       <tr key={addr}>
                         <td className="mono"><Link to={`/hull/${addr}`}>{`${addr.slice(0, 6)}…${addr.slice(-4)}`}</Link></td>
                         <td><div className="tags">{h.pose.tags.length ? h.pose.tags.map((t) => <TagChip key={t} tag={t} />) : <TagChip tag={null} />}</div></td>
-                        <td className="mono">{h.pose.hullTemp}</td>
+                        <td className="mono">{RISK_LABEL[h.pose.hullTemp]}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -130,7 +130,7 @@ export function Home() {
         <>
           {WELL_PREVIEW ? (
             <div className="banner" data-testid="preview-banner">
-              PREVIEW — real chain reads. {verificationText()}. Treat poses as provisional until both venues are verified.
+              PREVIEW — real chain reads. {verificationText()}. Treat position types as provisional until both venues are verified.
               (Shown because this is a dev build or VITE_WELL_PREVIEW=1.)
             </div>
           ) : null}
@@ -138,10 +138,10 @@ export function Home() {
             <div className="banner" data-testid="census-missing">{census.message}</div>
           ) : null}
 
-          <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado account found on-chain</span>}>
+          <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado wallet found on-chain</span>}>
             <div className="stack" style={{ gap: 12 }}>
               <CensusStatusLine snap={snap} stats={lw.stats} now={now} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
-              {census.status === 'loading' ? <div className="dim">Loading census…</div> : null}
+              {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
               {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
               {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
               {ships.length > 0 ? (
@@ -163,7 +163,7 @@ export function Home() {
                 </div>
               ) : null}
               {ships.length > 0 && view === 'sphere' ? (
-                <Suspense fallback={<div className="wg hs-loading-box">LOADING HULL SPHERE…</div>}>
+                <Suspense fallback={<div className="wg hs-loading-box">LOADING THE SPHERE…</div>}>
                   <HullSphere ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} />
                 </Suspense>
               ) : null}
@@ -174,7 +174,7 @@ export function Home() {
           </Panel>
 
           <div className="grid two">
-            <Panel title="Wounded" rail="var(--red)">
+            <Panel title="Near liquidation" rail="var(--red)">
               <WoundedTape ships={lw.ships} head={head} />
             </Panel>
             <Panel title="Activity" rail="var(--cyan)">
@@ -182,7 +182,7 @@ export function Home() {
             </Panel>
           </div>
 
-          <Panel title="Live layer" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
+          <Panel title="Live updates" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
             <LivePanel stats={lw.stats} />
           </Panel>
         </>
@@ -191,10 +191,10 @@ export function Home() {
       <Panel title="How the well is built" rail="var(--slate)">
         <ul className="dim" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
           <li>Every wallet here was found from public on-chain events (Tydro token transfers, Nado deposits and trades). Nothing is scraped or bought.</li>
-          <li>An hourly job reads them all and publishes a snapshot. While this page is open, your browser watches every new block and re-reads any wallet that acts, plus the ones near danger.</li>
-          <li>Each ship shows how old its reading is. A reading that fails is never filled in — the last good one is kept and its age shows.</li>
-          <li>Size is shown as <strong>bands</strong>, never balances. The wounded list is ordered by when a book was first seen wounded, never by how close it is to liquidation.</li>
-          <li>Synthetic calibration books live on <Link to="/calibration">/calibration</Link> and never appear here.</li>
+          <li>An hourly scan reads them all and publishes the result. While this page is open, your browser watches every new block and re-reads any wallet that acts, plus the ones near danger.</li>
+          <li>Each wallet shows how old its reading is. A reading that fails is never filled in — the last good one is kept and its age shows.</li>
+          <li>Size is shown in <strong>ranges</strong> (e.g. $1k–10k), never balances. The near-liquidation list is ordered by when a wallet was first seen near liquidation, never by how close it is.</li>
+          <li>Made-up test wallets live on the <Link to="/calibration">Checks</Link> page and never appear here.</li>
         </ul>
       </Panel>
     </div>

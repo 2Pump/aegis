@@ -16,7 +16,7 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'DARK',
     kind: 'STATE',
-    human: 'A sensor could not be read. We refuse to guess the missing half of the book.',
+    human: "A data source couldn't be read. AEGIS won't guess the missing half of the wallet.",
     predicate: 'tydro.status = DARK OR nado.status = DARK (RPC dead, venue timeout, parse fail, rate limit)',
   },
   {
@@ -34,7 +34,7 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'CARRY',
     kind: 'PRIMARY',
-    human: 'Owns an asset and is short the same asset on perps, sized roughly equal. Basis-ish hedge.',
+    human: 'Owns an asset and is short the same asset on perps, sized roughly equal, so price moves mostly cancel out.',
     predicate: `∃ family F: |S_F − P_F| / max(S_F, P_F, 1) ≤ ${p(R.CARRY_BAND)} AND min(S_F, P_F) ≥ $${R.CARRY_MIN_LEG_USD}`,
   },
   {
@@ -52,19 +52,19 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'KBTC-CORE',
     kind: 'PRIMARY',
-    human: 'kBTC is the backbone of the margin stack.',
+    human: 'Mostly kBTC underneath everything.',
     predicate: `kb ≥ $${R.KBTC_MIN_USD} AND kb / max(totalMargin, 1) ≥ ${p(R.KBTC_SHARE)}`,
   },
   {
     tag: 'LOCKED',
     kind: 'PRIMARY',
-    human: 'Parked in the Tydro locker. Not fighting on Nado.',
+    human: 'Money parked in Tydro lending, no trading on Nado.',
     predicate: `tydroSupplies > $${R.LOCKED_MIN_SUPPLY_USD} AND no Nado perps AND no Nado risk spots (non-stable or borrowed, ≥ $${R.DUST_USD})`,
   },
   {
     tag: 'STABLE-BALLAST',
     kind: 'PRIMARY',
-    human: 'Mostly stables in the hold.',
+    human: 'Mostly dollar-pegged coins.',
     predicate: `st / max(totalMargin, 1) ≥ ${p(R.STABLE_SHARE)}`,
   },
   {
@@ -76,7 +76,7 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'HOLD',
     kind: 'PRIMARY',
-    human: 'Owns non-stable assets outright — no perps, no borrowing. Only when no other pose fits.',
+    human: 'Owns non-stable assets outright — no perps, no borrowing. Only when no other type fits.',
     predicate: `non-stable spot + Tydro supply ≥ $${R.HOLD_MIN_USD} AND no perp ≥ $${R.DUST_USD} AND no debt ≥ $${R.DUST_USD} (Tydro or Nado)`,
   },
 ];

@@ -72,7 +72,7 @@ describe('hull sphere — camera', () => {
     expect(sphereFineMix(3)).toBe(1);
     expect(sphereGlyphScale(1)).toBe(1);
     expect(sphereGlyphScale(20)).toBeLessThan(0.3);
-    expect(sphereHud({ az: 214.2, el: 18.4, r: 0.6234, zoom: 3.4, lod: 'TISSUE' })).toBe('AZ 214°  EL 18°  R 0.62  ZOOM 3.4×');
-    expect(sphereHud({ az: -10, el: -5, r: null, zoom: 1, lod: 'MANTLE' })).toBe('AZ 350°  EL -05°  R -.--  ZOOM 1.0×');
+    expect(sphereHud({ az: 214.2, el: 18.4, r: 0.6234, zoom: 3.4, lod: 'TISSUE' })).toBe('AZ 214°  EL 18°  DEPTH 0.62  ZOOM 3.4×');
+    expect(sphereHud({ az: -10, el: -5, r: null, zoom: 1, lod: 'MANTLE' })).toBe('AZ 350°  EL -05°  DEPTH -.--  ZOOM 1.0×');
   });
 });

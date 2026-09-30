@@ -140,7 +140,7 @@ export class LiveEngine {
       this.stats.head = head;
       if (this.stats.cursor === null) this.stats.cursor = head - 1;
       if (head - this.stats.cursor > this.o.maxCatchUp) {
-        log('err', `live: snapshot is ${head - this.stats.cursor} blocks old (~${((head - this.stats.cursor) / 3600).toFixed(1)} h) — catching up the last ${this.o.maxCatchUp} (~4 h); older changes arrive with the next census`);
+        log('err', `live: snapshot is ${head - this.stats.cursor} blocks old (~${((head - this.stats.cursor) / 3600).toFixed(1)} h) — catching up the last ${this.o.maxCatchUp} (~4 h); older changes arrive with the next scan`);
         this.stats.cursor = head - this.o.maxCatchUp;
         this.stats.gap = true;
       }

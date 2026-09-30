@@ -37,8 +37,8 @@ describe('glyphs', () => {
   });
   it('share text carries no dollar figures', () => {
     const s = summaryText(carry.address, pc, { tydro: true, nado: true }, 'https://x/hull/0x');
-    expect(s).toContain('CARRY');
-    expect(s).toContain('HULL NOMINAL');
+    expect(s).toContain('Hedged');
+    expect(s).toContain('risk: Safe');
     expect(s).not.toMatch(/\$/);
   });
   it('grid hit-test finds the right ship among 20,000, fast', () => {

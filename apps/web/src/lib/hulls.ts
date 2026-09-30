@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { classify, type Book, type Pose } from '@aegis/pose';
+import { NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from '@aegis/glyphs';
 import { ENV } from './env';
 import { log } from './log';
 import { loadBook, loadHead } from './sensors';
@@ -58,10 +59,10 @@ export function useLiveHull(addr: `0x${string}` | null): { state: HullState | nu
       if (!alive) return;
       const ms = Math.round(performance.now() - t0);
       const b = r.book;
-      log(b.tydro.status === 'OK' ? 'ok' : 'err', addr, b.tydro.status === 'OK' ? `TYDRO ok · block ${b.asOfBlock ?? '?'} · hf ${b.tydro.data.hf?.toFixed(3) ?? '∞ (no debt)'} · ${b.tydro.data.supplies.length} supply / ${b.tydro.data.debts.length} debt legs` : `TYDRO DARK · ${b.tydro.code} · ${b.tydro.message}`);
-      log(b.nado.status === 'OK' ? 'ok' : 'err', addr, b.nado.status === 'OK' ? `NADO ok · ${b.nado.data.subaccounts.length} subaccount(s) · ${b.nado.data.spots.length} spot / ${b.nado.data.perps.length} perp legs` : `NADO DARK · ${b.nado.code} · ${b.nado.message}`);
+      log(b.tydro.status === 'OK' ? 'ok' : 'err', addr, b.tydro.status === 'OK' ? `TYDRO ok · block ${b.asOfBlock ?? '?'} · hf ${b.tydro.data.hf?.toFixed(3) ?? '∞ (no debt)'} · ${b.tydro.data.supplies.length} supply / ${b.tydro.data.debts.length} debt legs` : `TYDRO COULDN'T READ · ${b.tydro.code} · ${b.tydro.message}`);
+      log(b.nado.status === 'OK' ? 'ok' : 'err', addr, b.nado.status === 'OK' ? `NADO ok · ${b.nado.data.subaccounts.length} subaccount(s) · ${b.nado.data.spots.length} spot / ${b.nado.data.perps.length} perp legs` : `NADO COULDN'T READ · ${b.nado.code} · ${b.nado.message}`);
       const pose = classify(b);
-      log('info', addr, `pose ${pose.tags.join(' + ') || 'NO RULE FIRED'} · hull ${pose.hullTemp} · ${ms}ms`);
+      log('info', addr, `type ${pose.tags.map((t) => TAG_LABEL[t]).join(' + ') || NO_TYPE_LABEL} · risk ${RISK_LABEL[pose.hullTemp]} · ${ms}ms`);
       const prev = cache.get(addr);
       const next: HullState = {
         book: b,

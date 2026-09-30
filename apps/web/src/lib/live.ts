@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { LiveEngine, type CensusShip, type LiveChange, type LiveStats } from '@aegis/census';
+import { RISK_LABEL, TAG_LABEL, NO_TYPE_LABEL } from '@aegis/glyphs';
+import type { HullTemp, Tag } from '@aegis/pose';
 import { log } from './log';
 import { inkClient } from './sensors';
 import type { CensusState } from './census';
@@ -20,7 +22,7 @@ export interface LiveWell {
  */
 export function useLiveWell(census: CensusState, enabled = true): LiveWell {
   const engine = useMemo(
-    () => new LiveEngine(inkClient, { onLog: (lvl, msg) => log(lvl, 'live', msg) }),
+    () => new LiveEngine(inkClient, { onLog: (lvl, msg) => log(lvl, 'live', plainLive(msg)) }),
     [],
   );
   const [, bump] = useReducer((x: number) => x + 1, 0);
@@ -65,10 +67,10 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
     const ready = census.status === 'ok' || census.status === 'missing';
     if (enabled && live && visible && ready) {
       engine.start();
-      log('info', 'live', 'live layer started');
+      log('info', 'live', 'live updates started');
     } else if (engine.stats.running) {
       engine.stop();
-      log('info', 'live', visible ? 'live layer paused' : 'live layer paused (tab hidden)');
+      log('info', 'live', visible ? 'live updates paused' : 'live updates paused (tab hidden)');
     }
     return () => engine.stop();
   }, [enabled, live, visible, census.status, engine]);
@@ -81,4 +83,12 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
     setLive,
     flashes: flashes.current,
   };
+}
+
+/** "CARRY/NOMINAL → NAKED/CRITICAL" in engine log lines → plain names ("Hedged, Safe → Unhedged bet, Near liquidation"). */
+export function plainLive(msg: string): string {
+  return msg.replace(/([A-Z][A-Z-]*|—)\/(NOMINAL|ELEVATED|CRITICAL|UNKNOWN)/g, (_, t: string, h: HullTemp) => {
+    const type = t === '—' ? NO_TYPE_LABEL : ((TAG_LABEL as Record<string, string>)[t as Tag] ?? t);
+    return `${type}, ${RISK_LABEL[h]}`;
+  }).replace(/ (new|flip|temp|wounded|healed):/, (_, k: string) => ` ${({ new: 'new wallet', flip: 'type changed', temp: 'risk changed', wounded: 'now near liquidation', healed: 'recovered' } as Record<string, string>)[k] ?? k}:`);
 }

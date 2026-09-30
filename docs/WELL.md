@@ -3,13 +3,18 @@
 The well has three views, chosen with the SPHERE / 2D / LIST switch or `?view=sphere|2d|list`:
 - **HULL SPHERE** (default, since 2026-09-29): a 3D glass world, described in the next section.
 - **WELL GLASS** (2D): the polar plot described after it. It's also what `?well=legacy` shows for one release, and what browsers without WebGL get.
-- **LIST:** the accessible ship list, opened.
+- **LIST:** the accessible wallet list, opened.
 
 Filters, Find, share links and the hull pages work the same in all three.
 
+
+## Words on screen
+
+Since 2026-09-29 everything a visitor reads uses plain names from `packages/glyphs/src/labels.ts`: position types (Hedged, Unhedged bet, …, see RULES.md section 6), risk (Safe / Watch / Near liquidation / Couldn't read) and size ($1k–10k …). The engine names below (pose, hull temp, HAZE/MANTLE/TISSUE/NODE, CORE/HULL pivot) are code names; on screen they read as position type, risk, VIEW FAR/OVERVIEW/CLOSE-UP/WALLET and CENTRED ON SPHERE/WALLET/POINT. The sphere HUD says DEPTH instead of R.
+
 ## HULL SPHERE
 
-A skin and a renderer only: pose, ink-io, the census job and census.json are unchanged. It draws only fields already on a ship row, with no balances, HF or liquidation prices.
+A skin and a renderer only: pose, ink-io, the census job and census.json are unchanged. It draws only fields already on a wallet row, with no balances, HF or liquidation prices.
 
 | Axis | Comes from |
 |---|---|
@@ -21,8 +26,8 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 - **Shells:** nested glass shells at 0.84 / 0.54 / 0.32, labelled NOMINAL / WARN / LIQ ZONE at their visual top. The LIQ shell is dark ruby, and the core is a dim recessed nucleus.
 - **Lunes:** meridian lines at the lune edges, pose-coloured brackets on the equator, and lune names on the equator that fade on the far side (and near the edges on phones).
 - **Threads:** decoration only (`buildThreads` in `packages/glyphs/src/sphere.ts`).
-  - Same main pose only, and only among ships currently drawn.
-  - Up to 3 per ship, within a short distance.
+  - Same main pose only, and only among wallets currently drawn.
+  - Up to 3 per wallet, within a short distance.
   - Built in address-hash order, never risk order.
   - Caps: 3,500 at full orbit (2,000 on phones), 4,000 in the zoomed region.
 
@@ -32,8 +37,8 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 |---|---|---|
 | HAZE | zoom < 0.85 | haze + the orbit glyph set |
 | MANTLE | the default | haze + glyphs for ≥$10k, wounded/critical ≥$1k, elevated ≥$1k and a 1-in-16 sample (phones: ≥$10k and wounded ≥$1k only), faint threads, hairline wounded rings |
-| TISSUE | zoom ≥ 1.8 | every ship fades in (1.5×–2.1×); ships near the camera fade so you see through the mantle; short threads around where you're looking, rebuilt when the camera settles |
-| NODE | a hull is framed by Find, double-click or F | the neighbourhood dims; a cyan hairline bracket and a plate (short address, pose chips, hull temp, band, **Open hull**) |
+| TISSUE | zoom ≥ 1.8 | every wallet fades in (1.5×–2.1×); wallets near the camera fade so you see through the mantle; short threads around where you're looking, rebuilt when the camera settles |
+| NODE | a wallet is framed by Find, double-click or F | the neighbourhood dims; a cyan hairline bracket and a plate (short address, pose chips, risk, band, **Open wallet**) |
 
 **Framing stays until you end it:**
 - It survives orbiting, panning and live updates; the hull is kept by address, not by list position.
@@ -41,11 +46,11 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 - F re-frames the found hull.
 
 **The pivot:**
-- While a hull is framed, the camera orbits **around that hull** (`PIVOT HULL` in the HUD), with gentler rotate, zoom and pan for fine control.
+- While a wallet is framed, the camera orbits **around that hull** (`PIVOT HULL` in the HUD), with gentler rotate, zoom and pan for fine control.
 - When the framing ends, the pivot slides back to the core (`PIVOT CORE`), and the camera moves with it so the sphere re-centres without the view swinging. Scrolling or dragging cannot stop it halfway (the first version could). Orbit and zoom then turn about exactly the same axis as before the search.
 - Right-drag panning moves the pivot off-centre (`PIVOT POINT`); 0 resets it.
 
-**Hover and tap:** they pick the ship whose drawn glyph is under the pointer, nearest the camera first, so never a ship hidden behind it. The framed hull always wins where it's drawn.
+**Hover and tap:** they pick the wallet whose drawn glyph is under the pointer, nearest the camera first, so never a wallet hidden behind it. The framed wallet always wins where it's drawn.
 
 Glyphs shrink as you close in, so they stay beads.
 
@@ -60,13 +65,13 @@ Glyphs shrink as you close in, so they stay beads.
 
 **Motion:**
 - Up to 64 wounded rings breathe on a 1.8 s cycle, at most 30 fps. The breathing set is picked by address hash, never by risk.
-- One 200 ms ember when a ship changes live.
+- One 200 ms ember when a wallet changes live.
 - Camera eases.
 - A 160 ms fade on filter change.
 - With reduced motion switched on in the OS: no breath, no ember, no easing.
 
 **Performance:**
-- **Draw calls:** about 24 whatever the fleet size (measured with 18,555 ships). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
+- **Draw calls:** about 24 whatever the fleet size (measured with 18,555 wallets). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
 - **Pixel density cap:** 1.5 on desktop, 2 on phones.
 - **Rendering on demand:** only when the camera moves or the capped breath ticks, and paused when the tab is hidden.
 - **Loading:** three.js and the engine load only when the sphere opens, as a ~136 KB (compressed) chunk; the main bundle is unchanged.
@@ -78,16 +83,16 @@ Glyphs shrink as you close in, so they stay beads.
 
 # WELL GLASS — the 2D polar plot
 
-A visual refit only. Nothing in pose, ink-io, the census job, prove, or the published snapshot changed. The well draws only fields already on a ship row.
+A visual refit only. Nothing in pose, ink-io, the census job, prove, or the published snapshot changed. The well draws only fields already on a wallet row.
 
 ## Reading it
 
 | On the glass | Means |
 |---|---|
-| **Bearing** (angle) | The ship's **main pose**. Each pose owns a fixed sector. |
+| **Bearing** (angle) | The wallet's **main pose**. Each pose owns a fixed sector. |
 | **Radius** | **Risk**, the same hull-temp rings as before. |
 | **Dot size** | **Size band** only: 5 radii, capped so $100k+ doesn't cover the glass. |
-| **Red ring** | **WOUNDED**, on the ship in its own pose's slice. Never a fill, never a sector. |
+| **Red ring** | **WOUNDED**, on the wallet in its own pose's slice. Never a fill, never a sector. |
 
 The risk rings, from inside out:
 
@@ -111,11 +116,11 @@ Nothing on the glass, its legend, or its tooltip carries a balance, a health fac
 - The share comes from the live mix of 2026-09-29, **frozen** in `packages/glyphs/src/glass.ts` (`SECTOR_MIX_FROZEN`).
 - The widths do not follow the live mix, which would reshuffle every seat. A retune needs owner approval and means a one-time, documented reseat.
 
-**The last sector** holds DARK, EMPTY, "no rule fired", and WOUNDED-as-main-pose. Those ships are drawn neutral grey with the red ring, because red stays reserved for the ring.
+**The last sector** holds DARK, EMPTY, "no rule fired", and WOUNDED-as-main-pose. Those wallets are drawn neutral grey with the red ring, because red stays reserved for the ring.
 
 ## Seats
 
-A ship's position inside its sector comes from its address:
+A wallet's position inside its sector comes from its address:
 - **Bearing** = sector start + span × (0.04 + 0.92 × hash(address)).
 - **Radius** = a position inside its hull-temp ring, from a second hash.
 
@@ -127,11 +132,11 @@ The same address gets the same seat on every load, until the rules version or th
 - ≥$10k
 - WOUNDED or CRITICAL ≥$1k, and ELEVATED ≥$1k
 - a stable 1-in-16 sample, for texture
-- the ship you found
+- the wallet you found
 
 **Phones** draw only ≥$10k glyphs over the haze.
 
-**From 1.6× to 2.2×** the haze fades out and every ship fades in.
+**From 1.6× to 2.2×** the haze fades out and every wallet fades in.
 
 ## Controls
 
@@ -141,21 +146,21 @@ The same address gets the same seat on every load, until the rules version or th
 - **Keys:** + / − / 0, and the arrow keys.
 - **Find** frames the hull at 3.2×.
 - **Filters:** changing a filter sends the camera home.
-- **Tapping on a phone:** the first tap shows the ship's plate, the second opens it.
+- **Tapping on a phone:** the first tap shows the wallet's plate, the second opens it.
 
 The HUD reads `AZ 214°  R 0.62  ZOOM 3.4×`, where AZ is the bearing and R the radius fraction under the pointer.
 
 ## Motion
 
 - A 160 ms fade when the filter changes.
-- One pulse (1.2 s) on a ship that changed live.
+- One pulse (1.2 s) on a wallet that changed live.
 - A short highlight on new tape rows.
 
 Nothing else moves. There's no idle pulsing, no rotation, and no lock-on.
 
 ## Performance
 
-Profiled with 20,245 ships in the production build:
+Profiled with 20,245 wallets in the production build:
 
 | Test | Result |
 |---|---|
