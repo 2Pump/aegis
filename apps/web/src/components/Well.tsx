@@ -472,9 +472,9 @@ export function Well({
 }
 
 /** Accessible list: wounded first, then biggest bands; paginated. */
-export function ShipList({ ships, onOpen }: { ships: readonly WellShip[]; onOpen: (href: string) => void }) {
+export function ShipList({ ships, onOpen, defaultOpen = false }: { ships: readonly WellShip[]; onOpen: (href: string) => void; defaultOpen?: boolean }) {
   const [page, setPage] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const PER = 50;
   // sorted only while the list is open, and only when the layout changes — never per live block
   const listed = useMemo(() => {
@@ -488,7 +488,7 @@ export function ShipList({ ships, onOpen }: { ships: readonly WellShip[]; onOpen
   const pages = Math.max(1, Math.ceil(ships.length / PER));
   const view = listed.slice(page * PER, page * PER + PER);
   return (
-    <details className="ship-list" onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+    <details className="ship-list" open={defaultOpen || undefined} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="mono dim" style={{ fontSize: 12, cursor: 'pointer' }}>
         List view ({ships.length.toLocaleString('en-US')} ships) — for screen readers and scanning
       </summary>

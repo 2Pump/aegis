@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CensusShip } from '@aegis/census';
 import { COPY, shipLiteFromPose } from '@aegis/glyphs';
@@ -7,7 +7,18 @@ import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
 import { WellFilters } from '../components/WellFilters';
-import { WellLegacy } from '../components/WellLegacy';
+import { ShipList } from '../components/Well';
+import { hasWebGL } from '../lib/webgl';
+
+// three.js + the sphere engine load only when the sphere is shown
+const HullSphere = lazy(() => import('../components/sphere/HullSphere'));
+
+type WellView = 'sphere' | '2d' | 'list';
+const VIEWS: Array<[WellView, string]> = [
+  ['sphere', 'SPHERE'],
+  ['2d', '2D'],
+  ['list', 'LIST'],
+];
 import { applyFilter, filterFromParams, filterToParams, type PoseKey, type WellFilter } from '../lib/wellFilter';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
@@ -48,9 +59,16 @@ export function Home() {
 
   const [params, setParams] = useSearchParams();
   const filter = useMemo(() => filterFromParams(params), [params]);
-  // ?well=legacy keeps the pre-WELL GLASS well for one release, so the two can be diffed
+  // ?well=legacy keeps the WELL GLASS 2D plot for one release (so the sphere can be compared with it);
+  // ?view=sphere|2d|list picks the view. No WebGL → the 2D plot.
   const legacy = params.get('well') === 'legacy';
-  const setFilter = (f: WellFilter) => setParams({ ...filterToParams(f), ...(legacy ? { well: 'legacy' } : {}) }, { replace: true });
+  const glOk = useMemo(() => hasWebGL(), []);
+  const viewParam = params.get('view');
+  const asked: WellView | null = viewParam === 'sphere' || viewParam === '2d' || viewParam === 'list' ? viewParam : null;
+  const view: WellView = asked === 'sphere' && !glOk ? '2d' : asked ?? (legacy || !glOk ? '2d' : 'sphere');
+  const keep = () => ({ ...(legacy ? { well: 'legacy' } : {}), ...(asked ? { view: asked } : {}) });
+  const setFilter = (f: WellFilter) => setParams({ ...filterToParams(f), ...keep() }, { replace: true });
+  const setView = (v: WellView) => setParams({ ...filterToParams(filter), ...(legacy ? { well: 'legacy' } : {}), view: v }, { replace: true });
   const resetKey = useMemo(() => JSON.stringify({ ...filter, find: '' }), [filter]);
   const counts = useMemo(() => {
     const m = new Map<PoseKey, number>();
@@ -127,12 +145,30 @@ export function Home() {
               {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
               {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
               {ships.length > 0 ? (
-                legacy ? (
-                  <WellLegacy ships={shown} found={filter.find || null} onOpen={(href) => nav(href)} />
-                ) : (
-                  <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} />
-                )
+                <div className="view-switch" role="group" aria-label="Well view" data-testid="view-switch">
+                  {VIEWS.map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`sq-btn${view === v ? ' on' : ''}`}
+                      aria-pressed={view === v}
+                      disabled={v === 'sphere' && !glOk}
+                      title={v === 'sphere' && !glOk ? 'This browser has no WebGL — the sphere needs it' : undefined}
+                      onClick={() => setView(v)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {!glOk ? <span className="faint mono" style={{ fontSize: 10, marginLeft: 8 }}>NO WEBGL · 2D WELL</span> : null}
+                </div>
               ) : null}
+              {ships.length > 0 && view === 'sphere' ? (
+                <Suspense fallback={<div className="wg hs-loading-box">LOADING HULL SPHERE…</div>}>
+                  <HullSphere ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} />
+                </Suspense>
+              ) : null}
+              {ships.length > 0 && view === '2d' ? <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} /> : null}
+              {ships.length > 0 && view === 'list' ? <ShipList ships={shown} onOpen={(href) => nav(href)} defaultOpen /> : null}
               <MixBar mix={mixOf(lw.ships)} label={COPY.censusFull} />
             </div>
           </Panel>

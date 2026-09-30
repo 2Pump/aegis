@@ -1,4 +1,70 @@
-# WELL GLASS — how the well is drawn
+# The well — HULL SPHERE (default) and WELL GLASS (2D)
+
+The well has three views, chosen with the SPHERE / 2D / LIST switch or `?view=sphere|2d|list`:
+- **HULL SPHERE** (default, since 2026-09-29): a 3D glass world, described in the next section.
+- **WELL GLASS** (2D): the polar plot described after it. It's also what `?well=legacy` shows for one release, and what browsers without WebGL get.
+- **LIST:** the accessible ship list, opened.
+
+Filters, Find, share links and the hull pages work the same in all three.
+
+## HULL SPHERE
+
+A skin and a renderer only: pose, ink-io, the census job and census.json are unchanged. It draws only fields already on a ship row, with no balances, HF or liquidation prices.
+
+| Axis | Comes from |
+|---|---|
+| **Longitude (lune)** | Main pose, using the same frozen sector table and address hash as the 2D plot, so a wallet's bearing is **identical** in both views. |
+| **Depth (radius)** | Hull temp, using the same rings as 2D: LIQ 0.12–0.30 · WARN 0.34–0.52 · NOMINAL 0.56–0.82 · dark sensors 0.86–0.96. |
+| **Latitude** | A third hash of the address, spread evenly over the surface. The top and bottom ~26° stay empty so the lunes don't crush together at the poles. |
+
+**What's on the glass:**
+- **Shells:** nested glass shells at 0.84 / 0.54 / 0.32, labelled NOMINAL / WARN / LIQ ZONE at their visual top. The LIQ shell is dark ruby, and the core is a dim recessed nucleus.
+- **Lunes:** meridian lines at the lune edges, pose-coloured brackets on the equator, and lune names on the equator that fade on the far side (and near the edges on phones).
+- **Threads:** decoration only (`buildThreads` in `packages/glyphs/src/sphere.ts`).
+  - Same main pose only, and only among ships currently drawn.
+  - Up to 3 per ship, within a short distance.
+  - Built in address-hash order, never risk order.
+  - Caps: 3,500 at full orbit (2,000 on phones), 4,000 in the zoomed region.
+
+**Level of detail**, set by zoom (default distance ÷ current distance):
+
+| LOD | When | Drawn |
+|---|---|---|
+| HAZE | zoom < 0.85 | haze + the orbit glyph set |
+| MANTLE | the default | haze + glyphs for ≥$10k, wounded/critical ≥$1k, elevated ≥$1k and a 1-in-16 sample (phones: ≥$10k and wounded ≥$1k only), faint threads, hairline wounded rings |
+| TISSUE | zoom ≥ 1.8 | every ship fades in (1.5×–2.1×); ships near the camera fade so you see through the mantle; short threads around where you're looking, rebuilt when the camera settles |
+| NODE | a hull is framed by Find, double-click or F | the neighbourhood dims; a cyan hairline bracket and a plate (short address, pose chips, hull temp, band, **Open hull**) |
+
+Glyphs shrink as you close in, so they stay beads.
+
+**Camera:**
+- **Default view:** 18° tilt, sphere at ~70% of the view (86% on phones).
+- **Mouse:** drag orbits (damped; it can't tip over the poles), the wheel zooms, right-drag pans. Double-click frames a hull.
+- **Keys:** ← → orbit, + − zoom, 0 or Esc resets, F frames.
+- **Phone:** one finger orbits; pinch zooms, and two fingers also pan.
+- **Find** eases to the hull with no overshoot, and changing a filter sends the camera home.
+- **Scrolling out:** at full zoom-out, scrolling down scrolls the page.
+- **Nothing moves on its own:** no auto-spin.
+
+**Motion:**
+- Up to 64 wounded rings breathe on a 1.8 s cycle, at most 30 fps. The breathing set is picked by address hash, never by risk.
+- One 200 ms ember when a ship changes live.
+- Camera eases.
+- A 160 ms fade on filter change.
+- With reduced motion switched on in the OS: no breath, no ember, no easing.
+
+**Performance:**
+- **Draw calls:** about 24 whatever the fleet size (measured with 18,555 ships). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
+- **Pixel density cap:** 1.5 on desktop, 2 on phones.
+- **Rendering on demand:** only when the camera moves or the capped breath ticks, and paused when the tab is hidden.
+- **Loading:** three.js and the engine load only when the sphere opens, as a ~136 KB (compressed) chunk; the main bundle is unchanged.
+- **Checking it:** `?fps=1` shows frames drawn per second and draw calls on the page. Targets are 60 fps with a floor of 40 on a mid laptop at default orbit, and 30+ on a phone. If a device misses them, drop threads first, then pixel density, then the glyph sample; never the sphere.
+
+**Code:** seats, LOD and threads in `packages/glyphs/src/sphere.ts` (tested); the engine in `apps/web/src/components/sphere/engine.ts`; the view in `HullSphere.tsx`.
+
+---
+
+# WELL GLASS — the 2D polar plot
 
 A visual refit only. Nothing in pose, ink-io, the census job, prove, or the published snapshot changed. The well draws only fields already on a ship row.
 
@@ -94,4 +160,4 @@ Plain 2D canvas holds this, so no WebGL is used.
 
 ## Legacy
 
-`?well=legacy` shows the old well for one release so the two can be compared. The flag survives filter changes.
+`?well=legacy` now shows WELL GLASS (this 2D plot) for one release, so the sphere can be compared with it. The flag survives filter changes. The older donut well was retired on 2026-09-29.

@@ -299,3 +299,20 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 }
 .find .pill-btn { margin-left: -1px; padding: 6px 12px; }
 .found-card { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid rgba(229, 249, 247, 0.3); font-size: 12.5px; }
+
+/* ───────── HULL SPHERE ───────── */
+.view-switch { display: flex; align-items: center; gap: 0; }
+.view-switch .sq-btn { margin-left: -1px; padding: 6px 12px; }
+.view-switch .sq-btn.on { background: var(--cyan); color: var(--void); border-color: var(--cyan); position: relative; z-index: 1; }
+.hs { cursor: grab; }
+.hs:active { cursor: grabbing; }
+.hs .hs-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hs.hs-fade .hs-canvas { animation: wg-fade 160ms ease-out; }
+.hs-title { color: var(--ink); letter-spacing: 0.3em; }
+.hs-loading, .hs-loading-box { display: flex; align-items: center; justify-content: center; font: 500 10.5px var(--mono); letter-spacing: 0.24em; color: var(--ink-faint); }
+.hs-loading { position: absolute; inset: 0; z-index: 1; }
+.hs-loading-box { height: 420px; }
+.hs-plate {
+  position: absolute; z-index: 4; min-width: 220px; background: rgba(2, 4, 7, 0.94); border: 1px solid rgba(76, 224, 210, 0.45);
+  padding: 9px 11px; font: 11px/1.5 var(--mono);
+}

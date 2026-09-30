@@ -3,6 +3,7 @@ import { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand }
 
 export { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
 export * from './glass.js';
+export * from './sphere.js';
 
 /* ───────────────────────── size bands (privacy default) ───────────────────────── */
 

@@ -157,10 +157,11 @@ The production well stays locked until `verification/status.json` is proven (see
 
 ## Costs and limits
 
-- **GitHub Actions:** GitHub bills each run rounded up to a whole minute, and setup (checkout + install) takes about a minute. On 2026-09-29 an hourly run read 4,609 wallets in about 4 minutes, so a run costs about 5–6 minutes. Hourly on a **private** repo comes to roughly 3,500–4,300 minutes a month, against the 2,000 free. Skipped duplicates cost 1 minute each. Options:
-  - make the repo public (standard runners are free and unlimited for public repos; the code holds no secrets), or
-  - use GitHub Pro (3,000 minutes), or
-  - set the timer to every 2 hours. The live layer keeps the well fresh in between, and it catches up to 4 hours of blocks when someone opens the site.
+- **GitHub Actions:** the account is on **GitHub Pro** (since 2026-09-29), which includes **3,000 minutes** a month; minutes past that cost **$0.006** each on the standard Linux runner (GitHub Docs, 2026 prices). GitHub bills each run rounded up to a whole minute, and setup (checkout + install) takes about a minute.
+  - On 2026-09-29 an hourly run read 4,609 wallets in about 4 minutes, so a run costs about 5–6 minutes, or roughly **3,500–4,300 minutes a month**. That's about 500–1,300 minutes over, about **$3–8 a month** on top of Pro's $4.
+  - Skipped duplicate runs cost 1 minute each.
+  - Paying for extra minutes needs a payment method on file. Without one, runs are blocked once the included minutes are used.
+  - An **Actions budget** (github.com/settings/billing → Budgets) caps it. It's a ceiling with email alerts, not a prepayment: GitHub charges only what was used, once a month. We use **$15**. With "stop usage when budget limit is reached" ticked, the census pauses at the cap instead of overspending, and the live site keeps working.
 - **Vercel Blob:** each well visit downloads the snapshot, about 210 KB compressed per 15,000 ships. Check Vercel → Usage.
 - **RPC:** each open well tab makes a few small calls every 4 s and one heavier Nado read every ~15 s. Fine for testing on the public RPC. Use a private RPC key before announcing publicly.
 
