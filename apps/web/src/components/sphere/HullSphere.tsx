@@ -132,9 +132,8 @@ export default function HullSphere({
   // data → engine (layout changes only)
   useEffect(() => {
     if (!ready) return;
-    engine.current?.setSeats(world.seats);
+    engine.current?.setSeats(world.seats); // the engine keeps the framed hull by address
     setHover(null);
-    setFramed(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, world.seats]);
 
@@ -152,7 +151,9 @@ export default function HullSphere({
       host.current.classList.add('hs-fade');
     }
     firstReset.current = false;
-  }, [ready, resetKey, foundIdx]);
+    // keyed on the ADDRESS: a live update that shifts indices must not pull the camera back to the hull
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, resetKey, found, foundIdx >= 0]);
 
   // one ember per live change
   const flashKey = useMemo(() => {
@@ -180,7 +181,9 @@ export default function HullSphere({
     else if (k === '+' || k === '=') eng.zoomBy(1.4);
     else if (k === '-' || k === '_') eng.zoomBy(1 / 1.4);
     else if (k === '0' || k === 'Escape') eng.goHome();
-    else if (k === 'f' || k === 'F') eng.frameHovered();
+    else if (k === 'f' || k === 'F') {
+      if (!eng.frameHovered() && foundIdx >= 0) eng.frame(foundIdx); // F with nothing under the pointer re-frames the found hull
+    }
     else return;
     e.preventDefault();
   };

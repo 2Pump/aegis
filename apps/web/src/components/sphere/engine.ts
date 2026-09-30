@@ -303,7 +303,9 @@ export class SphereEngine {
   /* ───────────── ships ───────────── */
 
   setSeats(seats: SphereSeat[]) {
-    if (this.framed !== null) this.setFramed(null); // indices change with the layout; Find re-frames
+    // indices change when the live layer adds a ship or one changes pose: keep the framed hull by ADDRESS
+    const keepFramed = this.framed !== null ? (this.seats[this.framed]?.address ?? null) : null;
+    if (this.framed !== null) this.setFramed(null, true);
     this.hovered = null;
     this.tapped = null;
     this.seats = seats;
@@ -342,8 +344,18 @@ export class SphereEngine {
     this.threadsOrbit = this.threads(orbitSeats, buildThreads(orbitSeats, { k: 3, maxLen: 0.12, cap: phone ? 2000 : 3500 }), 0.26);
     this.world.add(this.haze, this.glyphs, this.fine, this.coronaG, this.coronaF, this.threadsOrbit);
     this.threadsNear = undefined;
+    if (keepFramed) {
+      const again = seats.findIndex((s) => s.address === keepFramed);
+      if (again >= 0) this.setFramed(again); // same hull, new index — the camera does not move
+      else this.cb.onFramed(null, 0, 0); // it left the well (e.g. it emptied)
+    }
     this.scheduleSettle();
     this.touch();
+  }
+
+  /** index of the framed hull, if any */
+  framedIndex(): number | null {
+    return this.framed;
   }
 
   private nodes(idx: number[], geo: THREE.BufferGeometry, u: Uniforms): THREE.InstancedMesh {
@@ -540,12 +552,15 @@ export class SphereEngine {
     this.moveTo(pos, p, true);
   }
 
-  frameHovered() {
+  /** F: frame the hull under the pointer (or re-frame the current one). false = nothing to frame. */
+  frameHovered(): boolean {
     if (this.hovered !== null) this.frame(this.hovered);
     else if (this.framed !== null) this.frame(this.framed);
+    else return false;
+    return true;
   }
 
-  private setFramed(i: number | null) {
+  private setFramed(i: number | null, silent = false) {
     this.framed = i;
     for (const o of [...this.focusGroup.children]) {
       this.focusGroup.remove(o);
@@ -583,7 +598,7 @@ export class SphereEngine {
       this.focusGroup.add(br);
     }
     if (this.coronaG) (this.coronaG.material as THREE.ShaderMaterial).uniforms.strength!.value = i === null ? 0.5 : 0.38;
-    if (i === null) this.cb.onFramed(null, 0, 0);
+    if (i === null && !silent) this.cb.onFramed(null, 0, 0);
     this.touch();
   }
 
@@ -623,21 +638,32 @@ export class SphereEngine {
     const o = ray.ray.origin;
     const d = ray.ray.direction;
     const pxPerUnitAt1 = this.h / (2 * Math.tan((FOV * Math.PI) / 360));
-    const reach = this.opts.phone ? 14 : 10;
+    // a ship is under the pointer when the pointer is on its DRAWN glyph (plus a small margin, bigger on touch);
+    // of those, the one nearest the camera wins — never a ship hidden behind it
+    const pad = this.opts.phone ? 8 : 3;
+    const minReach = this.opts.phone ? 12 : 6;
+    const gs = this.uGlyph.uGS!.value as number;
     const fineOn = sphereFineMix(this.zoom()) > 0.5 || this.framed !== null;
     const near = (this.uGlyph.uNear!.value as number) * 0.8;
-    let best: number | null = null;
-    let bestPx = Infinity;
-    const test = (i: number) => {
+    const hit = (i: number): number | null => {
       const s = this.seats[i]!;
       const vx = s.x - o.x, vy = s.y - o.y, vz = s.z - o.z;
       const t = vx * d.x + vy * d.y + vz * d.z;
-      if (t <= near) return;
+      if (t <= Math.max(near, 1e-4)) return null;
       const px = vx - d.x * t, py = vy - d.y * t, pz = vz - d.z * t;
       const dp = (Math.sqrt(px * px + py * py + pz * pz) / t) * pxPerUnitAt1;
-      if (dp < reach && dp < bestPx) {
+      const rPx = ((SPHERE_BAND_W[BANDS[s.bandIdx]!] * gs) / t) * pxPerUnitAt1;
+      return dp <= Math.max(rPx + pad, minReach) ? t : null;
+    };
+    // the framed hull always wins where it is drawn
+    if (this.framed !== null && hit(this.framed) !== null) return this.framed;
+    let best: number | null = null;
+    let bestT = Infinity;
+    const test = (i: number) => {
+      const t = hit(i);
+      if (t !== null && t < bestT) {
         best = i;
-        bestPx = dp;
+        bestT = t;
       }
     };
     for (const i of this.glyphIdx) test(i);
@@ -756,6 +782,7 @@ export class SphereEngine {
   };
 
   private render() {
+    if (this.framed !== null && !this.tween && this.camera.position.distanceTo(this.controls.target) > 0.6) this.setFramed(null);
     const zoom = this.zoom();
     const lod = sphereLod(zoom, this.framed !== null);
     const mix = this.framed !== null ? 1 : sphereFineMix(zoom);

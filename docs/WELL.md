@@ -35,6 +35,13 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 | TISSUE | zoom ≥ 1.8 | every ship fades in (1.5×–2.1×); ships near the camera fade so you see through the mantle; short threads around where you're looking, rebuilt when the camera settles |
 | NODE | a hull is framed by Find, double-click or F | the neighbourhood dims; a cyan hairline bracket and a plate (short address, pose chips, hull temp, band, **Open hull**) |
 
+**Framing stays until you end it:**
+- It survives orbiting, panning and live updates; the hull is kept by address, not by list position.
+- It ends when you zoom back out (camera more than ~3× its framing distance), press 0 or Esc, or hit Clear.
+- F re-frames the found hull.
+
+**Hover and tap:** they pick the ship whose drawn glyph is under the pointer, nearest the camera first, so never a ship hidden behind it. The framed hull always wins where it's drawn.
+
 Glyphs shrink as you close in, so they stay beads.
 
 **Camera:**
