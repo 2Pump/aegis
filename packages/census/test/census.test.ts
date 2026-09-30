@@ -448,9 +448,14 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
 
     // next run: full sweep; the owner's book now includes the isolated subaccount
     const chain3 = fakeChain({ head: HEAD + 200, isolatedTradeAt: 30_500_000 });
-    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: chain3.client, store });
+    const logs3: string[] = [];
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: chain3.client, store, log: (m) => logs3.push(m) });
     expect(snap.sweep.kind).toBe('full');
     expect(chain3.stats.isolatedReads).toBeGreaterThan(0);
+    // the isolated subaccount reports exists=false but holds a 0.05 BTC long: it must be counted (OI 0.1 → 50% of longs)
+    expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5);
+    expect(logs3.some((l) => l.includes('report exists=false on-chain (counted since census v1.2)'))).toBe(true);
+    expect(logs3.some((l) => l.includes('protocol accounts ('))).toBe(true);
   });
 
   it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {

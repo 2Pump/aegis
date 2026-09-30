@@ -58,17 +58,23 @@ export class CoverageAcc {
       for (const l of book.tydro.data.supplies) bump(this.tydroSupply, l.symbol, Math.abs(l.amount));
       for (const l of book.tydro.data.debts) bump(this.tydroDebt, l.symbol, Math.abs(l.amount));
     }
-    if (book.nado.status === 'OK') {
-      for (const s of book.nado.data.spots) {
+    if (book.nado.status === 'OK') this.addNado(book.nado.data.spots, book.nado.data.perps);
+    if (book.tydro.status === 'DARK' || book.nado.status === 'DARK') this.dark++;
+  }
+
+  /** Nado balances only (protocol accounts, which have no Tydro side). */
+  addNado(spots: ReadonlyArray<{ productId: number; amount: number }>, perps: ReadonlyArray<{ productId: number; sizeBase: number }>): void {
+    const bump = <K>(m: Map<K, number>, k: K, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+    {
+      for (const s of spots) {
         if (s.amount > 0) bump(this.nadoDeposits, s.productId, s.amount);
         else if (s.amount < 0) bump(this.nadoBorrows, s.productId, -s.amount);
       }
-      for (const p of book.nado.data.perps) {
+      for (const p of perps) {
         if (p.sizeBase > 0) bump(this.nadoLongs, p.productId, p.sizeBase);
         else if (p.sizeBase < 0) bump(this.nadoShorts, p.productId, -p.sizeBase);
       }
     }
-    if (book.tydro.status === 'DARK' || book.nado.status === 'DARK') this.dark++;
   }
 }
 

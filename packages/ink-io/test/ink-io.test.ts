@@ -157,3 +157,26 @@ describe('tydro reader (mock RPC)', () => {
     expect(n).toBeGreaterThan(5);
   });
 });
+
+describe('subaccounts that report exists=false (census v1.2)', () => {
+  const sub = (exists: boolean, withPerp: boolean) => ({
+    subaccount: `0x${'ab'.repeat(20)}0000020069736f0000000000`,
+    exists,
+    spots: [],
+    perps: withPerp
+      ? [{ productId: 2, subaccount: 'x', symbol: 'BTC-PERP', family: 'BTC', assetClass: 'CRYPTO', sizeBase: 0.05, notionalUsd: 5000, priceUsd: 100000, priceSource: 'NADO_ONCHAIN', vQuoteUsd: -5000, unsettledUsd: 0 }]
+      : [],
+    initial: null,
+    maintenance: null,
+    unweighted: null,
+  });
+  it('a subaccount holding a position is counted even when the chain says exists=false', () => {
+    const book = aggregate([sub(false, true) as never], []);
+    expect(book.perps).toHaveLength(1);
+    expect(book.notes.some((n) => n.includes('exists=false'))).toBe(true);
+  });
+  it('an empty subaccount that does not exist is still ignored', () => {
+    const book = aggregate([sub(false, false) as never], []);
+    expect(book.subaccounts).toHaveLength(0);
+  });
+});

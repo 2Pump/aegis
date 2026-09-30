@@ -14,6 +14,7 @@
 
 **Step B: the live layer**, which runs in the viewer's browser while the well is open (`LiveEngine`)
 - **Starts from** the snapshot.
+- **Catches up** to ~4 hours of blocks (14,400) if the snapshot is old; anything older arrives with the next census.
 - **Every ~4 s:** it scans new blocks for Tydro and Nado events and re-reads any wallet that acted. Changes show within seconds.
 - **Every ~15 s:** it re-reads the next few at-risk ships, because price alone can hurt them.
 - **Pauses** when the tab is hidden, or when you click "Pause live".
@@ -31,6 +32,8 @@
 | Healthy wallets that never borrowed on Tydro | weekly full sweep (no debt → price can't wound them; any deposit, withdrawal or trade re-reads them at once) |
 | Empty wallets | weekly full sweep (they can only fill up through an event, which re-reads them at once) |
 
+The first hourly run on this rule (2026-09-29, run #13) read 4,609 wallets in about 4 minutes and carried 60,265.
+
 **First run.**
 - **Tydro** is seeded from the Ink explorer's holder lists for its 28 tokens, about 400 small requests. The explorer supplies addresses only; every balance and HF is still read on-chain. If the explorer fails, the job falls back to a chain scan.
 - **Nado** history is scanned on-chain. The public Ink RPC allows only 1,000 blocks per history request, so its ~27M blocks take a few hours, spread over several hourly runs (it saves progress after every phase and resumes). A private RPC with a bigger range cap makes this much faster.
@@ -47,6 +50,7 @@
 5. **First run.** In GitHub **Actions** → **census** → **Run workflow**. The log shows discovery progress, then "published N ships … → https://….public.blob.vercel-storage.com/census/census.json". **Copy that URL.**
 6. **Point the site at it.** Vercel → project → **Settings → Environment Variables**: `VITE_CENSUS_URL` = that URL. Then redeploy.
    Use the **Config** type, not Secret. `VITE_` values are built into the public site anyway.
+7. **Hourly start.** Set up the outside timer (see "Hourly start" at the end).
 
 ### Bootstrap from a local census (what we actually did, 2026-09-28)
 
@@ -58,7 +62,7 @@ $env:BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_..."   # Vercel → Storage → aeg
 node packages/census/scripts/push-local.mjs          # uploads census/known.json + census/census.json
 ```
 
-After that, each hourly run only covers the last hour of blocks, taking about a minute.
+After that, each hourly run only covers the last hour of blocks.
 
 ### Local run (no Blob needed)
 
@@ -107,7 +111,7 @@ So the census no longer reads that venue for such a wallet. Its sensor is OK and
 A full sweep reads wallets in address order and saves a cursor (`fullSweep` in `known.json`). If it runs out of time, the next run **continues from the cursor**; it never starts over. Before this, an unfinished sweep restarted from zero every run, and each of those runs used the whole 40 minutes.
 - A wallet whose read fails keeps its last good reading, and **does not** make the sweep start over (the old code treated one failed read as "sweep unfinished").
 - The snapshot says `sweep.complete: false` while a sweep is still going; the site shows **FULL · PARTIAL**.
-- **Coverage** needs every wallet read at one block, so it is measured only by a sweep that starts and finishes in the same run (the weekly sweep of ~65k wallets took 36 minutes on 2026-09-29). A sweep that spans runs logs "coverage not measured" and the last measurement is kept.
+- **Coverage** needs every wallet read at one block, so it is measured only by a sweep that starts and finishes in the same run (the sweep of ~65k wallets took 36 minutes on 2026-09-29). A sweep that spans runs logs "coverage not measured" and the last measurement is kept.
 
 ## Coverage check (is anyone missing?)
 
@@ -124,16 +128,24 @@ A gap would mean accounts the discovery doesn't see yet.
 
 **First measurement (2026-09-29, block 57,211,516):** Tydro supplied 100.0%, Tydro borrowed 100.0%, Nado deposits 82.1%, Nado open interest 46.2% (longs) / 46.4% (shorts). The largest gaps were BTC-, ETH- and HYPE-PERP open interest on both sides (about 45–50% seen), USDT0 deposits (70%), and spot product 11 borrows (0% of about $7.7M).
 
-### Isolated-margin subaccounts (why Nado was at ~46%)
+### Why Nado was at ~46%: what we checked, in order
 
-Nado's engine creates a separate subaccount for each isolated-margin position and funds it from the owner's main account. Its name carries `iso` (Nado SDK bytes32 tests: `…0000020069736f…`). It never makes a deposit, so the deposit scan can't find it. The only public event that names it is a trade (`BalanceUpdate`), and until v1.2 trades were scanned for the last ~6 hours only. So an isolated position opened earlier and still open was invisible, on both the long and the short side.
+**How Nado counts open interest.** Nado is a Vertex fork. In Vertex's `PerpEngineState._updateBalance`, `openInterest` goes up only when a balance is positive, so it's the sum of **longs** (plus base in any AMM LP pool). Every long has a short on the other side, so comparing longs seen with it, and shorts seen with it, is right. The 46% was a real gap, not a formula mistake.
 
-The fix (census v1.2):
-- **One-time trade-history backfill.** `BalanceUpdate` since Nado's launch, resumable across runs (`nado.tradeHistory` in `known.json`), within the 60% backfill share of each run. Every subaccount it finds is added to its owner, and the owner's book then reads it with the rest.
-- **No more skipped trade windows.** The forward trade scan no longer caps itself at 6 hours, so a gap between runs is never skipped.
-- **Coverage re-measured.** When the backfill completes, the next run starts a fresh full sweep with its whole budget and measures coverage again.
+**1. Isolated subaccounts: discovery was not the problem.** Nado's engine creates a separate subaccount for each isolated-margin position and funds it from the owner's main account. Its name ends in `…69736f` ("iso"). Census v1.2 scans every trade since launch once to find them (`nado.tradeHistory` in `known.json`, resumable, within the 60% backfill share of each run), and the forward trade scan no longer caps itself at 6 hours.
 
-The log counts the isolated subaccounts found and prints a few name layouts, so the `iso` pattern can be checked against real data.
+The first run of that scan (2026-09-29, run #13) covered blocks 29.85M → 36.92M, about 26% of history. It saw 24,170 subaccounts, **2,391 of them isolated, and all of them already known** (+0 new). So the census already found and read these subaccounts.
+
+**2. Reading: a subaccount holding positions was dropped if the chain said `exists = false`.** When an owner's subaccounts were combined, any that Nado's on-chain reader (FQuerier) reported as `exists = false` were skipped, even if they held balances. Engine-created subaccounts are the likely case, since they're never registered by a deposit. From v1.2 a subaccount that holds balances always counts. The hull page gets the same fix, and the log counts how many wallets were affected.
+
+**3. Protocol accounts are now measured.** Nado's own accounts have a zero owner (Vertex: FEES_ACCOUNT = 0, X_ACCOUNT = 1, V_ACCOUNT = 2), and the census deliberately never draws them. On every coverage sweep they are now read, for the log only, so it's clear how much of the open interest sits with the protocol itself rather than with wallets we missed.
+
+**What the next coverage line should look like:**
+- If 2 was the cause, open interest coverage jumps and the log reports wallets with `exists=false` balances.
+- If 3 holds the rest, the "wallets + protocol accounts" line closes the gap.
+- If neither does, the gap is accounts we still don't see, and the per-product gap lines show where to look next.
+
+The trade-history scan still completes once, so the old 6-hour gaps are covered too. When it finishes, the next run does a full sweep and measures coverage again.
 
 The job log shows the coverage line only on full sweeps; the other runs republish the last full sweep's shares.
 
@@ -145,7 +157,7 @@ The production well stays locked until `verification/status.json` is proven (see
 
 ## Costs and limits
 
-- **GitHub Actions:** GitHub bills each run rounded up to a whole minute, and setup (checkout + install) takes about a minute. On a **private** repo the free plan includes 2,000 minutes a month, and hourly runs of 2–4 minutes come to roughly 1,500–3,000. Check **github.com/settings/billing** after a day or two. If it's over:
+- **GitHub Actions:** GitHub bills each run rounded up to a whole minute, and setup (checkout + install) takes about a minute. On 2026-09-29 an hourly run read 4,609 wallets in about 4 minutes, so a run costs about 5–6 minutes. Hourly on a **private** repo comes to roughly 3,500–4,300 minutes a month, against the 2,000 free. Skipped duplicates cost 1 minute each. Options:
   - make the repo public (standard runners are free and unlimited for public repos; the code holds no secrets), or
   - use GitHub Pro (3,000 minutes), or
   - set the timer to every 2 hours. The live layer keeps the well fresh in between, and it catches up to 4 hours of blocks when someone opens the site.
@@ -169,17 +181,19 @@ GitHub's own schedule is best-effort. On 2026-09-28/29 it started the hourly wor
 
 It reads the snapshot's age from the repo **variable** `CENSUS_URL`, the public census.json URL. Without it, every run goes ahead.
 
+It went live on 2026-09-29. Run #12 failed on a bug in this check (`node -e` doesn't allow a top-level `return`), fixed the same day. Run #14 then skipped itself correctly, 5 minutes after run #13 published.
+
 **Setup:**
 1. **Repo variable.** github.com/2Pump/aegis → Settings → Secrets and variables → Actions → **Variables** tab → New repository variable: `CENSUS_URL` = `https://…public.blob.vercel-storage.com/census/census.json`.
 2. **Token for the timer.** github.com/settings/personal-access-tokens/new (fine-grained):
    - **Name:** `aegis census timer`
    - **Expiration:** the longest offered. Put the date in your calendar; the timer stops when the token expires.
    - **Repository access:** Only select repositories → `aegis`.
-   - **Permissions:** Repository permissions → **Actions: Read and write**. Nothing else.
+   - **Permissions:** Add permissions → **Actions: Read and write**. Nothing else. GitHub may add **Metadata: Read-only** by itself; that's fine.
    - Generate the token and copy it.
 3. **cron-job.org.** Sign up (free), then create a cronjob:
    - **URL:** `https://api.github.com/repos/2Pump/aegis/actions/workflows/census.yml/dispatches`
-   - **Schedule:** every hour, at minute 5
+   - **Schedule:** every hour, at minute 5. With the Custom option, leave no hour selected, so the crontab reads `5 * * * *`.
    - **Advanced → Request method:** `POST`
    - **Advanced → Headers:**
      - `Accept: application/vnd.github+json`
@@ -188,4 +202,8 @@ It reads the snapshot's age from the repo **variable** `CENSUS_URL`, the public 
      - `Content-Type: application/json`
    - **Advanced → Request body:** `{"ref":"main","inputs":{"source":"timer"}}`
    - Save, then **Test run**. GitHub answers **204** (success, empty reply). A new run appears in Actions named **census · timer**.
-4. **If it fails.** cron-job.org can email you when a call fails. A **401** means the token expired or was pasted wrong. A **404** means the URL or the token's repository access is wrong. A **422** means the body or the branch name is wrong.
+4. **If it fails.** cron-job.org can email you when a call fails.
+   - **401:** the token expired or was pasted wrong.
+   - **404:** the URL or the token's repository access is wrong.
+   - **422:** the body or the branch name is wrong.
+5. **API version.** GitHub marks the `2022-11-28` API version as deprecated from 10 March 2026, with a sunset on 10 March 2028. When you renew the token, check GitHub's API versions page for the current version and update the header.

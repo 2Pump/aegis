@@ -91,7 +91,8 @@ export function fakeChain(o: FakeOpts) {
       stats.isolatedReads++;
       return {
         subaccount: ISO_SUB,
-        exists: true,
+        // engine-created isolated subaccount: holds a position, yet reports exists=false (the v1.2 finding)
+        exists: false,
         healths: [
           { assets: 500n * e18, liabilities: 0n, health: 450n * e18 },
           { assets: 500n * e18, liabilities: 0n, health: 400n * e18 },
@@ -102,8 +103,10 @@ export function fakeChain(o: FakeOpts) {
         perpCount: 1,
         spotBalances: [{ productId: 0, balance: { amount: 500n * e18 } }],
         perpBalances: [{ productId: 2, balance: { amount: e18 / 20n, vQuoteBalance: -5_000n * e18, lastCumulativeFundingX18: 0n } }],
-        spotProducts: [],
-        perpProducts: [],
+        spotProducts: [
+          { productId: 0, oraclePriceX18: e18, state: { cumulativeDepositsMultiplierX18: e18, cumulativeBorrowsMultiplierX18: e18, totalDepositsNormalized: 500n * e18, totalBorrowsNormalized: 0n } },
+        ],
+        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
       };
     }
     if (sub.toLowerCase() !== sCarry) throw new Error('fake: getSubaccountInfo called for an empty subaccount (health filter should have skipped it)');

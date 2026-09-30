@@ -2,8 +2,11 @@ import {
   NADO_START_BLOCK,
   TYDRO_START_BLOCK,
   TYDRO_TOKENS,
+  VERTEX_PROTOCOL_SUBS,
+  decodeNadoProtocolSubaccounts,
   decodeNadoSubaccounts,
   decodeTydroTransfers,
+  readNadoSubsMany,
   nadoSubaccount,
   readBooksMany,
   readProtocolTotals,
@@ -59,6 +62,8 @@ export interface CensusState {
      * public event that names them.
      */
     tradeHistory?: History;
+    /** protocol-owned (zero-owner) subaccounts seen in logs — read for coverage only, never drawn */
+    protocolSubs?: string[];
   };
   lastFullBlock: number;
   lastFullAt: string | null;
@@ -120,6 +125,15 @@ function retryLog(log: (m: string) => void, label: string) {
       log(`${label}: ${what} (try ${i.attempt}; ${i.error})`);
     }
   };
+}
+
+/** Sum of two coverage accumulators (wallets + protocol accounts). */
+function mergeAcc(a: CoverageAcc, b: CoverageAcc): CoverageAcc {
+  const out = new CoverageAcc();
+  for (const k of ['tydroSupply', 'tydroDebt', 'nadoDeposits', 'nadoBorrows', 'nadoLongs', 'nadoShorts'] as const) {
+    for (const src of [a, b]) for (const [key, v] of src[k] as Map<string | number, number>) (out[k] as Map<string | number, number>).set(key, ((out[k] as Map<string | number, number>).get(key) ?? 0) + v);
+  }
+  return out;
 }
 
 /** Isolated-margin subaccounts carry "iso" in their 12-byte name (Nado SDK bytes32 tests). Used for logging only. */
@@ -206,6 +220,11 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     state.tydro.users[addr] = [...cur].sort((a, b) => a - b);
     if (markTouched) touched.add(addr);
   };
+  const noteProtocol = (logs: Parameters<typeof decodeNadoProtocolSubaccounts>[0]) => {
+    const cur = new Set(state.nado.protocolSubs ?? []);
+    for (const s of decodeNadoProtocolSubaccounts(logs)) cur.add(s);
+    state.nado.protocolSubs = [...cur].sort();
+  };
   const addSub = (sub: string) => {
     const owner = subaccountOwner(sub);
     const list = state.nado.subs[owner] ?? [];
@@ -240,6 +259,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       const owner = addSub(sub);
       if (state.nado.accountsScannedTo > 0) touched.add(owner);
     }
+    noteProtocol(r.logs);
     state.nado.accountsScannedTo = r.scannedTo;
     await o.store.put('known.json', state);
     log(`nado account discovery → ${r.scannedTo}${r.complete ? '' : ` — PAUSED (${r.stoppedBecause}); progress saved, resumes next run`} · ${r.logs.length} logs`);
@@ -258,6 +278,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     if (!r.complete) log(`nado activity paused at ${r.scannedTo}: ${r.stoppedBecause}`);
     const subs = decodeNadoSubaccounts(r.logs);
     for (const sub of subs) touched.add(addSub(sub));
+    noteProtocol(r.logs);
     state.nado.activityScannedTo = r.scannedTo;
     log(`nado activity ${aFrom}→${r.scannedTo} · ${r.logs.length} logs · ${subs.size} subaccounts touched`);
   }
@@ -294,6 +315,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     const before = subCount();
     const seen = decodeNadoSubaccounts(r.logs);
     for (const sub of seen) addSub(sub);
+    noteProtocol(r.logs);
     const iso = [...seen].filter(isIsolatedSub);
     const done = r.scannedTo >= trh.end;
     state.nado.tradeHistory = done ? { done: true } : { ...trh, next: r.scannedTo + 1 };
@@ -428,6 +450,8 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const nextActive = new Set(activeSet);
   let reread = 0;
   let darkNow = 0;
+  /** wallets with a subaccount that reports exists=false on-chain but holds balances (counted since v1.2) */
+  let unregistered = 0;
   /** why sensors went dark this run — grouped, so one log line explains a systemic failure */
   const darkWhy = new Map<string, number>();
   const noteDark = (sensor: string, msg: string) => {
@@ -463,6 +487,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     for (const s of res.activeSubs) nextActive.add(s);
     for (const [a, book] of res.books) {
       cov?.add(book);
+      if (book.nado.status === 'OK' && book.nado.data.notes.some((n) => n.includes('exists=false'))) unregistered++;
       if (book.tydro.status === 'DARK') noteDark('TYDRO', book.tydro.message);
       if (book.nado.status === 'DARK') noteDark('NADO', book.nado.message);
       const pose = classify(book);
@@ -507,6 +532,30 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       for (const g of full.gaps.slice(0, 8)) {
         log(`  gap ${g.venue} ${g.key} ${g.side}: ours $${Math.round(g.oursUsd).toLocaleString('en-US')} of $${Math.round(g.totalUsd).toLocaleString('en-US')} (${coveragePct(g.oursUsd, g.totalUsd)})`);
       }
+      // who holds the rest? Protocol accounts (fees / liquidity, zero owner) are not wallets and are never drawn,
+      // but measuring them tells a discovery gap apart from positions that sit with the protocol itself
+      const protoSubs = [...new Set([...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])])] as `0x${string}`[];
+      try {
+        const parsed = await readNadoSubsMany(client, protoSubs, readBlock);
+        const pAcc = new CoverageAcc();
+        let holding = 0;
+        for (const r of parsed.values()) {
+          if (!r.ok || (!r.value.spots.length && !r.value.perps.length)) continue;
+          holding++;
+          pAcc.addNado(r.value.spots, r.value.perps);
+        }
+        const pc = buildCoverage(pAcc, totals.value).totals;
+        const both = buildCoverage(mergeAcc(cov, pAcc), totals.value).totals;
+        log(
+          `  protocol accounts (${protoSubs.length} known, ${holding} holding balances; not drawn): Nado deposits ${coveragePct(pc.nadoDeposits.oursUsd, pc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(pc.nadoOpenInterest.oursLongUsd, pc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(pc.nadoOpenInterest.oursShortUsd, pc.nadoOpenInterest.totalUsd)}`,
+        );
+        log(
+          `  wallets + protocol accounts: Nado deposits ${coveragePct(both.nadoDeposits.oursUsd, both.nadoDeposits.totalUsd)} · OI longs ${coveragePct(both.nadoOpenInterest.oursLongUsd, both.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(both.nadoOpenInterest.oursShortUsd, both.nadoOpenInterest.totalUsd)}`,
+        );
+      } catch (e) {
+        log(`  protocol accounts not measured: ${String(e).slice(0, 160)}`);
+      }
+      if (unregistered) log(`  ${unregistered} wallets hold balances in subaccounts that report exists=false on-chain (counted since census v1.2)`);
     } else {
       log(`coverage not measured this sweep: ${totals.error.message}`);
     }

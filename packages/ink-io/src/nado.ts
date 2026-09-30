@@ -183,7 +183,11 @@ export function parseSubaccountInfo(json: unknown, symbols: SymbolMap, priceSour
 /* ─────────────── aggregate across subaccounts ─────────────── */
 
 export function aggregate(subs: ParsedSub[], notes: string[]): NadoBook {
-  const live = subs.filter((s) => s.exists);
+  // A subaccount that holds balances counts, whatever its `exists` flag says. Engine-created subaccounts
+  // (isolated margin) may never be registered the way a deposit registers one; dropping them hid their positions.
+  const live = subs.filter((s) => s.exists || s.spots.length > 0 || s.perps.length > 0);
+  const unregistered = live.filter((s) => !s.exists).length;
+  if (unregistered) notes.push(`${unregistered} subaccount${unregistered === 1 ? '' : 's'} report exists=false on-chain but hold balances — counted`);
   const spots = live.flatMap((s) => s.spots);
   const perps = live.flatMap((s) => s.perps);
   const equityUsd = spots.reduce((a, s) => a + s.usd, 0) + perps.reduce((a, p) => a + p.unsettledUsd, 0);

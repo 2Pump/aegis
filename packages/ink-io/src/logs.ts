@@ -188,6 +188,24 @@ export function decodeTydroTransfers(logs: readonly Log[]): Map<string, Set<numb
 
 /** Nado: every subaccount (bytes32) mentioned by ModifyCollateral, Liquidation or BalanceUpdate. */
 export function decodeNadoSubaccounts(logs: readonly Log[]): Set<`0x${string}`> {
+  const all = decodeNadoSubaccountsAll(logs);
+  for (const s of [...all]) if (isProtocolSub(s)) all.delete(s); // protocol/zero-owner subaccounts
+  return all;
+}
+
+/** Protocol-owned subaccounts (zero owner: fees, liquidity and similar engine accounts). Not wallets — never drawn. */
+export const isProtocolSub = (s: string) => /^0x0{40}/i.test(s);
+
+/**
+ * Protocol subaccounts seen in logs, plus Vertex's fixed ones (FEES_ACCOUNT = 0, X_ACCOUNT = 1, V_ACCOUNT = 2 in
+ * vertex-contracts core/contracts/common/Constants.sol; Nado is a Vertex fork). Read for coverage only.
+ */
+export const VERTEX_PROTOCOL_SUBS: readonly `0x${string}`[] = [0, 1, 2].map((n) => `0x${n.toString(16).padStart(64, '0')}` as `0x${string}`);
+export function decodeNadoProtocolSubaccounts(logs: readonly Log[]): Set<`0x${string}`> {
+  return new Set([...decodeNadoSubaccountsAll(logs)].filter(isProtocolSub));
+}
+
+function decodeNadoSubaccountsAll(logs: readonly Log[]): Set<`0x${string}`> {
   const out = new Set<`0x${string}`>();
   for (const l of logs) {
     const t0 = l.topics[0];
@@ -205,7 +223,6 @@ export function decodeNadoSubaccounts(logs: readonly Log[]): Set<`0x${string}`> 
       if (d.length >= 128) out.add(`0x${d.slice(64, 128)}`.toLowerCase() as `0x${string}`);
     }
   }
-  for (const s of [...out]) if (/^0x0{40}/.test(s)) out.delete(s); // protocol/zero-owner subaccounts
   return out;
 }
 
