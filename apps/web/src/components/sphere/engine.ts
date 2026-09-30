@@ -32,10 +32,12 @@ const HOME_AZ = 38;
 const HOME_EL = 18;
 const BREATH_MAX = 64;
 const EMBER_MS = 200;
+/** Control feel: around the core, and (gentler, finer) around a framed hull a few hundredths of a unit away. */
+const SPEED = { core: { rotate: 0.55, zoom: 0.9, pan: 0.6 }, hull: { rotate: 0.32, zoom: 0.55, pan: 0.3 } } as const;
 
 export interface SphereCallbacks {
   /** HUD line + LOD band, whenever they change */
-  onHud(hud: string, lod: SphereLod): void;
+  onHud(hud: string, lod: SphereLod, pivot: 'CORE' | 'HULL' | 'POINT'): void;
   /** hover (mouse) / first tap (touch): index into the seats, or null */
   onHover(i: number | null, x: number, y: number): void;
   /** click, or second tap on the same ship */
@@ -86,6 +88,7 @@ export class SphereEngine {
   private lastBreath = 0;
   private hudLast = '';
   private lodLast: SphereLod | null = null;
+  private pivotLast: 'CORE' | 'HULL' | 'POINT' | null = null;
   private tween: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t0: number; ms: number } | null = null;
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
   private fpsT0 = 0;
@@ -135,9 +138,9 @@ export class SphereEngine {
     Object.assign(this.controls, {
       enableDamping: true,
       dampingFactor: 0.085,
-      rotateSpeed: 0.55,
-      zoomSpeed: 0.9,
-      panSpeed: 0.6,
+      rotateSpeed: SPEED.core.rotate,
+      zoomSpeed: SPEED.core.zoom,
+      panSpeed: SPEED.core.pan,
       screenSpacePanning: true,
       minDistance: 0.12,
       minPolarAngle: 0.18,
@@ -562,6 +565,8 @@ export class SphereEngine {
 
   private setFramed(i: number | null, silent = false) {
     this.framed = i;
+    const sp = i === null ? SPEED.core : SPEED.hull;
+    Object.assign(this.controls, { rotateSpeed: sp.rotate, zoomSpeed: sp.zoom, panSpeed: sp.pan });
     for (const o of [...this.focusGroup.children]) {
       this.focusGroup.remove(o);
       const any = o as THREE.Mesh;
@@ -782,7 +787,12 @@ export class SphereEngine {
   };
 
   private render() {
-    if (this.framed !== null && !this.tween && this.camera.position.distanceTo(this.controls.target) > 0.6) this.setFramed(null);
+    if (this.framed !== null && !this.tween && this.camera.position.distanceTo(this.controls.target) > 0.6) {
+      // zoomed back out of a framed hull: end the framing and glide the pivot back to the core,
+      // so orbit and zoom feel exactly as they did before the search
+      this.setFramed(null);
+      this.moveTo(this.camera.position.clone(), new THREE.Vector3(), true);
+    }
     const zoom = this.zoom();
     const lod = sphereLod(zoom, this.framed !== null);
     const mix = this.framed !== null ? 1 : sphereFineMix(zoom);
@@ -840,10 +850,12 @@ export class SphereEngine {
     const el = (Math.asin(THREE.MathUtils.clamp(p.y / Math.max(p.length(), 1e-6), -1, 1)) * 180) / Math.PI;
     const focus = this.framed ?? this.hovered;
     const hud = sphereHud({ az, el, r: focus !== null ? this.seats[focus]!.r : null, zoom, lod });
-    if (hud !== this.hudLast || lod !== this.lodLast) {
+    const pivot = this.framed !== null ? 'HULL' : this.controls.target.lengthSq() < 1e-4 ? 'CORE' : 'POINT';
+    if (hud !== this.hudLast || lod !== this.lodLast || pivot !== this.pivotLast) {
       this.hudLast = hud;
       this.lodLast = lod;
-      this.cb.onHud(hud, lod);
+      this.pivotLast = pivot;
+      this.cb.onHud(hud, lod, pivot);
     }
     if (this.framed !== null) {
       const s = this.seats[this.framed]!;

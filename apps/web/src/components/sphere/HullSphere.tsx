@@ -34,7 +34,7 @@ export default function HullSphere({
   const [w, setW] = useState(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-  const [hud, setHud] = useState<{ text: string; lod: SphereLod }>({ text: 'AZ ---°  EL --°  R -.--  ZOOM 1.0×', lod: 'MANTLE' });
+  const [hud, setHud] = useState<{ text: string; lod: SphereLod; pivot: 'CORE' | 'HULL' | 'POINT' }>({ text: 'AZ ---°  EL --°  R -.--  ZOOM 1.0×', lod: 'MANTLE', pivot: 'CORE' });
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
   const [framed, setFramed] = useState<{ i: number; x: number; y: number } | null>(null);
   // ?fps=1: on-page frame counter for checking the budget on a real laptop / phone (counts frames actually drawn)
@@ -100,7 +100,7 @@ export default function HullSphere({
         eng = new SphereEngine(
           host.current,
           {
-            onHud: (text, lod) => setHud({ text, lod }),
+            onHud: (text, lod, pivot) => setHud({ text, lod, pivot }),
             onHover: (i, x, y) => setHover(i === null ? null : { i, x, y }),
             onOpen: (i) => {
               const r = refsRef.current[i];
@@ -225,6 +225,7 @@ export default function HullSphere({
         <div className="wg-hud tl">
           <span className="hs-title">HULL SPHERE</span>
           {'\n'}LOD  {hud.lod}
+          {'\n'}PIVOT  {hud.pivot}
           {fps ? `\nFPS  ${fps.fps}  ·  DRAW CALLS ${fps.calls}  ·  ${ships.length.toLocaleString('en-US')} SHIPS` : ''}
         </div>
         {!phone ? (
@@ -267,7 +268,7 @@ export default function HullSphere({
       {phone ? (
         <div className="wg-strip">
           <span data-testid="sphere-hud">{hud.text}</span>
-          <span>LOD {hud.lod}</span>
+          <span>LOD {hud.lod} · PIVOT {hud.pivot}</span>
           {sizeKey}
         </div>
       ) : null}

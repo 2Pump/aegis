@@ -40,6 +40,11 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 - It ends when you zoom back out (camera more than ~3× its framing distance), press 0 or Esc, or hit Clear.
 - F re-frames the found hull.
 
+**The pivot:**
+- While a hull is framed, the camera orbits **around that hull** (`PIVOT HULL` in the HUD), with gentler rotate, zoom and pan for fine control.
+- When the framing ends, the pivot glides back to the core (`PIVOT CORE`), so the controls feel the same as before the search.
+- Right-drag panning moves the pivot off-centre (`PIVOT POINT`); 0 resets it.
+
 **Hover and tap:** they pick the ship whose drawn glyph is under the pointer, nearest the camera first, so never a ship hidden behind it. The framed hull always wins where it's drawn.
 
 Glyphs shrink as you close in, so they stay beads.
