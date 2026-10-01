@@ -11,6 +11,10 @@ const SIZE_KEY: Array<[keyof typeof SPHERE_BAND_W, string]> = [
   ['<1k', '<$1K'],
 ];
 const FLASH_WINDOW_MS = 1500;
+/** A data change touching at most this many wallets is a live update (deferred while moving, spaced out on phones). */
+const LIVE_DELTA_MAX = 25;
+/** Phones: at most one live rebuild of the sphere every 8 s. */
+const PHONE_LIVE_GAP_MS = 8000;
 
 /**
  * HULL SPHERE — the well as a glass world. Longitude = main-pose lune, depth = risk, size = band, red ring = WOUNDED.
@@ -46,11 +50,12 @@ export default function HullSphere({
 
   // seats cached per address: a new block refreshes "read N ago" text, it never re-seats the world
   const cache = useRef(new Map<string, { sig: string; seat: SphereSeat; ref: WellShip }>());
-  const layout = useRef<{ seats: SphereSeat[]; refs: WellShip[] } | null>(null);
+  const layout = useRef<{ seats: SphereSeat[]; refs: WellShip[]; delta: number } | null>(null);
   const world = useMemo(() => {
     const prev = cache.current;
     const next = new Map<string, { sig: string; seat: SphereSeat; ref: WellShip }>();
     let changed = layout.current === null || ships.length !== prev.size;
+    let delta = layout.current === null ? Infinity : Math.abs(ships.length - prev.size);
     for (const s of ships) {
       const sig = `${s.primary}|${s.tags.join(',')}|${s.hullTemp}|${s.band}|${s.focused ? 1 : 0}`;
       const p = prev.get(s.address);
@@ -59,6 +64,7 @@ export default function HullSphere({
         next.set(s.address, p);
       } else {
         changed = true;
+        delta++;
         next.set(s.address, { sig, seat: seatSphere(s), ref: s });
       }
     }
@@ -68,14 +74,52 @@ export default function HullSphere({
       return layout.current;
     }
     const vals = [...next.values()];
-    layout.current = { seats: vals.map((v) => v.seat), refs: vals.map((v) => v.ref) };
+    layout.current = { seats: vals.map((v) => v.seat), refs: vals.map((v) => v.ref), delta };
     return layout.current;
   }, [ships]);
-  const refsRef = useRef(world.refs);
-  refsRef.current = world.refs;
+  /*
+   * The world the engine is actually drawing. Live updates (a handful of wallets) never land mid-gesture — they wait
+   * until the camera rests — and on phones at most every few seconds, because each one rebuilds the GPU buffers.
+   * A filter change (many wallets) lands at once. Every index (hover, plate, find, flash) refers to this world.
+   */
+  const [applied, setApplied] = useState(world);
+  const pendingWorld = useRef<typeof world | null>(null);
+  const lastApply = useRef(0);
+  const applyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushRef = useRef<() => void>(() => {});
+  flushRef.current = () => {
+    const next = pendingWorld.current;
+    if (!next) return;
+    if (engine.current?.isMoving()) return; // onSettle calls back
+    const small = next.delta <= LIVE_DELTA_MAX;
+    const wait = small && phone ? PHONE_LIVE_GAP_MS - (Date.now() - lastApply.current) : 0;
+    if (wait > 0) {
+      if (!applyTimer.current)
+        applyTimer.current = setTimeout(() => {
+          applyTimer.current = null;
+          flushRef.current();
+        }, wait);
+      return;
+    }
+    pendingWorld.current = null;
+    lastApply.current = Date.now();
+    setApplied(next);
+  };
+  useEffect(() => {
+    if (world === applied) return; // same seats (only "read N ago" text changed in place)
+    pendingWorld.current = world;
+    flushRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world]);
+  useEffect(() => () => {
+    if (applyTimer.current) clearTimeout(applyTimer.current);
+  }, []);
+
+  const refsRef = useRef(applied.refs);
+  refsRef.current = applied.refs;
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
-  const foundIdx = useMemo(() => (found ? world.seats.findIndex((s) => s.address === found) : -1), [world, found]);
+  const foundIdx = useMemo(() => (found ? applied.seats.findIndex((s) => s.address === found) : -1), [applied, found]);
 
   // size
   useLayoutEffect(() => {
@@ -107,6 +151,7 @@ export default function HullSphere({
               if (r) onOpenRef.current(r.href);
             },
             ...(showFps ? { onFps: (f: number, calls: number) => setFps({ fps: f, calls }) } : {}),
+            onSettle: () => flushRef.current(),
             onFramed: (i, x, y) =>
               setFramed((prev) => (i === null ? null : prev && prev.i === i && Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { i, x, y })),
           },
@@ -132,10 +177,10 @@ export default function HullSphere({
   // data → engine (layout changes only)
   useEffect(() => {
     if (!ready) return;
-    engine.current?.setSeats(world.seats); // the engine keeps the framed hull by address
+    engine.current?.setSeats(applied.seats); // the engine keeps the framed hull by address
     setHover(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, world.seats]);
+  }, [ready, applied.seats]);
 
   // filter change → home (with a short fade); Find → frame the hull
   const firstReset = useRef(true);
@@ -165,12 +210,12 @@ export default function HullSphere({
     if (!ready || !flashKey) return;
     const now = Date.now();
     const idx: number[] = [];
-    world.refs.forEach((r, i) => {
+    applied.refs.forEach((r, i) => {
       if (r.flashAt && now - r.flashAt < FLASH_WINDOW_MS) idx.push(i);
     });
     engine.current?.flash(idx);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, flashKey]);
+  }, [ready, flashKey, applied]);
 
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const eng = engine.current;
@@ -188,8 +233,8 @@ export default function HullSphere({
     e.preventDefault();
   };
 
-  const tipShip = hover ? world.refs[hover.i] : undefined;
-  const plateShip = framed ? world.refs[framed.i] : undefined;
+  const tipShip = hover ? applied.refs[hover.i] : undefined;
+  const plateShip = framed ? applied.refs[framed.i] : undefined;
   const sizeKey = (
     <div className="wg-key" aria-label="Size key: glyph size is the wallet's size">
       <div className="wg-key-h">WALLET SIZE</div>
@@ -226,7 +271,7 @@ export default function HullSphere({
           <span className="hs-title">THE WELL · SPHERE</span>
           {'\n'}VIEW  {VIEW_LABEL[hud.lod]}
           {'\n'}CENTRED ON  {CENTRE_LABEL[hud.pivot]}
-          {fps ? `\nFPS  ${fps.fps}  ·  DRAW CALLS ${fps.calls}  ·  ${ships.length.toLocaleString('en-US')} SHIPS` : ''}
+          {fps ? `\nFPS  ${fps.fps}  ·  DRAW CALLS ${fps.calls}  ·  ${ships.length.toLocaleString('en-US')} WALLETS` : ''}
         </div>
         {!phone ? (
           <>

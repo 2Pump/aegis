@@ -46,7 +46,17 @@ export interface SphereCallbacks {
   onFramed(i: number | null, x: number, y: number): void;
   /** frames drawn in the last second while the camera was moving (only with ?fps=1) */
   onFps?(fps: number, drawCalls: number): void;
+  /** the camera has come to rest (no drag, no damping, no tween) — a good moment to swap in new data */
+  onSettle?(): void;
 }
+
+/** Phone budget: full sharpness at rest, cheaper pixels while the camera moves. */
+const PHONE_DPR_REST = 1.5;
+const PHONE_DPR_MOVING = 1;
+/** HUD text updates at most this often while moving (the final value always lands on rest). */
+const HUD_EVERY_MS = 150;
+/** The camera counts as at rest after this long without movement. */
+const REST_MS = 260;
 
 export function webglAvailable(): boolean {
   try {
@@ -95,6 +105,12 @@ export class SphereEngine {
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
   private fpsT0 = 0;
   private fpsN = 0;
+  /** last time the camera moved (drag, damping, tween, recentring); 0 = at rest */
+  private movedAt = 0;
+  private moving = false;
+  private dprRest = 1;
+  private hudAt = 0;
+  private hudPending = false;
 
   private seats: SphereSeat[] = [];
   private glyphIdx: number[] = [];
@@ -134,7 +150,8 @@ export class SphereEngine {
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setClearColor(0x010203);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.phone ? 2 : 1.5));
+    this.dprRest = Math.min(window.devicePixelRatio || 1, opts.phone ? PHONE_DPR_REST : 1.5);
+    this.renderer.setPixelRatio(this.dprRest);
     this.renderer.domElement.className = 'hs-canvas';
     host.prepend(this.renderer.domElement);
 
@@ -193,7 +210,7 @@ export class SphereEngine {
 
   private glass(radius: number, tint: string, o: { base: number; rim: number; power: number; spec: number; side?: THREE.Side; dark?: number }, order: number) {
     const m = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, this.opts.phone ? 64 : 96, this.opts.phone ? 40 : 64),
+      new THREE.SphereGeometry(radius, this.opts.phone ? 48 : 96, this.opts.phone ? 32 : 64),
       new THREE.ShaderMaterial({
         transparent: true,
         depthWrite: false,
@@ -340,7 +357,7 @@ export class SphereEngine {
     const geo = phone ? new THREE.OctahedronGeometry(1, 0) : new THREE.IcosahedronGeometry(1, 0);
     this.glyphs = this.nodes(this.glyphIdx, geo, this.uGlyph);
     this.fine = this.nodes(this.fineIdx, geo, this.uFine);
-    this.coronaG = this.coronas(this.glyphIdx.filter((i) => seats[i]!.wounded), true, 0.5);
+    this.coronaG = this.coronas(this.glyphIdx.filter((i) => seats[i]!.wounded), !phone, 0.5);
     this.coronaF = this.coronas(this.fineIdx.filter((i) => seats[i]!.wounded), false, 0);
 
     const orbitSeats = this.glyphIdx.map((i) => seats[i]!);
@@ -496,6 +513,20 @@ export class SphereEngine {
     this.uPx.value = (this.h * this.renderer.getPixelRatio()) / (2 * Math.tan((FOV * Math.PI) / 360));
     if (first) this.goHome(false);
     this.touch();
+  }
+
+  /** Phones draw fewer pixels while the camera moves and go back to full sharpness once it rests. */
+  private setDpr(r: number) {
+    if (Math.abs(this.renderer.getPixelRatio() - r) < 0.01) return;
+    this.renderer.setPixelRatio(r);
+    this.renderer.setSize(this.w, this.h, false);
+    this.uPx.value = (this.h * r) / (2 * Math.tan((FOV * Math.PI) / 360));
+    this.dirty = true;
+  }
+
+  /** true while dragging, damping, tweening or recentring */
+  isMoving(): boolean {
+    return this.moving;
   }
 
   private zoom() {
@@ -776,7 +807,23 @@ export class SphereEngine {
       }
       this.dirty = true;
     }
-    if (this.controls.update()) this.dirty = true;
+    let moved = this.tween !== null || this.recentering;
+    if (this.controls.update()) {
+      this.dirty = true;
+      moved = true;
+    }
+    if (moved || this.down?.moved) {
+      this.movedAt = now;
+      if (!this.moving) {
+        this.moving = true;
+        if (this.opts.phone) this.setDpr(Math.min(this.dprRest, PHONE_DPR_MOVING));
+      }
+    } else if (this.moving && now - this.movedAt > REST_MS) {
+      this.moving = false;
+      if (this.opts.phone) this.setDpr(this.dprRest);
+      if (this.hudPending) this.dirty = true; // land the final HUD value
+      this.cb.onSettle?.();
+    }
     if (this.embers) {
       const k = (now - this.embers.t0) / EMBER_MS;
       if (k >= 1 && this.emberPts) {
@@ -872,10 +919,16 @@ export class SphereEngine {
     const hud = sphereHud({ az, el, r: focus !== null ? this.seats[focus]!.r : null, zoom, lod });
     const pivot = this.framed !== null ? 'HULL' : this.controls.target.lengthSq() < 1e-4 ? 'CORE' : 'POINT';
     if (hud !== this.hudLast || lod !== this.lodLast || pivot !== this.pivotLast) {
-      this.hudLast = hud;
-      this.lodLast = lod;
-      this.pivotLast = pivot;
-      this.cb.onHud(hud, lod, pivot);
+      // the HUD is React text: while the camera moves it updates a few times a second, not every frame
+      const t = performance.now();
+      if (!this.moving || lod !== this.lodLast || pivot !== this.pivotLast || t - this.hudAt >= HUD_EVERY_MS) {
+        this.hudLast = hud;
+        this.lodLast = lod;
+        this.pivotLast = pivot;
+        this.hudAt = t;
+        this.hudPending = false;
+        this.cb.onHud(hud, lod, pivot);
+      } else this.hudPending = true;
     }
     if (this.framed !== null) {
       const s = this.seats[this.framed]!;

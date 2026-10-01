@@ -64,7 +64,7 @@ Glyphs shrink as you close in, so they stay beads.
 - **Nothing moves on its own:** no auto-spin.
 
 **Motion:**
-- Up to 64 wounded rings breathe on a 1.8 s cycle, at most 30 fps. The breathing set is picked by address hash, never by risk.
+- Up to 64 wounded rings breathe on a 1.8 s cycle, at most 30 fps (desktop only — on phones the rings stay still, so an untouched phone draws nothing). The breathing set is picked by address hash, never by risk.
 - One 200 ms ember when a wallet changes live.
 - Camera eases.
 - A 160 ms fade on filter change.
@@ -74,6 +74,11 @@ Glyphs shrink as you close in, so they stay beads.
 - **Draw calls:** about 24 whatever the fleet size (measured with 18,555 wallets). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
 - **Pixel density cap:** 1.5 on desktop, 2 on phones.
 - **Rendering on demand:** only when the camera moves or the capped breath ticks, and paused when the tab is hidden.
+- **Phones (since 2026-10-01):**
+  - Pixel density is 1.5× at rest and drops to 1× while the camera moves. It sharpens again about a quarter-second after the camera stops.
+  - The glass shells use fewer segments.
+  - The HUD text updates about 6 times a second while moving instead of every frame; its final value always lands at rest.
+- **Live data never lands mid-gesture.** A live update (25 or fewer wallets changed) waits until the camera rests, because each one rebuilds the GPU buffers. On phones it also waits at least 8 s after the previous one. A filter change lands at once. Hover, plate, Find and the ember all index the world that is actually drawn.
 - **Loading:** three.js and the engine load only when the sphere opens, as a ~136 KB (compressed) chunk; the main bundle is unchanged.
 - **Checking it:** `?fps=1` shows frames drawn per second and draw calls on the page. Targets are 60 fps with a floor of 40 on a mid laptop at default orbit, and 30+ on a phone. If a device misses them, drop threads first, then pixel density, then the glyph sample; never the sphere.
 
