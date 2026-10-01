@@ -49,8 +49,7 @@ code { font-size: 0.92em; color: var(--iron); }
   border-bottom: 1px solid var(--hair); flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 12px; padding-right: 6px; }
-.brand-cap { width: 14px; height: 14px; border: 1px solid var(--cyan); position: relative; }
-.brand-cap::after { content: ''; position: absolute; inset: 3px; background: var(--cyan); box-shadow: 0 0 6px rgba(76, 224, 210, 0.6); }
+.brand-mark { display: inline-flex; color: var(--ink); }
 .brand h1 { font: 600 18px/1 var(--mono); letter-spacing: 0.34em; margin: 0; }
 .brand small { display: block; font: 500 9.5px/1 var(--mono); letter-spacing: 0.28em; color: var(--ink-faint); margin-top: 6px; }
 .nav { display: flex; gap: 0; align-items: stretch; flex-wrap: wrap; flex: 1; }
@@ -63,6 +62,12 @@ code { font-size: 0.92em; color: var(--iron); }
 .nav a.active { color: var(--void); background: var(--cyan); border-color: var(--cyan); position: relative; z-index: 1; }
 .nav a:hover:not(.active) { color: var(--ink); border-color: rgba(120, 190, 200, 0.4); text-decoration: none; position: relative; z-index: 1; }
 .nav .pill-btn { margin-left: 10px; }
+/* phones: the nav takes its own full-width row under the logo instead of squeezing into a column beside it */
+@media (max-width: 560px) {
+  .nav { flex-basis: 100%; }
+  .nav a { padding: 9px 10px; }
+  .nav .pill-btn { margin-left: auto; }
+}
 
 /* stamped buttons (class name kept for compatibility — no pills anywhere) */
 .pill-btn, .sq-btn {

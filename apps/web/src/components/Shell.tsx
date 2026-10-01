@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Mark } from './Mark';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { COPY } from '@aegis/glyphs';
 import { INK_CHAIN_ID } from '@aegis/ink-io';
@@ -14,10 +15,10 @@ export function Shell() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-cap" aria-hidden />
+          <span className="brand-mark"><Mark size={28} /></span>
           <div>
             <h1>AEGIS</h1>
-            <small>THE WELL MAP · INK {INK_CHAIN_ID}</small>
+            <small>TYDRO · NADO · INK {INK_CHAIN_ID}</small>
           </div>
         </div>
         <nav className="nav" aria-label="Primary">

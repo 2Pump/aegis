@@ -1,4 +1,4 @@
-# AEGIS — THE WELL MAP
+# AEGIS — Tydro · Nado · Ink
 
 A camera on what every Ink wallet is doing. Paste an Ink address and AEGIS reads Tydro (Aave v3 on Ink) and Nado.
 It classifies the pose (CARRY, NAKED, EQUITY-MARGIN, …) with public rules and draws it as a ship in a gravity well.

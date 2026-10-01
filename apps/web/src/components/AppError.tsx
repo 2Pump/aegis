@@ -1,5 +1,6 @@
 import { useRouteError } from 'react-router-dom';
 import { COPY } from '@aegis/glyphs';
+import { Mark } from './Mark';
 import { isStaleBuildError, reloadForNewBuild } from '../lib/staleBuild';
 
 /** Shown instead of the router's developer page. A stale build (site updated while the tab was open) reloads itself once. */
@@ -10,7 +11,7 @@ export function AppError() {
   const msg = err instanceof Error ? err.message : String(err);
   return (
     <main className="stack" style={{ maxWidth: 720, paddingTop: 48 }}>
-      <h2 className="page">AEGIS</h2>
+      <h2 className="page row" style={{ gap: 10 }}><Mark size={22} /> AEGIS</h2>
       {reloading ? (
         <div className="banner cyan" data-testid="app-updating">AEGIS was just updated. Loading the new version…</div>
       ) : (
