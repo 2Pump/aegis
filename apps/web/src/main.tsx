@@ -5,15 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { wagmiConfig } from './wagmi';
 import { Shell } from './components/Shell';
+import { AppError } from './components/AppError';
+import { installStaleBuildReload } from './lib/staleBuild';
 import { Home } from './pages/Home';
 import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
 import { CensusPage, NotFound, RulesPage, WatchPage } from './pages/Static';
 import './styles.css';
 
+installStaleBuildReload();
+
 const router = createBrowserRouter([
   {
     element: <Shell />,
+    errorElement: <AppError />,
     children: [
       { path: '/', element: <Home /> },
       { path: '/hull/:address', element: <HullPage /> },

@@ -171,6 +171,9 @@ export class SphereEngine {
       maxPolarAngle: Math.PI - 0.18,
     });
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    // phones: a pinch only zooms. Two fingers always drift a little, and with pan on that drift slid the pivot off the
+    // centre, so the sphere then turned around some other point. The pivot stays on the centre (or the framed wallet).
+    if (opts.phone) this.controls.enablePan = false;
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     this.controls.addEventListener('change', () => this.touch());
     this.controls.addEventListener('start', () => {

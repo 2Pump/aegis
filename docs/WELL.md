@@ -58,7 +58,8 @@ Glyphs shrink as you close in, so they stay beads.
 - **Default view:** 18° tilt, sphere at ~70% of the view (86% on phones).
 - **Mouse:** drag orbits (damped; it can't tip over the poles), the wheel zooms, right-drag pans. Double-click frames a hull.
 - **Keys:** ← → orbit, + − zoom, 0 or Esc resets, F frames.
-- **Phone:** one finger orbits; pinch zooms, and two fingers also pan.
+- **Phone:** one finger orbits; pinch only zooms (no pan since 2026-10-01). A pinch always drifts a little, and with pan on that drift slid the pivot off the centre, so the sphere turned around some other point. The pivot is always the centre, or the framed wallet.
+- **Site updated while a tab was open:** the first lazy load (the sphere) fails because the old build's files are gone. The page reloads once by itself (guarded, never a loop) and gets the new build; otherwise it shows a plain error panel with Reload, never the router's developer page.
 - **Find** eases to the hull with no overshoot, and changing a filter sends the camera home.
 - **Scrolling:** while the pointer is over the well, the wheel only zooms the well; the page never scrolls (even fully zoomed out). Scroll the page from outside the well.
 - **Nothing moves on its own:** no auto-spin.

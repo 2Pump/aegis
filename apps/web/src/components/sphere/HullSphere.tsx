@@ -3,6 +3,7 @@ import { CENTRE_LABEL, RISK_LABEL, SIZE_LABEL, SPHERE_BAND_W, VIEW_LABEL, seatSp
 import { TagChip } from '../bits';
 import { ShipList, type WellShip } from '../Well';
 import type { SphereEngine } from './engine';
+import { isStaleBuildError, reloadForNewBuild } from '../../lib/staleBuild';
 
 const SIZE_KEY: Array<[keyof typeof SPHERE_BAND_W, string]> = [
   ['100k+', '$100K+'],
@@ -160,7 +161,10 @@ function HullSphere({
         engine.current = eng;
         setReady(true);
       })
-      .catch((e: unknown) => setFailed(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => {
+        if (isStaleBuildError(e) && reloadForNewBuild()) return; // the site was updated while this tab was open
+        setFailed(e instanceof Error ? e.message : String(e));
+      });
     return () => {
       alive = false;
       eng?.dispose();
@@ -323,7 +327,9 @@ function HullSphere({
         <span>SIZE = WALLET SIZE</span>
         <span className="red">RED RING = NEAR LIQUIDATION</span>
         <span className="faint">THREADS = SAME TYPE, NEARBY · DECORATION ONLY</span>
-        <span className="faint">DRAG ORBIT · WHEEL / PINCH ZOOM · RIGHT-DRAG PAN · F FRAME · 0 RESET</span>
+        <span className="faint">
+          {phone ? 'DRAG ORBIT · PINCH ZOOM · TAP A WALLET · 0 RESET' : 'DRAG ORBIT · WHEEL / PINCH ZOOM · RIGHT-DRAG PAN · F FRAME · 0 RESET'}
+        </span>
       </div>
       <ShipList ships={ships} onOpen={onOpen} />
     </div>
