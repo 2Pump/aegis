@@ -27,7 +27,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          chain: ['viem', 'wagmi', '@tanstack/react-query'],
+          chain: ['viem'],
         },
       },
     },

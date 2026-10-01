@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mark } from './Mark';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useMyWallet } from '../lib/myWallet';
 import { COPY } from '@aegis/glyphs';
 import { INK_CHAIN_ID } from '@aegis/ink-io';
 import { fmtAge } from '../lib/fmt';
@@ -54,7 +54,7 @@ export function Shell() {
           <NavLink to="/calibration">Checks</NavLink>
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>
         </nav>
-        <FocusMyShip />
+        <MyWalletButton />
       </header>
       <main>
         <Outlet />
@@ -76,46 +76,15 @@ export function Shell() {
   );
 }
 
-/** Optional connect — read-only. Only purpose: jump to your own wallet page. */
-function FocusMyShip() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
-  const { disconnect } = useDisconnect();
+/** "My wallet": a shortcut to the wallet you saved on its page. No wallet extension is ever asked for anything. */
+function MyWalletButton() {
+  const mine = useMyWallet();
   const nav = useNavigate();
-  const [asked, setAsked] = useState(false);
-  useEffect(() => {
-    if (asked && isConnected && address) {
-      nav(`/hull/${address.toLowerCase()}`);
-      setAsked(false);
-    }
-  }, [asked, isConnected, address, nav]);
-  const injectedConn = connectors[0];
-  if (isConnected && address) {
-    return (
-      <div className="row" style={{ gap: 6 }}>
-        <button className="pill-btn" onClick={() => nav(`/hull/${address.toLowerCase()}`)} title="Read-only. No signing, no transactions.">
-          My wallet {address.slice(0, 6)}…{address.slice(-4)}
-        </button>
-        <button className="pill-btn" onClick={() => disconnect()}>Disconnect</button>
-      </div>
-    );
-  }
+  if (!mine) return null;
   return (
-    <div className="row" style={{ gap: 6 }}>
-      <button
-        className="pill-btn"
-        disabled={!injectedConn || isPending}
-        title={injectedConn ? 'Optional. Reads your address only. AEGIS never asks for a signature or approval.' : 'No browser wallet detected — paste an address instead.'}
-        onClick={() => {
-          if (!injectedConn) return;
-          setAsked(true);
-          connect({ connector: injectedConn });
-        }}
-      >
-        {isPending ? 'Connecting…' : 'Open my wallet'}
-      </button>
-      {error ? <span className="mono" style={{ color: 'var(--red)', fontSize: 11 }}>{error.message.split('\n')[0]}</span> : null}
-    </div>
+    <button className="pill-btn" onClick={() => nav(`/hull/${mine}`)} title="Saved in this browser only. AEGIS never connects to your wallet." data-testid="my-wallet">
+      My wallet {mine.slice(0, 6)}…{mine.slice(-4)}
+    </button>
   );
 }
 

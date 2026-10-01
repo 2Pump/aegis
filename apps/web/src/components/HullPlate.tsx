@@ -7,6 +7,7 @@ import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
 import { Lamp, Panel, TagChip, TEMP_RAIL, Usd } from './bits';
 import { SensorLog } from './SensorLog';
 import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
+import { setMyWallet, useMyWallet } from '../lib/myWallet';
 
 export interface HullPlateProps {
   book: Book;
@@ -64,6 +65,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
                 Re-read
               </button>
             ) : null}
+            {!isFixture ? <MyWalletToggle address={book.address} /> : null}
           </div>
         </div>
       </div>
@@ -199,6 +201,21 @@ function Reason({ r }: { r: string }) {
     <>
       <b>{p.label}</b> <span className="faint mono" style={{ fontSize: 11 }}>{p.tag}</span> · {p.rest}
     </>
+  );
+}
+
+/** Remember this address as "my wallet" (this browser only). Replaces wallet connect: nothing is ever asked of a wallet. */
+function MyWalletToggle({ address }: { address: string }) {
+  const mine = useMyWallet();
+  const isMine = mine === address.toLowerCase();
+  return isMine ? (
+    <button className="pill-btn" onClick={() => setMyWallet(null)} title="Saved in this browser only. Click to forget it." data-testid="my-wallet-toggle">
+      ✓ My wallet · forget
+    </button>
+  ) : (
+    <button className="pill-btn" onClick={() => setMyWallet(address)} title="Adds a My wallet shortcut to the header. Saved in this browser only; AEGIS never connects to your wallet." data-testid="my-wallet-toggle">
+      Set as my wallet
+    </button>
   );
 }
 

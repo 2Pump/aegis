@@ -16,13 +16,11 @@
     "@aegis/glyphs": "workspace:*",
     "@aegis/ink-io": "workspace:*",
     "@aegis/pose": "workspace:*",
-    "@tanstack/react-query": "5.104.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",
     "three": "0.180.0",
-    "viem": "2.56.9",
-    "wagmi": "2.19.5"
+    "viem": "2.56.9"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

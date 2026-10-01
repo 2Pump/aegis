@@ -15,7 +15,7 @@
     "test": "pnpm -r test",
     "e2e": "pnpm --filter @aegis/web e2e",
     "audit:writes": "node scripts/audit-writes.mjs",
-    "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && pnpm -r test",
+    "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && pnpm -r test && pnpm --filter @aegis/web build",
     "fixtures": "node scripts/make-fixtures.mjs",
     "sync:tydro": "node scripts/sync-tydro-registry.mjs",
     "prove": "tsx scripts/prove.ts",

@@ -25,4 +25,8 @@ The census job costs the same however many people visit, because it runs once an
 
 - Verification: both venues proven in `verification/status.json`, so the PREVIEW banner goes (see VERIFICATION.md).
 - Coverage: Nado open interest coverage explained or closed (see CENSUS.md, "Why Nado was at ~46%").
+- **Own domain, and a clean reputation with wallets.** On 2026-09-30, MetaMask flagged the site on connect: "signs of phishing or wallet-draining activity". Wallet connect has since been removed (nothing is ever asked of a wallet), but a free `*.vercel.app` address is heavily used by drainer sites and scores badly. Before launch:
+  - Move to a custom domain.
+  - Update the two `og.png` addresses in `apps/web/index.html`.
+  - Ask MetaMask support for a manual review of the old and new domains (screenshots, repo link, "read-only, no connect"), as their security-alerts page describes.
 - Renew-by dates: the cron-job.org GitHub token expiry, and the `X-GitHub-Api-Version: 2022-11-28` header (sunset 10 March 2028).

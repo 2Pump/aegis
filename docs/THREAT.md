@@ -42,4 +42,4 @@
 ## D. Write-path guarantees
 
 - No `approve`, `transfer`, `writeContract`, `sendTransaction`, `signTypedData`, `signMessage`, Nado `/execute` or order code in `apps/` or `packages/`. `node scripts/audit-writes.mjs` fails the build if one appears.
-- Wallet connect is injected-only and used solely to read the connected address.
+- **No wallet connection at all** (since 2026-09-30). "My wallet" is an address you save on its wallet page, kept in this browser only. The site never calls a wallet extension, so no connect prompt and nothing for MetaMask/Blockaid's phishing scoring to react to. `audit-writes.mjs` bans `eth_requestAccounts`, `ethereum.request` and wallet-connect libraries.

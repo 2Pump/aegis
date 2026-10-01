@@ -72,3 +72,32 @@ test('live hull plate carries the unverified banner', async ({ page }) => {
   await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
   await expect(page.getByTestId('unverified-plate')).toBeVisible({ timeout: 30_000 });
 });
+
+test('"My wallet" is remembered from a wallet page — and no wallet extension is ever asked for anything', async ({ page }) => {
+  // a fake injected wallet that records every request the site makes to it
+  await page.addInitScript(() => {
+    (window as unknown as { __walletCalls: string[] }).__walletCalls = [];
+    (window as unknown as { ethereum: unknown }).ethereum = {
+      isMetaMask: true,
+      request: async (a: { method: string }) => {
+        (window as unknown as { __walletCalls: string[] }).__walletCalls.push(a.method);
+        return [];
+      },
+      on() {},
+      removeListener() {},
+    };
+  });
+  const addr = '0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560';
+  await page.goto('/');
+  await expect(page.getByTestId('my-wallet')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /open my wallet|connect/i })).toHaveCount(0);
+  await page.goto(`/hull/${addr}`);
+  await page.getByTestId('my-wallet-toggle').click({ timeout: 30_000 });
+  await expect(page.getByTestId('my-wallet')).toContainText('0x8d7d');
+  await page.goto('/');
+  await page.getByTestId('my-wallet').click();
+  await expect(page).toHaveURL(new RegExp(`/hull/${addr}$`));
+  await page.getByTestId('my-wallet-toggle').click({ timeout: 30_000 });
+  await expect(page.getByTestId('my-wallet')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __walletCalls: string[] }).__walletCalls)).toEqual([]);
+});

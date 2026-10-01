@@ -19,6 +19,10 @@ const BANNED = [
   /\bplaceOrder\b/,
   /\btransferFrom\b/,
   /\bpermit\s*\(/,
+  // no wallet connection at all (2026-09-30): a connect prompt is what wallet phishing checks score
+  /\beth_requestAccounts\b/,
+  /\.ethereum\.request\b/,
+  /from\s+['"](wagmi|@wagmi\/|ethers|@web3-onboard\/|@rainbow-me\/|@reown\/|@walletconnect\/)/,
 ];
 
 const hits = [];
@@ -40,4 +44,4 @@ if (hits.length) {
   console.error('WRITE PATHS FOUND:\n' + hits.join('\n'));
   process.exit(1);
 }
-console.log('audit-writes: 0 write/sign/order paths in apps/ and packages/');
+console.log('audit-writes: 0 write/sign/order/wallet-connect paths in apps/ and packages/');

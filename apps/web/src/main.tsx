@@ -1,9 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider } from 'wagmi';
-import { wagmiConfig } from './wagmi';
 import { Shell } from './components/Shell';
 import { AppError } from './components/AppError';
 import { installStaleBuildReload } from './lib/staleBuild';
@@ -33,14 +30,8 @@ const router = createBrowserRouter([
   },
 ]);
 
-const qc = new QueryClient();
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={qc}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <RouterProvider router={router} />
   </StrictMode>,
 );
