@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { wagmiConfig } from './wagmi';
@@ -10,7 +10,7 @@ import { installStaleBuildReload } from './lib/staleBuild';
 import { Home } from './pages/Home';
 import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
-import { CensusPage, NotFound, RulesPage, WatchPage } from './pages/Static';
+import { CensusPage, NotFound, WatchPage } from './pages/Static';
 import './styles.css';
 
 installStaleBuildReload();
@@ -23,7 +23,8 @@ const router = createBrowserRouter([
       { path: '/', element: <Home /> },
       { path: '/hull/:address', element: <HullPage /> },
       { path: '/fixture/:name', element: <FixturePage /> },
-      { path: '/rules', element: <RulesPage /> },
+      // the rules are the drawer now; old links to /rules open it over the well
+      { path: '/rules', element: <Navigate to="/?rules=1" replace /> },
       { path: '/calibration', element: <CalibrationPage /> },
       { path: '/census', element: <CensusPage /> },
       { path: '/watch', element: <WatchPage /> },

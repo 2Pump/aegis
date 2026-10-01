@@ -61,6 +61,6 @@ scripts           census · prove · make-fixtures · sync-tydro-registry · aud
 - `/`: the well. It shows every Tydro and Nado account from the hourly census, kept live in the browser (events every ~4 s, at-risk re-reads every ~15 s), plus the wounded tape, the live-changes tape and the live diagnostics. It stays **locked** in production until verification passes; dev builds and `VITE_WELL_PREVIEW=1` show it with a PREVIEW banner. Fixtures never appear in it.
 - `/hull/:address`: the ship plate. It re-reads every 15 s, backs off on 429, and pauses while the tab is hidden. It has sections REGISTRY, HULL TEMP, POSE, LOCKER, BOOK, VECTOR and SHARE, plus an on-page **sensor log**, so a screenshot shows exactly what each sensor returned.
 - `/calibration`: proof status + the six fixture books. `/fixture/carry|naked|equity-margin|wounded|dark|empty`: calibration plates.
-- `/rules`: rules page. There is also a rules drawer in the header.
+- Rules: one drawer, opened from the header button, the footer, a wallet page, or any link with `?rules=1` (old `/rules` links redirect to it).
 - `/census`: pose mix of every account found, coverage, and snapshot and backfill status.
 - `/watch`: placeholder for Phase 3 (Telegram).

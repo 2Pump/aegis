@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mark } from './Mark';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { COPY } from '@aegis/glyphs';
@@ -9,8 +9,34 @@ import { useChainHead, useNow } from '../lib/hulls';
 import { ENV } from '../lib/env';
 import { RulesContent } from './RulesContent';
 
+/**
+ * The rules live in ONE place: the drawer. It opens over whatever page you are on and is part of the address
+ * (?rules=1), so a link can open it and the back button closes it. The old /rules page redirects here.
+ */
+export const RULES_LINK = { search: '?rules=1' } as const;
+
 export function Shell() {
-  const [drawer, setDrawer] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const drawer = params.get('rules') === '1';
+  const setDrawer = (open: boolean) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (open) next.set('rules', '1');
+        else next.delete('rules');
+        return next;
+      },
+      { replace: !open },
+    );
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawer(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawer]);
   return (
     <div className="shell">
       <header className="topbar">
@@ -23,11 +49,10 @@ export function Shell() {
         </div>
         <nav className="nav" aria-label="Primary">
           <NavLink to="/" end>Well</NavLink>
-          <NavLink to="/rules">Rules</NavLink>
           <NavLink to="/census">Scan</NavLink>
           <NavLink to="/watch">Alerts</NavLink>
           <NavLink to="/calibration">Checks</NavLink>
-          <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules drawer</button>
+          <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>
         </nav>
         <FocusMyShip />
       </header>
@@ -119,7 +144,7 @@ function Footer() {
       <span className="sep">·</span>
       <span>camera, not a broker</span>
       <span className="sep">·</span>
-      <NavLink to="/rules">rules</NavLink>
+      <Link to={RULES_LINK}>rules</Link>
       <span className="camera" style={{ flexBasis: '100%' }}>{COPY.footer}</span>
     </footer>
   );

@@ -105,7 +105,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
       </div>
 
       {/* 3 POSITION TYPE */}
-      <Panel idx="03" title="Position type — why" rail={rail} right={<span className="mono">rules {pose.rulesVersion} · <Link to="/rules">read rules</Link></span>} testId="pose-panel">
+      <Panel idx="03" title="Position type — why" rail={rail} right={<span className="mono">rules {pose.rulesVersion} · <Link to={{ search: '?rules=1' }}>read rules</Link></span>} testId="pose-panel">
         <ul className="reasons" data-testid="reasons">
           {pose.reasons.map((r, i) => (
             <li key={i}><Reason r={r} /></li>

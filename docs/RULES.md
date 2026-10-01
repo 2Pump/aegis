@@ -6,7 +6,7 @@ The classifier lives in `packages/pose/src/classify.ts`. Every constant lives in
 `packages/pose/src/config.ts`. The table below is **tested against that file**
 (`packages/pose/test/rules-doc.test.ts`). If a number here and a number in code disagree, CI goes red.
 
-The in-app `/rules` page renders from the same constants (`packages/pose/src/rules.ts`).
+The in-app rules drawer (header button, or any link with `?rules=1`; old `/rules` links redirect to it) renders from the same constants (`packages/pose/src/rules.ts`).
 
 ---
 
@@ -102,7 +102,7 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 ## 6. Display names
 
-Approved by the project owner on 2026-09-29. **Display only — not a rule change.** The rule tags above stay the names in the classifier, `census.json`, share links (`?pose=CARRY`) and tests, so nothing underneath moves and `RULES_VERSION` is unchanged. The site shows the plain name; `/rules` shows both. The single source is `packages/glyphs/src/labels.ts`.
+Approved by the project owner on 2026-09-29. **Display only — not a rule change.** The rule tags above stay the names in the classifier, `census.json`, share links (`?pose=CARRY`) and tests, so nothing underneath moves and `RULES_VERSION` is unchanged. The site shows the plain name; the rules drawer shows both. The single source is `packages/glyphs/src/labels.ts`.
 
 | Rule tag | Shown as | Meaning |
 |---|---|---|

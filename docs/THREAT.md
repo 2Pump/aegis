@@ -11,7 +11,7 @@
 | Isolated Nado positions missed | Archive subaccount discovery; if it fails, plate says “read 'default' only; isolated positions not shown”. |
 | Two venues, two prices | Every USD number carries a source chip (TYDRO ORACLE / NADO ORACLE / FIXTURE). No off-chain prices. |
 | Unknown token hedging a known perp | Unknown symbols become their own family; they can never make a CARRY. |
-| Rules drift from docs | `rules-doc.test.ts` fails if RULES.md constants ≠ `config.ts`. `/rules` renders from the same constants. |
+| Rules drift from docs | `rules-doc.test.ts` fails if RULES.md constants ≠ `config.ts`. the rules drawer renders from the same constants. |
 | Fixtures mistaken for real accounts | Synthetic `0x…ae60NN` addresses, FIXTURE banner, FIXTURE chips, no explorer link, copy-link disabled. |
 | Wrong chain RPC | `getChainId() ≠ 57073` → WRONG_CHAIN → DARK. |
 

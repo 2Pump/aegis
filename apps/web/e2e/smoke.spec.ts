@@ -46,12 +46,20 @@ test('paste a real-format address → hull page renders (DARK if sensors unreach
   await expect(page.getByTestId('sensor-log')).toContainText(/TYDRO|NADO/);
 });
 
-test('rules page and drawer render constants', async ({ page }) => {
-  await page.goto('/rules');
-  await expect(page.getByText('CARRY_BAND')).toBeVisible();
-  await expect(page.getByTestId('display-names')).toContainText('Unhedged bet');
+test('rules live in one drawer: the button opens it, old /rules links open it, Escape closes it', async ({ page }) => {
+  await page.goto('/fixture/carry');
   await page.getByTestId('rules-drawer-btn').click();
   await expect(page.getByTestId('rules-drawer')).toContainText('WOUNDED_HF');
+  await expect(page.getByTestId('display-names')).toContainText('Unhedged bet');
+  await expect(page).toHaveURL(/\/fixture\/carry\?rules=1$/);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('rules-drawer')).toHaveCount(0);
+  await page.getByText('read rules').click();
+  await expect(page.getByTestId('rules-drawer')).toContainText('CARRY_BAND');
+  await page.goto('/rules');
+  await expect(page).toHaveURL(/\/\?rules=1$/);
+  await expect(page.getByTestId('rules-drawer')).toContainText('CARRY_BAND');
+  await expect(page.getByRole('link', { name: 'Rules', exact: true })).toHaveCount(0);
 });
 
 test('calibration page lists fixtures and shows not-yet-checked status', async ({ page }) => {

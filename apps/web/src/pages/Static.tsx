@@ -5,18 +5,6 @@ import { verificationText } from '../lib/verification';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { Panel } from '../components/bits';
-import { RulesContent } from '../components/RulesContent';
-
-export function RulesPage() {
-  return (
-    <div className="stack">
-      <h2 className="page">Rules — how a position type is decided</h2>
-      <Panel title="Classifier" rail="var(--cyan)">
-        <RulesContent />
-      </Panel>
-    </div>
-  );
-}
 
 export function CensusPage() {
   const census = useCensus();
