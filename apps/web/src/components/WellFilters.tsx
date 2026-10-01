@@ -131,7 +131,7 @@ export function WellFilters({
           <span className="mono">{found.address.slice(0, 6)}…{found.address.slice(-4)}</span>
           <TagChip tag={found.primary} />
           {found.tags.includes('WOUNDED') && found.primary !== 'WOUNDED' ? <TagChip tag="WOUNDED" /> : null}
-          <span className="faint">risk {RISK_LABEL[found.hullTemp]} · size {SIZE_LABEL[found.band]}{found.meta ? ` · ${found.meta}` : ''}</span>
+          <span className="faint">risk {RISK_LABEL[found.hullTemp]} · size {SIZE_LABEL[found.band]}{found.meta ? ` · ${found.meta()}` : ''}</span>
           <Link to={found.href}>Open wallet →</Link>
         </div>
       ) : null}

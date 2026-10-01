@@ -125,6 +125,9 @@ export class SphereEngine {
   private uGlyph: Uniforms = { uGS: { value: 1 }, uNear: { value: 0 }, uAlpha: { value: 1 }, uDim: { value: 1 } };
   private uFine: Uniforms = { uGS: { value: 1 }, uNear: { value: 0 }, uAlpha: { value: 0 }, uDim: { value: 1 } };
   private uPx = { value: 1 };
+  /** largest haze dot / near-liquidation ring, in device pixels: points never balloon into full-screen fill when you zoom in */
+  private uHazeMax = { value: 12 };
+  private uRingMax = { value: 80 };
   private uTime = { value: 0 };
 
   private world = new THREE.Group(); // ships (rebuilt on data change)
@@ -179,11 +182,11 @@ export class SphereEngine {
       transparent: true,
       depthWrite: false,
       vertexColors: true,
-      uniforms: { size: { value: 0.016 }, px: this.uPx, alpha: { value: 0.22 }, nearFade: { value: 0 } },
-      vertexShader: `uniform float size; uniform float px; uniform float nearFade; varying vec3 vC; varying float vA;
+      uniforms: { size: { value: 0.016 }, px: this.uPx, maxPt: this.uHazeMax, alpha: { value: 0.22 }, nearFade: { value: 0 } },
+      vertexShader: `uniform float size; uniform float px; uniform float maxPt; uniform float nearFade; varying vec3 vC; varying float vA;
         void main(){ vC = color; vec4 mv = modelViewMatrix*vec4(position,1.); float d = -mv.z;
           vA = nearFade > 0.0 ? smoothstep(nearFade*0.55, nearFade, d) : 1.0;
-          gl_PointSize = max(1.5, size * px / d); gl_Position = projectionMatrix*mv; }`,
+          gl_PointSize = clamp(size * px / d, 1.5, maxPt); gl_Position = projectionMatrix*mv; }`,
       fragmentShader: `uniform float alpha; varying vec3 vC; varying float vA;
         void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(vC, smoothstep(0.5, 0.0, r) * alpha * vA); }`,
     });
@@ -424,12 +427,12 @@ export class SphereEngine {
     const mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { t: this.uTime, px: this.uPx, gs: this.uGlyph.uGS!, nearFade: this.uGlyph.uNear!, strength: { value: strength }, reduce: { value: this.opts.reduceMotion ? 1 : 0 } },
-      vertexShader: `attribute float sz; attribute float breath; uniform float t, px, gs, nearFade, reduce; varying float vB; varying float vA;
+      uniforms: { t: this.uTime, px: this.uPx, maxPt: this.uRingMax, gs: this.uGlyph.uGS!, nearFade: this.uGlyph.uNear!, strength: { value: strength }, reduce: { value: this.opts.reduceMotion ? 1 : 0 } },
+      vertexShader: `attribute float sz; attribute float breath; uniform float t, px, maxPt, gs, nearFade, reduce; varying float vB; varying float vA;
         void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); float d = -mv.z;
           vA = nearFade > 0.0 ? smoothstep(nearFade*0.55, nearFade, d) : 1.0;
           vB = breath * (1.0 - reduce) * (0.5 + 0.5*sin(t*6.2831853/1.8));
-          gl_PointSize = max(7.0, sz * gs * 3.4 * px / d) * (1.0 + 0.12*vB); gl_Position = projectionMatrix*mv; }`,
+          gl_PointSize = clamp(sz * gs * 3.4 * px / d, 7.0, maxPt) * (1.0 + 0.12*vB); gl_Position = projectionMatrix*mv; }`,
       fragmentShader: `uniform float strength; varying float vB; varying float vA;
         void main(){ float r = length(gl_PointCoord - 0.5); float ring = smoothstep(0.5,0.46,r) * smoothstep(0.38,0.42,r); if (ring < 0.01) discard;
           gl_FragColor = vec4(1.0, 0.32, 0.32, ring * (0.7 + 0.3*vB) * vA * strength); }`,
@@ -511,6 +514,7 @@ export class SphereEngine {
     this.home = sphereFitDistance(FOV, this.camera.aspect, this.opts.phone ? 0.86 : 0.7);
     this.controls.maxDistance = this.home * 1.35;
     this.uPx.value = (this.h * this.renderer.getPixelRatio()) / (2 * Math.tan((FOV * Math.PI) / 360));
+    this.pointCaps();
     if (first) this.goHome(false);
     this.touch();
   }
@@ -521,7 +525,14 @@ export class SphereEngine {
     this.renderer.setPixelRatio(r);
     this.renderer.setSize(this.w, this.h, false);
     this.uPx.value = (this.h * r) / (2 * Math.tan((FOV * Math.PI) / 360));
+    this.pointCaps();
     this.dirty = true;
+  }
+
+  private pointCaps() {
+    const r = this.renderer.getPixelRatio();
+    this.uHazeMax.value = (this.opts.phone ? 5 : 9) * r;
+    this.uRingMax.value = (this.opts.phone ? 34 : 56) * r;
   }
 
   /** true while dragging, damping, tweening or recentring */
@@ -877,6 +888,8 @@ export class SphereEngine {
       (this.coronaF.material as THREE.ShaderMaterial).uniforms.strength!.value = mix * (this.framed === null ? 1 : 0.38);
     }
     this.hazeMat.uniforms.alpha!.value = zoom >= 1.8 || this.framed !== null ? 0.1 : 0.22;
+    // phones: once every wallet is drawn as a glyph the haze adds nothing but fill cost
+    if (this.haze) this.haze.visible = !(this.opts.phone && mix >= 0.98);
     this.hazeMat.uniforms.nearFade!.value = nearFade;
     if (this.threadsOrbit) (this.threadsOrbit.material as THREE.LineBasicMaterial).opacity = 0.26 * (1 - mix) + 0.08;
     if (this.threadsNear) (this.threadsNear.material as THREE.LineBasicMaterial).opacity = (this.framed !== null ? 0.22 : 0.3) * mix;

@@ -8,6 +8,8 @@ import type { CensusState } from './census';
 
 export interface LiveWell {
   ships: CensusShip[];
+  /** the engine's newest reading of one wallet (fresher than `ships` after a re-read that changed nothing) */
+  latest(address: string): CensusShip | undefined;
   changes: LiveChange[];
   stats: LiveStats;
   live: boolean;
@@ -26,6 +28,9 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
     [],
   );
   const [, bump] = useReducer((x: number) => x + 1, 0);
+  // a new array only when the engine says the drawn picture changed — re-reads that change nothing keep it stable
+  const version = engine.shipsVersion;
+  const ships = useMemo(() => [...engine.ships.values()], [engine, version]);
   const [live, setLive] = useState(true);
   const [visible, setVisible] = useState(typeof document === 'undefined' ? true : !document.hidden);
   const flashes = useRef(new Map<string, number>());
@@ -76,7 +81,8 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
   }, [enabled, live, visible, census.status, engine]);
 
   return {
-    ships: [...engine.ships.values()],
+    ships,
+    latest: (address: string) => engine.ships.get(address),
     changes: engine.changes,
     stats: engine.stats,
     live,

@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats } from '@aegis/census';
 import { COPY, NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL, tagColor } from '@aegis/glyphs';
 import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
+import { useNow } from '../lib/hulls';
 import { TagChip } from './bits';
 import { SensorLog } from './SensorLog';
 
@@ -60,7 +62,9 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
 }
 
 /** Telemetry strip: what the well is showing, how old it is, and whether the live layer is watching. */
-export function CensusStatusLine({ snap, stats, now, live, onToggle }: { snap: CensusSnapshot | null; stats: LiveStats; now: number; live: boolean; onToggle: () => void }) {
+export function CensusStatusLine({ snap, stats, live, onToggle }: { snap: CensusSnapshot | null; stats: LiveStats; live: boolean; onToggle: () => void }) {
+  // the clock ticks here, not in Home: a once-a-second re-render of the whole page would re-walk 18k wallets
+  const now = useNow(1000);
   const cell = (k: string, v: React.ReactNode, style?: React.CSSProperties) => (
     <div className="tele-cell" style={style}>
       {k} <b>{v}</b>
@@ -142,8 +146,11 @@ export function woundText(s: CensusShip): string {
 
 export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; head: number | null }) {
   // ordered by when they were first seen wounded — never by how close to liquidation
-  const all = ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0));
-  const asMain = all.filter((s) => s.primary === 'WOUNDED').length;
+  const all = useMemo(
+    () => ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0)),
+    [ships],
+  );
+  const asMain = useMemo(() => all.filter((s) => s.primary === 'WOUNDED').length, [all]);
   const wounded = all.slice(0, 8);
   return (
     <div data-testid="wounded-tape">
@@ -175,7 +182,8 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
 
 const KIND_TEXT: Record<LiveChange['kind'], string> = { new: 'new wallet', flip: 'type changed', temp: 'risk changed', wounded: 'now near liquidation', healed: 'recovered' };
 
-export function ActivityTape({ changes, now }: { changes: readonly LiveChange[]; now: number }) {
+export function ActivityTape({ changes }: { changes: readonly LiveChange[] }) {
+  const now = useNow(1000);
   return (
     <div data-testid="activity-tape">
       <div className="panel-title" style={{ marginBottom: 6 }}>Live changes</div>

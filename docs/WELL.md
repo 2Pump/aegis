@@ -78,6 +78,12 @@ Glyphs shrink as you close in, so they stay beads.
   - Pixel density is 1.5× at rest and drops to 1× while the camera moves. It sharpens again about a quarter-second after the camera stops.
   - The glass shells use fewer segments.
   - The HUD text updates about 6 times a second while moving instead of every frame; its final value always lands at rest.
+- **Points never balloon:** haze dots are capped at 5 px on phones and 9 px on desktop, and the near-liquidation rings at 34 px and 56 px. Before the cap, zooming into the crowded core made thousands of big overlapping see-through points, which is a phone GPU's worst case. On phones the haze switches off once every wallet is drawn as a glyph.
+- **The page doesn't re-walk every wallet once a second:**
+  - The clocks live inside the two strips that show times.
+  - The wallet list only changes when the live layer changes what you see (the engine's `shipsVersion`), not on every re-read.
+  - The "read N ago" line is worked out when a tooltip or row draws.
+  - Measured on a phone-speed CPU, idle script time went from 1.2 s to 0.2 s per 10 s.
 - **Live data never lands mid-gesture.** A live update (25 or fewer wallets changed) waits until the camera rests, because each one rebuilds the GPU buffers. On phones it also waits at least 8 s after the previous one. A filter change lands at once. Hover, plate, Find and the ember all index the world that is actually drawn.
 - **Loading:** three.js and the engine load only when the sphere opens, as a ~136 KB (compressed) chunk; the main bundle is unchanged.
 - **Checking it:** `?fps=1` shows frames drawn per second and draw calls on the page. Targets are 60 fps with a floor of 40 on a mid laptop at default orbit, and 30+ on a phone. If a device misses them, drop threads first, then pixel density, then the glyph sample; never the sphere.

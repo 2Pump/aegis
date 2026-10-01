@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   CAMERA_HOME,
   FLASH_MS,
@@ -31,8 +31,11 @@ import { TagChip } from './bits';
 
 export interface WellShip extends ShipLite {
   href: string;
-  /** freshness line for the tooltip, e.g. "read 12 s ago (live)" */
-  meta?: string;
+  /**
+   * freshness line for the tooltip, e.g. "read 12 blocks ago (~12s)". A function, read when the tooltip draws, so a new
+   * block never has to rebuild 18k ship objects just to change this text.
+   */
+  meta?: () => string;
   /** which venues this book is on (census ships); unknown for hulls opened this session */
   venues?: { tydro: boolean; nado: boolean };
 }
@@ -59,7 +62,7 @@ const makeCanvas = (w: number, h: number) => {
  * Wheel / pinch zoom, drag to pan, double-click to close in, + − 0 on the keyboard.
  * Nothing on the glass carries a balance, a health number or a liquidation price.
  */
-export function Well({
+function WellInner({
   ships,
   onOpen,
   found = null,
@@ -89,7 +92,7 @@ export function Well({
   const geomRef = useRef(geom);
   geomRef.current = geom;
 
-  // Seats are cached per address. Home hands us a fresh array every block (the "read N blocks ago" text changes),
+  // Seats are cached per address. Home hands us a fresh array whenever the live layer changes a wallet,
   // but the layout only changes when a pose / tags / hull temp / band changes or the filter adds or removes ships.
   // Re-seating 20k ships and rebuilding the haze once a second would cost phones their frame budget.
   const seatCache = useRef(new Map<string, { sig: string; seat: Seat }>());
@@ -456,7 +459,7 @@ export function Well({
             </div>
             <div style={{ marginTop: 6 }}>{hover.s.label ?? `${hover.s.address.slice(0, 6)}…${hover.s.address.slice(-4)}`}</div>
             <div className="dim">size {SIZE_LABEL[hover.s.band]} · risk {RISK_LABEL[hover.s.hullTemp]}</div>
-            {hover.s.meta ? <div className="faint">{hover.s.meta}</div> : null}
+            {hover.s.meta ? <div className="faint">{hover.s.meta()}</div> : null}
             {geom.phone ? <div className="faint">tap again to open</div> : null}
           </div>
         ) : null}
@@ -532,7 +535,7 @@ export function ShipList({ ships, onOpen, defaultOpen = false }: { ships: readon
                 </td>
                 <td className="mono">{RISK_LABEL[s.hullTemp]}</td>
                 <td className="mono">{SIZE_LABEL[s.band]}</td>
-                <td className="mono faint">{s.meta ?? ''}</td>
+                <td className="mono faint">{s.meta?.() ?? ''}</td>
               </tr>
             ))}
           </tbody>
@@ -548,3 +551,6 @@ export function ShipList({ ships, onOpen, defaultOpen = false }: { ships: readon
     </details>
   );
 }
+
+/** memo: re-rendered only when its props change */
+export const Well = memo(WellInner);

@@ -68,6 +68,11 @@ export class LiveEngine {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private busy = false;
   private listeners = new Set<() => void>();
+  /**
+   * Bumped only when what a viewer sees changes: a snapshot load, or a re-read that changed a wallet's type, tags, risk,
+   * size or venues. A re-read that changes nothing does not bump it, so the UI never re-walks every wallet for nothing.
+   */
+  shipsVersion = 0;
   private o: Required<Omit<LiveOpts, 'onLog'>> & Pick<LiveOpts, 'onLog'>;
 
   constructor(private client: PublicClient, opts: LiveOpts = {}) {
@@ -99,6 +104,7 @@ export class LiveEngine {
       const cur = this.ships.get(s.address);
       if (!cur || s.readBlock >= cur.readBlock) this.ships.set(s.address, s);
     }
+    this.shipsVersion++;
     if (this.stats.cursor === null || this.stats.cursor < snapshotBlock) this.stats.cursor = snapshotBlock;
     this.emit();
   }
@@ -201,6 +207,7 @@ export class LiveEngine {
           this.ships.set(a, next);
           this.stats.reads++;
           const change = diff(prev, next, this.o.now());
+          if (change || !prev || visibleChanged(prev, next)) this.shipsVersion++;
           if (change) {
             this.changes.unshift(change);
             if (this.changes.length > 50) this.changes.length = 50;
@@ -231,4 +238,17 @@ function diff(prev: CensusShip | undefined, next: CensusShip, at: number): LiveC
   if (prev.primary !== next.primary) return { at, address: next.address, kind: 'flip', from, to };
   if (prev.hullTemp !== next.hullTemp) return { at, address: next.address, kind: 'temp', from, to };
   return null;
+}
+
+/** Anything the well draws or filters on (beyond the type/risk changes `diff` reports). */
+function visibleChanged(a: CensusShip, b: CensusShip): boolean {
+  return (
+    a.primary !== b.primary ||
+    a.hullTemp !== b.hullTemp ||
+    a.band !== b.band ||
+    a.tags.join(',') !== b.tags.join(',') ||
+    a.venues.tydro !== b.venues.tydro ||
+    a.venues.nado !== b.venues.nado ||
+    a.woundedSince !== b.woundedSince
+  );
 }

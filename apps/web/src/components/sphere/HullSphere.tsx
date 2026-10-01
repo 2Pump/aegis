@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CENTRE_LABEL, RISK_LABEL, SIZE_LABEL, SPHERE_BAND_W, VIEW_LABEL, seatSphere, type SphereLod, type SphereSeat } from '@aegis/glyphs';
 import { TagChip } from '../bits';
 import { ShipList, type WellShip } from '../Well';
@@ -21,7 +21,7 @@ const PHONE_LIVE_GAP_MS = 8000;
  * The three.js engine loads only when this view is shown. Filters, Find, the hull links and the list view work as before;
  * nothing on the sphere carries a balance, a health number or a liquidation price.
  */
-export default function HullSphere({
+function HullSphere({
   ships,
   onOpen,
   found = null,
@@ -292,7 +292,7 @@ export default function HullSphere({
             </div>
             <div style={{ marginTop: 6 }}>{tipShip.label ?? `${tipShip.address.slice(0, 6)}…${tipShip.address.slice(-4)}`}</div>
             <div className="dim">size {SIZE_LABEL[tipShip.band]} · risk {RISK_LABEL[tipShip.hullTemp]}</div>
-            {tipShip.meta ? <div className="faint">{tipShip.meta}</div> : null}
+            {tipShip.meta ? <div className="faint">{tipShip.meta()}</div> : null}
             {phone ? <div className="faint">tap again to open</div> : null}
           </div>
         ) : null}
@@ -329,3 +329,6 @@ export default function HullSphere({
     </div>
   );
 }
+
+/** memo: Home re-renders for its own reasons (filters, tapes); the sphere only cares when its props change */
+export default memo(HullSphere);

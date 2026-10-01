@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CensusShip } from '@aegis/census';
 import { COPY, RISK_LABEL, shipLiteFromPose } from '@aegis/glyphs';
@@ -22,7 +22,7 @@ const VIEWS: Array<[WellView, string]> = [
 import { applyFilter, filterFromParams, filterToParams, type PoseKey, type WellFilter } from '../lib/wellFilter';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
-import { useHullCache, useNow } from '../lib/hulls';
+import { useHullCache } from '../lib/hulls';
 import { useLiveWell } from '../lib/live';
 
 export function Home() {
@@ -30,10 +30,13 @@ export function Home() {
   const cache = useHullCache();
   const census = useCensus();
   const lw = useLiveWell(census, WELL_ON);
-  const now = useNow(1000);
   const snap = census.status === 'ok' ? census.snap : null;
   const head = lw.stats.head ?? snap?.block ?? null;
 
+  // the head moves every block; ships must not be rebuilt for that (18k objects → re-filter → re-seat), so the
+  // "read N ago" line reads the head when a tooltip or row draws it
+  const headRef = useRef(head);
+  headRef.current = head;
   const ships: WellShip[] = useMemo(() => {
     const out = new Map<string, WellShip>();
     const fromCensus = (s: CensusShip): WellShip => ({
@@ -43,7 +46,10 @@ export function Home() {
       hullTemp: s.hullTemp,
       band: s.band,
       href: `/hull/${s.address}`,
-      meta: `read ${blocksAgo(s.readBlock, head)}${snap && s.readBlock > snap.block ? ' · live' : ''}`,
+      meta: () => {
+        const rb = lw.latest(s.address)?.readBlock ?? s.readBlock; // a re-read that changed nothing still freshens this line
+        return `read ${blocksAgo(rb, headRef.current)}${snap && rb > snap.block ? ' · live' : ''}`;
+      },
       flashAt: lw.flashes.get(s.address),
       venues: s.venues,
     });
@@ -51,11 +57,11 @@ export function Home() {
     // hulls this viewer opened: ringed, and their fresher hull-page reading wins
     for (const [addr, h] of cache) {
       if (h.pose.primary === 'EMPTY') continue;
-      out.set(addr, { ...shipLiteFromPose(addr, h.pose), focused: true, href: `/hull/${addr}`, meta: 'opened by you · read live' });
+      out.set(addr, { ...shipLiteFromPose(addr, h.pose), focused: true, href: `/hull/${addr}`, meta: () => 'opened by you · read live' });
     }
     return [...out.values()];
-    // lw.stats.reads changes whenever the live layer updates a ship
-  }, [lw.ships, lw.flashes, lw.stats.reads, cache, head, snap]);
+    // lw.ships is a new array only when a wallet's type, risk, size, venues or the snapshot changed (not on every re-read)
+  }, [lw.ships, lw.flashes, cache, snap]);
 
   const [params, setParams] = useSearchParams();
   const filter = useMemo(() => filterFromParams(params), [params]);
@@ -85,6 +91,8 @@ export function Home() {
     return f;
   }, [ships, filter]);
 
+  const mix = useMemo(() => mixOf(lw.ships), [lw.ships]);
+  const open = useCallback((href: string) => nav(href), [nav]);
   const sessionList = [...cache.entries()];
 
   return (
@@ -140,7 +148,7 @@ export function Home() {
 
           <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado wallet found on-chain</span>}>
             <div className="stack" style={{ gap: 12 }}>
-              <CensusStatusLine snap={snap} stats={lw.stats} now={now} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
+              <CensusStatusLine snap={snap} stats={lw.stats} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
               {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
               {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
               {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
@@ -164,12 +172,12 @@ export function Home() {
               ) : null}
               {ships.length > 0 && view === 'sphere' ? (
                 <Suspense fallback={<div className="wg hs-loading-box">LOADING THE SPHERE…</div>}>
-                  <HullSphere ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} />
+                  <HullSphere ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={open} />
                 </Suspense>
               ) : null}
-              {ships.length > 0 && view === '2d' ? <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={(href) => nav(href)} /> : null}
+              {ships.length > 0 && view === '2d' ? <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={open} /> : null}
               {ships.length > 0 && view === 'list' ? <ShipList ships={shown} onOpen={(href) => nav(href)} defaultOpen /> : null}
-              <MixBar mix={mixOf(lw.ships)} label={COPY.censusFull} />
+              <MixBar mix={mix} label={COPY.censusFull} />
             </div>
           </Panel>
 
@@ -178,7 +186,7 @@ export function Home() {
               <WoundedTape ships={lw.ships} head={head} />
             </Panel>
             <Panel title="Activity" rail="var(--cyan)">
-              <ActivityTape changes={lw.changes} now={now} />
+              <ActivityTape changes={lw.changes} />
             </Panel>
           </div>
 
