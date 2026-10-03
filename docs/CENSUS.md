@@ -115,6 +115,15 @@ A full sweep reads wallets in address order and saves a cursor (`fullSweep` in `
 - The snapshot says `sweep.complete: false` while a sweep is still going; the site shows **FULL · PARTIAL**.
 - **Coverage** needs every wallet read at one block, so it is measured only by a sweep that starts and finishes in the same run (the sweep of ~65k wallets took 36 minutes on 2026-09-29). A sweep that spans runs logs "coverage not measured" and the last measurement is kept.
 
+## The Scan page (`/census`)
+
+Since 2026-10-02 the page opens on one instrument (`apps/web/src/components/ScanInstrument.tsx`):
+- **Three nested rings:** outer = Tydro supplied + borrowed (one closed ring when both are 100%), middle = Nado deposits, inner = Nado open interest as two thin arcs (longs outside, shorts inside). The lit arc is the share seen, from 12 o'clock clockwise. The dark arc, with dashed edges, is what was not seen. It is drawn empty, never filled with made-up wallets.
+- **Hover or tap a ring** for its share and the block of the last full scan.
+- **One tick per position type** around the rings, its length = that type's share of drawn wallets. A click keeps that type lit, dims the others and reads out its count and percent underneath; click again or Clear. This filters the ticks only, never the well.
+- **The readout** beside the rings holds the same numbers the page had before: the five coverage percentages (plus "% not seen" for the Nado lines) and the wallet counts. Last scan and Limits sit underneath in tighter type.
+- Phones stack the rings above the readout. Shares and wallet counts only: no dollars, no health factors.
+
 ## Coverage check (is anyone missing?)
 
 On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:

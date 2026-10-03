@@ -363,3 +363,23 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
   .plate-stop-label { white-space: nowrap; font-size: 9px; letter-spacing: 0.1em; }
   .plate-off { bottom: -22px; }
 }
+
+/* ───────── SCAN INSTRUMENT (/census hero) ───────── */
+.scan-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 16px 28px; align-items: center; }
+.scan-svg { width: 100%; max-width: 440px; height: auto; display: block; justify-self: center; overflow: visible; }
+.scan-svg .scan-c-num { font: 600 26px var(--mono); fill: var(--ink); font-variant-numeric: tabular-nums; }
+.scan-svg .scan-c-lbl { font: 500 9.5px var(--mono); letter-spacing: 0.24em; fill: var(--ink-faint); }
+.scan-tick { cursor: pointer; outline: none; }
+.scan-tick:focus-visible line:first-of-type { stroke: var(--cyan); }
+.scan-read { min-width: 0; }
+.scan-cap { font: 500 9.5px/1.4 var(--mono); letter-spacing: 0.2em; color: var(--ink-faint); margin-bottom: 8px; text-transform: uppercase; }
+.kv.tight { gap: 3px 14px; font-size: 12px; }
+.kv.tight dt { font-size: 9.5px; padding-top: 2px; }
+.scan-hover { margin-top: 10px; font-size: 11px; color: var(--ink-dim); min-height: 2.8em; line-height: 1.4; }
+.scan-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hair-2); font-size: 12px; min-height: 34px; }
+.scan-pick i { width: 8px; height: 8px; display: inline-block; }
+.scan-limits { margin: 0; padding-left: 18px; line-height: 1.5; font-size: 12.5px; }
+/* phones: rings stack above the readout */
+@media (max-width: 760px) {
+  .scan-grid { grid-template-columns: minmax(0, 1fr); }
+}
