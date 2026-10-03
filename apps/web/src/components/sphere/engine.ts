@@ -34,14 +34,21 @@ const BREATH_MAX = 64;
 const EMBER_MS = 200;
 /** The nucleus and the NEAR LIQUIDATION shell breathe together: opacity and a hair of scale, eased, never a flash. */
 const NUCLEUS_CYCLE_S = 4;
-const NUCLEUS_GLOW = [0.82, 1.12] as const; // alpha multiplier at exhale / inhale
-const NUCLEUS_SCALE = 0.012; // ±1.2 % at the peak
+/** the breath leaves the nucleus and rolls outward through every shell, each a beat later */
+const WAVE = [
+  // shell radius, delay (s), glow at exhale / inhale, scale swing
+  { r: 0.11, delay: 0, glow: [0.7, 1.3], scale: 0.03 },
+  { r: 0.32, delay: 0.35, glow: [0.65, 1.45], scale: 0.018 },
+  { r: 0.54, delay: 0.7, glow: [0.55, 1.6], scale: 0.01 },
+  { r: 0.84, delay: 1.05, glow: [0.55, 1.6], scale: 0.006 },
+  { r: 1.0, delay: 1.4, glow: [0.75, 1.3], scale: 0 },
+] as const;
 /** One thin dim ring at a time is born at the inner shell and falls to the nucleus, fading as it goes. Not aimed at a wallet. */
 const FALL_FROM = 0.32;
 const FALL_TO = 0.11;
 const FALL_S = 3.2;
 const FALL_EVERY_S = NUCLEUS_CYCLE_S * 2; // one ring every second breath
-const FALL_OPACITY = 0.2;
+const FALL_OPACITY = 0.38;
 /** ~30 fps for the breath on desktops, ~20 on phones (a 4 s cycle needs no more) */
 const NUCLEUS_FRAME_MS = 33;
 const NUCLEUS_FRAME_MS_PHONE = 50;
@@ -112,6 +119,13 @@ export class SphereEngine {
   private lastNucleus = 0;
   private nucleus?: THREE.Mesh;
   private nearShell?: THREE.Mesh;
+  /** every glass shell, by radius, for the outward breath */
+  private shells: { r: number; mesh: THREE.Mesh }[] = [];
+  private grid?: THREE.LineSegments;
+  private core?: THREE.Mesh;
+  private coreHalo?: THREE.Sprite;
+  private uCoreT = { value: 0 };
+  private uCoreHeat = { value: 0.5 };
   private fallRing?: THREE.Mesh;
   private fallT0 = -1;
   /** phones: the falling ring only while frames keep up (smoothed rAF interval, ms) */
@@ -264,11 +278,13 @@ export class SphereEngine {
     this.scene.add(
       this.glass(1.0, '#6fa6b3', { base: 0.035, rim: 0.1, power: 2.0, spec: 0, side: THREE.BackSide }, 1),
       (this.nearShell = this.glass(0.32, '#8a1c24', { base: 0.1, rim: 0.4, power: 2.2, spec: 0.25 }, 3)),
-      this.glass(0.54, '#f5c14a', { base: 0, rim: 0.12, power: 3.0, spec: 0 }, 4),
-      this.glass(0.84, '#4ce0d2', { base: 0, rim: 0.1, power: 3.2, spec: 0 }, 5),
-      this.glass(1.0, '#78bfca', { base: 0.012, rim: 0.42, power: 3.0, spec: 0.55 }, 20),
+      this.shell(0.54, this.glass(0.54, '#f5c14a', { base: 0, rim: 0.12, power: 3.0, spec: 0 }, 4)),
+      this.shell(0.84, this.glass(0.84, '#4ce0d2', { base: 0, rim: 0.1, power: 3.2, spec: 0 }, 5)),
+      this.shell(1.0, this.glass(1.0, '#78bfca', { base: 0.012, rim: 0.42, power: 3.0, spec: 0.55 }, 20)),
       (this.nucleus = this.glass(0.11, '#3a0d12', { base: 0.55, rim: 0.35, power: 1.6, spec: 0.1, dark: 0.35 }, 2)), // the nucleus: a dim recessed well
     );
+    this.shells.push({ r: 0.11, mesh: this.nucleus! }, { r: 0.32, mesh: this.nearShell! });
+    this.buildCore();
     // the falling ring: a thin circle that always faces the camera, centred on the core
     this.fallRing = new THREE.Mesh(
       new THREE.RingGeometry(0.975, 1, this.opts.phone ? 72 : 128),
@@ -316,7 +332,8 @@ export class SphereEngine {
       l.renderOrder = order;
       return l;
     };
-    this.scene.add(lines(pts, cols, 0.55, 19), lines(bp, bc, 0.75, 21));
+    this.grid = lines(pts, cols, 0.55, 19);
+    this.scene.add(this.grid, lines(bp, bc, 0.75, 21));
 
     for (const k of SECTOR_ORDER) {
       const mid = (((SECTORS[k][0] + SECTORS[k][1]) / 2) * Math.PI) / 180;
@@ -331,6 +348,64 @@ export class SphereEngine {
       this.scene.add(s);
       this.shellLabels.push(s);
     }
+  }
+
+  private shell(r: number, m: THREE.Mesh): THREE.Mesh {
+    this.shells.push({ r, mesh: m });
+    return m;
+  }
+
+  /**
+   * The living core inside the recessed nucleus: slow molten ruby that churns (3D noise drifting through it) and a soft
+   * halo round it. Both swell with the breath. Decoration only: nothing here is a wallet.
+   */
+  private buildCore() {
+    const reduce = this.opts.reduceMotion ? 1 : 0;
+    this.core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, this.opts.phone ? 32 : 64, this.opts.phone ? 24 : 48),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { t: this.uCoreT, heat: this.uCoreHeat, reduce: { value: reduce } },
+        vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV;
+          void main(){ vP = position * 10.0; vec4 w = modelMatrix*vec4(position,1.); vN = normalize(mat3(modelMatrix)*normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
+        fragmentShader: `uniform float t, heat, reduce; varying vec3 vP; varying vec3 vN; varying vec3 vV;
+          float h(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+          float n3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+            return mix(mix(mix(h(i), h(i+vec3(1,0,0)), f.x), mix(h(i+vec3(0,1,0)), h(i+vec3(1,1,0)), f.x), f.y),
+                       mix(mix(h(i+vec3(0,0,1)), h(i+vec3(1,0,1)), f.x), mix(h(i+vec3(0,1,1)), h(i+vec3(1,1,1)), f.x), f.y), f.z); }
+          float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++){ s += a * n3(p); p = p * 2.03 + 1.7; a *= 0.5; } return s; }
+          void main(){
+            float tt = t * (1.0 - reduce);
+            vec3 q = vP * 1.6 + vec3(0.0, tt * 0.22, tt * 0.13);
+            float m = fbm(q + fbm(q + tt * 0.08) * 1.4);
+            float facing = abs(dot(normalize(vN), vV));
+            float body = pow(facing, 1.6);               // brightest straight through the middle, soft at the edge
+            float v = smoothstep(0.35, 0.85, m) * body;
+            vec3 deep = vec3(0.32, 0.03, 0.05), ember = vec3(1.0, 0.33, 0.28), hot = vec3(1.0, 0.72, 0.55);
+            vec3 col = mix(deep, ember, v);
+            col = mix(col, hot, smoothstep(0.62, 0.95, m) * body * heat);
+            gl_FragColor = vec4(col, (0.18 + 0.75 * v) * (0.55 + 0.6 * heat)); }`,
+      }),
+    );
+    this.core.renderOrder = 2;
+    // halo: a soft radial glow, always facing you
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const x = c.getContext('2d')!;
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,110,100,0.55)');
+    g.addColorStop(0.35, 'rgba(200,40,50,0.22)');
+    g.addColorStop(1, 'rgba(120,10,20,0)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    // drawn through the ships, like light from inside the sphere: it brightens what's in front, never hides it
+    this.coreHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0.4 }));
+    this.coreHalo.scale.setScalar(0.42);
+    this.coreHalo.renderOrder = 25;
+    this.scene.add(this.core, this.coreHalo);
   }
 
   private textSprite(text: string, color: string, px: number, spacing: number): THREE.Sprite {
@@ -811,13 +886,27 @@ export class SphereEngine {
 
   private breatheNucleus(t: number) {
     // eased 0 → 1 → 0 over one cycle (a raised cosine: slow at both ends, no flash)
-    const b = 0.5 - 0.5 * Math.cos((t / NUCLEUS_CYCLE_S) * Math.PI * 2);
-    const glow = NUCLEUS_GLOW[0] + (NUCLEUS_GLOW[1] - NUCLEUS_GLOW[0]) * b;
-    const sc = 1 + NUCLEUS_SCALE * (b - 0.5) * 2;
-    for (const m of [this.nucleus, this.nearShell]) {
-      if (!m) continue;
-      (m.material as THREE.ShaderMaterial).uniforms.glow!.value = glow;
-      m.scale.setScalar(sc);
+    const breath = (x: number) => 0.5 - 0.5 * Math.cos((x / NUCLEUS_CYCLE_S) * Math.PI * 2);
+    // the wave: the nucleus first, then each shell outward a beat later, then the glass
+    for (const sh of this.shells) {
+      const w = WAVE.find((v) => v.r === sh.r);
+      if (!w) continue;
+      const b = breath(t - w.delay);
+      (sh.mesh.material as THREE.ShaderMaterial).uniforms.glow!.value = w.glow[0] + (w.glow[1] - w.glow[0]) * b;
+      sh.mesh.scale.setScalar(1 + w.scale * (b - 0.5) * 2);
+    }
+    // the meridians and latitude lines catch the wave as it reaches the glass
+    if (this.grid) (this.grid.material as THREE.LineBasicMaterial).opacity = 0.42 + 0.28 * breath(t - 1.4);
+    // the core churns all the time and swells with the breath; a ring that lands in it warms it a little more
+    const b0 = breath(t);
+    const kf = this.fallT0 >= 0 ? (t - this.fallT0) / FALL_S : -1;
+    const landed = kf > 0.85 && kf < 1.35 ? Math.sin(((kf - 0.85) / 0.5) * Math.PI) : 0; // eased bump, no flash
+    this.uCoreT.value = t;
+    this.uCoreHeat.value = 0.35 + 0.5 * b0 + 0.25 * landed;
+    this.core?.scale.setScalar(1 + 0.05 * (b0 - 0.5) * 2);
+    if (this.coreHalo) {
+      this.coreHalo.scale.setScalar(0.5 + 0.22 * b0 + 0.06 * landed);
+      (this.coreHalo.material as THREE.SpriteMaterial).opacity = 0.22 + 0.4 * b0 + 0.12 * landed;
     }
     const ring = this.fallRing;
     if (!ring) return;

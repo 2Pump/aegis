@@ -66,14 +66,18 @@ Glyphs shrink as you close in, so they stay beads.
 
 **Motion:**
 - Near-liquidation rings stay still. Since 2026-10-03, no single wallet pulses on its own.
-- **The nucleus breathes.** The recessed nucleus and the inner NEAR LIQUIDATION shell breathe together on a 4 s eased cycle. Their opacity runs from 0.82× to 1.12× and their scale moves ±1.2%, with no flash.
-- **One falling ring at a time.** Every second breath, a thin dim ring (opacity at most 0.2) is born at the inner shell. It falls to the nucleus over 3.2 s and fades as it goes. It always faces the camera and is centred on the core, never aimed at a wallet. The shell label stays NEAR LIQUIDATION. There are no new words and no crosshair.
+- **The sphere breathes from the nucleus out.** It runs on a 4 s eased cycle, with no flash.
+  - The breath starts at the nucleus. It then rolls outward a beat at a time: NEAR LIQUIDATION (+0.35 s), WATCH (+0.7 s), SAFE (+1.05 s), then the outer glass (+1.4 s).
+  - Each shell's glow rises and falls. The inner shells also swell a hair: the nucleus 3%, NEAR LIQUIDATION 1.8%, WATCH 1%, SAFE 0.6%.
+  - The meridian and latitude lines catch the wave when it reaches the glass.
+- **The living core.** Inside the recessed nucleus is molten ruby that churns all the time (3D noise drifting through it) and a soft halo. Both swell with the breath, and the core warms a little when a falling ring lands in it. The halo is drawn through the ships, like light from inside the sphere: it brightens what's in front and never hides it. Nothing in the core is a wallet.
+- **One falling ring at a time.** Every second breath, a thin dim ring (opacity at most 0.38) is born at the inner shell. It falls to the nucleus over 3.2 s and fades as it goes. It always faces the camera and is centred on the core, never aimed at a wallet. The shell label stays NEAR LIQUIDATION. There are no new words and no crosshair.
 - Frame rate: about 30 fps on desktop and 20 fps on phones.
 - Phones always breathe, but the falling ring only runs while frames keep up. It switches off when the frame rate drops under about 42 fps and back on above about 52 fps.
 - One 200 ms ember when a wallet changes live.
 - Camera eases.
 - A 160 ms fade on filter change.
-- With reduced motion switched on in the OS: no breath, no falling ring, no ember, no easing.
+- With reduced motion switched on in the OS: no breath, no wave, no churn, no falling ring, no ember, no easing.
 
 **Performance:**
 - **Draw calls:** about 24 whatever the fleet size (measured with 18,555 wallets). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
