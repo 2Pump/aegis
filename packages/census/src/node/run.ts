@@ -8,6 +8,8 @@ import {
   decodeTydroTransfers,
   readNadoSubsMany,
   readNlpPools,
+  scanNadoTouched,
+  isProtocolSub,
   nadoSubaccount,
   readBooksMany,
   readProtocolTotals,
@@ -563,9 +565,11 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       // positions, so they can hold a large share of open interest. They are listed on-chain (Endpoint.getNlpPools), so
       // measure them directly. Job log only; nothing here is drawn or published. Pools already among the known
       // wallets are counted once.
+      const nlpSubs = new Set<string>();
       try {
         const pools = await readNlpPools(client, readBlock);
         if (!pools.ok) throw new Error(pools.error.message);
+        for (const p of pools.value) nlpSubs.add(p.subaccount);
         const knownSubs = new Set(Object.values(state.nado.subs).flat().map((x) => x.toLowerCase()));
         const fresh = pools.value.filter((p) => !knownSubs.has(p.subaccount));
         const parsed = fresh.length ? await readNadoSubsMany(client, fresh.map((p) => p.subaccount), readBlock) : new Map();
@@ -586,6 +590,9 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         const protoParsed = await readNadoSubsMany(client, [...new Set([...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])])] as `0x${string}`[], readBlock);
         for (const r of protoParsed.values()) if (r.ok && (r.value.spots.length || r.value.perps.length)) protoAcc.addNado(r.value.spots, r.value.perps);
         const all = buildCoverage(mergeAcc(mergeAcc(cov, protoAcc), nAcc), totals.value).totals;
+        // public: the share of Nado deposits that sits with Nado's own vault and accounts (shares only, no dollars)
+        const own = buildCoverage(mergeAcc(protoAcc, nAcc), totals.value).totals.nadoDeposits;
+        if (state.coverage) state.coverage.share.nadoDepositsNadoOwn = own.totalUsd > 0 ? Math.round((own.oursUsd / own.totalUsd) * 1000) / 1000 : null;
         log(
           `  NLP pools (${pools.value.length} on-chain, ${pools.value.length - fresh.length} already among known wallets, ${holding} more holding balances${unread ? `, ${unread} unreadable` : ''}; not drawn): Nado deposits ${coveragePct(nc.nadoDeposits.oursUsd, nc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(nc.nadoOpenInterest.oursLongUsd, nc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(nc.nadoOpenInterest.oursShortUsd, nc.nadoOpenInterest.totalUsd)}`,
         );
@@ -595,6 +602,38 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         );
       } catch (e) {
         log(`  NLP pools not measured: ${String(e).slice(0, 160)}`);
+      }
+      // discovery check: every subaccount whose Nado balance changed in the last ~6 hours, from both engines
+      // (BalanceUpdate and the Nado-only SpotBalance event). Any the census doesn't know is one discovery missed:
+      // read it at the coverage block, say how much of the remaining gap it holds, and add it to the known list
+      // (it is a real subaccount, named by the chain), so the hourly runs pick it up from now on.
+      try {
+        const from = Math.max(NADO_START_BLOCK, head - 21_600);
+        const t = await scanNadoTouched(client, from, head, { ...scanOpts, deadline: Date.now() + 4 * 60_000 });
+        const known = new Set<string>([
+          ...Object.values(state.nado.subs).flat().map((x) => x.toLowerCase()),
+          ...[...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])].map((x) => x.toLowerCase()),
+          ...nlpSubs,
+        ]);
+        const unknown = [...t.subs].filter((x) => !known.has(x));
+        log(
+          `  discovery check (blocks ${from}–${t.scannedTo}${t.complete ? '' : ', stopped early'}): ${t.subs.size} subaccounts changed balance (${t.spotBalanceEvents} SpotBalance events), ${unknown.length} not known before`,
+        );
+        if (unknown.length) {
+          const read = await readNadoSubsMany(client, unknown.slice(0, 300) as `0x${string}`[], readBlock);
+          const uAcc = new CoverageAcc();
+          for (const r of read.values()) if (r.ok && (r.value.spots.length || r.value.perps.length)) uAcc.addNado(r.value.spots, r.value.perps);
+          const uc = buildCoverage(uAcc, totals.value).totals;
+          log(
+            `  those ${Math.min(unknown.length, 300)} hold: Nado deposits ${coveragePct(uc.nadoDeposits.oursUsd, uc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(uc.nadoOpenInterest.oursLongUsd, uc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(uc.nadoOpenInterest.oursShortUsd, uc.nadoOpenInterest.totalUsd)}`,
+          );
+          for (const x of unknown.slice(0, 8)) log(`    missed: ${x.slice(0, 10)}…${x.slice(42)}${isProtocolSub(x) ? ' (zero owner)' : ''}`);
+          let added = 0;
+          for (const x of unknown) if (!isProtocolSub(x)) (addSub(x), added++);
+          if (added) log(`  added ${added} missed subaccounts to discovery — read from the next run on`);
+        }
+      } catch (e) {
+        log(`  discovery check not run: ${String(e).slice(0, 160)}`);
       }
       if (unregistered) log(`  ${unregistered} wallets hold balances in subaccounts that report exists=false on-chain (counted since census v1.2)`);
     } else {

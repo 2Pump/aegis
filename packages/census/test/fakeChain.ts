@@ -40,7 +40,14 @@ export interface FakeOpts {
   isolatedTradeAt?: number;
   /** Endpoint.getNlpPools() lists one NLP pool, holding a 0.05 BTC-PERP long (otherwise the list is empty) */
   nlpPool?: boolean;
+  /**
+   * a subaccount discovery never saw: it only appears in a Nado-only SpotBalance event (which discovery doesn't scan),
+   * near head, and holds a 0.05 BTC-PERP long
+   */
+  missedSub?: boolean;
 }
+
+export const MISSED_SUB = `0x6000000000000000000000000000000000000006${'64656661756c740000000000'}`.toLowerCase() as `0x${string}`;
 
 /** The NLP pool's subaccount in the fake chain: owner + name "nlp" (made-up test values, never published). */
 export const NLP_OWNER = '0x00000000000000000000000000000000000a11ce';
@@ -72,6 +79,7 @@ export function fakeChain(o: FakeOpts) {
   // a trade near head (BalanceUpdate: data = abi.encode(uint32 productId, bytes32 subaccount))
   mkLog(NADO_CONTRACTS.perpEngine, [TOPIC.balanceUpdate], `0x${(2).toString(16).padStart(64, '0')}${sCarry.slice(2)}`, o.tradeAt ?? o.head - 100);
 
+  if (o.missedSub) mkLog(NADO_CONTRACTS.spotEngine, [TOPIC.spotBalance, MISSED_SUB, pad('0x0')], `0x${'0'.repeat(128)}`, o.head - 50);
   if (o.isolatedTradeAt) mkLog(NADO_CONTRACTS.perpEngine, [TOPIC.balanceUpdate], `0x${(2).toString(16).padStart(64, '0')}${ISO_SUB.slice(2)}`, o.isolatedTradeAt);
 
   const prices = TYDRO_RESERVES.map((r) => (r.symbol === 'kBTC' ? 100_000n : r.symbol === 'WETH' ? 4_000n : 1n) * 10n ** 8n);
@@ -90,8 +98,26 @@ export function fakeChain(o: FakeOpts) {
     return [0n, 0n, 0n, 0n, 0n, 2n ** 256n - 1n];
   };
   const health = (sub: string, type: number): bigint =>
-    sub.toLowerCase() === sCarry ? (type === 1 ? 9_400n * e18 : 10_000n * e18) : o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB ? (type === 1 ? 400n * e18 : 500n * e18) : 0n;
+    sub.toLowerCase() === sCarry ? (type === 1 ? 9_400n * e18 : 10_000n * e18) : o.missedSub && sub.toLowerCase() === MISSED_SUB ? (type === 1 ? 400n * e18 : 500n * e18) : o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB ? (type === 1 ? 400n * e18 : 500n * e18) : 0n;
   const subInfo = (sub: string) => {
+    if (o.missedSub && sub.toLowerCase() === MISSED_SUB) {
+      return {
+        subaccount: MISSED_SUB,
+        exists: true,
+        healths: [
+          { assets: 500n * e18, liabilities: 0n, health: 450n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 400n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 500n * e18 },
+        ],
+        healthContributions: [],
+        spotCount: 0,
+        perpCount: 1,
+        spotBalances: [],
+        perpBalances: [{ productId: 2, balance: { amount: e18 / 20n, vQuoteBalance: -5_000n * e18, lastCumulativeFundingX18: 0n } }],
+        spotProducts: [],
+        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 5n } }],
+      };
+    }
     if (o.nlpPool && sub.toLowerCase() === NLP_SUB) {
       return {
         subaccount: NLP_SUB,

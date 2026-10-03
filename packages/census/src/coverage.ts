@@ -137,6 +137,11 @@ export interface CoveragePublic {
     nadoDeposits: number | null;
     nadoOpenInterestLongs: number | null;
     nadoOpenInterestShorts: number | null;
+    /**
+     * Nado deposits held by Nado itself: its NLP vault pools and its protocol accounts (since 2026-10-03). Seen,
+     * but not wallets, so never drawn. Absent in snapshots from before then.
+     */
+    nadoDepositsNadoOwn?: number | null;
   };
 }
 

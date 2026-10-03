@@ -379,6 +379,7 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 .colony-rim-lbl { font: 600 10.5px var(--mono); letter-spacing: 0.08em; fill: var(--ink); font-variant-numeric: tabular-nums; }
 .colony-rim-sub { font: 500 9px var(--mono); letter-spacing: 0.16em; fill: var(--ink-faint); }
 .colony-notseen { font: 600 10px var(--mono); letter-spacing: 0.14em; fill: var(--ink-dim); }
+.colony-own-lbl { font: 600 10px var(--mono); letter-spacing: 0.08em; fill: rgba(190, 200, 210, 0.85); font-variant-numeric: tabular-nums; }
 .colony-morsel { cursor: pointer; outline: none; transition: opacity 160ms; }
 .colony-morsel:focus-visible circle:first-of-type { stroke: var(--cyan); stroke-width: 2; }
 .colony-morsel-lbl { font: 600 9.5px var(--mono); fill: var(--ink); paint-order: stroke; stroke: #020406; stroke-width: 3px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
@@ -404,4 +405,5 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 .colony.compact .colony-rim-lbl { font-size: 21px; letter-spacing: 0.04em; }
 .colony.compact .colony-rim-sub { font-size: 16px; letter-spacing: 0.08em; }
 .colony.compact .colony-notseen { font-size: 19px; letter-spacing: 0.06em; }
+.colony.compact .colony-own-lbl { font-size: 19px; letter-spacing: 0.04em; }
 .colony.compact .colony-morsel-lbl { font-size: 20px; stroke-width: 5px; }

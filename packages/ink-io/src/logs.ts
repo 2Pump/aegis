@@ -18,6 +18,8 @@ export const TOPIC = {
   modifyCollateral: toEventSelector('ModifyCollateral(int128,bytes32,uint32)'),
   liquidation: toEventSelector('Liquidation(bytes32,bytes32,uint32,bool,int128,int128)'),
   balanceUpdate: toEventSelector('BalanceUpdate(uint32,bytes32)'),
+  /** SpotEngine, Nado-only (not in Vertex): nadohq/nado-typescript-sdk @ aa288c6 abis/SpotEngine.ts */
+  spotBalance: toEventSelector('SpotBalance(bytes32,uint32,int128,int128)'),
 } as const;
 
 export const TYDRO_START_BLOCK = 19_954_047; // Pool proxy creation tx 0x0320…3c40 (Blockscout, 2025-07-25)
@@ -240,6 +242,34 @@ export function scanNadoAccounts(client: PublicClient, fromBlock: number, toBloc
 }
 
 /** Every trade too (high volume) — only for short windows (hourly incremental, live layer). */
+/**
+ * Every subaccount whose balance changed in a block range, from both engines: BalanceUpdate (perp and spot) and
+ * SpotBalance (spot, Nado-only). Protocol (zero-owner) subaccounts included. Used to check discovery: anything here
+ * the census doesn't already know is a subaccount it missed.
+ */
+export async function scanNadoTouched(client: PublicClient, fromBlock: number, toBlock: number, o: Partial<ScanOpts> = {}) {
+  const r = await scanLogs(client, {
+    ...o,
+    address: [NADO_CONTRACTS.spotEngine, NADO_CONTRACTS.perpEngine],
+    topics: [[TOPIC.balanceUpdate, TOPIC.spotBalance]],
+    fromBlock,
+    toBlock,
+  });
+  const subs = new Set<`0x${string}`>();
+  let spotBalanceEvents = 0;
+  for (const l of r.logs) {
+    if (l.topics[0] === TOPIC.balanceUpdate) {
+      const d = (l.data ?? '0x').slice(2);
+      if (d.length >= 128) subs.add(`0x${d.slice(64, 128)}`.toLowerCase() as `0x${string}`);
+    } else if (l.topics[0] === TOPIC.spotBalance) {
+      spotBalanceEvents++;
+      const sub = topicBytes32(l.topics[1]);
+      if (sub) subs.add(sub);
+    }
+  }
+  return { ...r, subs, spotBalanceEvents };
+}
+
 export function scanNadoActivity(client: PublicClient, fromBlock: number, toBlock: number, o: Partial<ScanOpts> = {}) {
   return scanLogs(client, {
     ...o,

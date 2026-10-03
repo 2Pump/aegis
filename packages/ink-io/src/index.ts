@@ -31,6 +31,7 @@ export {
   decodeNadoSubaccounts,
   decodeNadoProtocolSubaccounts,
   isProtocolSub,
+  scanNadoTouched,
   VERTEX_PROTOCOL_SUBS,
   subaccountOwner,
   type ScanResult,

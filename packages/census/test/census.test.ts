@@ -7,7 +7,7 @@ beforeEach(() => resetLearnedMaxSpan());
 import { multicallAdaptive, scanTydro } from '@aegis/ink-io';
 import { decodeShip, decodeSnapshot, encodeShip, type CensusShip } from '../src/index.js';
 import { fileStore, runCensus } from '../src/node/index.js';
-import { ISO_SUB, NLP_OWNER, U, fakeChain } from './fakeChain.js';
+import { ISO_SUB, MISSED_SUB, NLP_OWNER, U, fakeChain } from './fakeChain.js';
 
 const HEAD = 57_200_000;
 
@@ -460,6 +460,7 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(logs3.some((l) => l.includes('NLP pools (1 on-chain, 0 already among known wallets, 1 more holding balances'))).toBe(true);
     expect(logs3.some((l) => /wallets \+ protocol accounts \+ NLP pools: .*OI longs 100/.test(l))).toBe(true);
     expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5); // the public share is still wallets only
+    expect(snap.coverage!.share.nadoDepositsNadoOwn).toBe(0); // published separately: the pool holds no deposits here
     expect(snap.ships.some((x) => x[0] === NLP_OWNER)).toBe(false);
   });
 
@@ -476,6 +477,24 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(logs.some((l) => l.includes('full sweep restarted by hand (the paused one had run 1 time(s))'))).toBe(true);
     expect(snap.sweep.kind).toBe('full');
     expect(logs.some((l) => l.startsWith('coverage: '))).toBe(true);
+  });
+
+  it('the discovery check finds a subaccount discovery missed, says what it holds, and adds it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-missed-'));
+    const store = fileStore(dir);
+    // the first run reads everyone (a full sweep) and runs the check
+    const logs: string[] = [];
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD, missedSub: true }).client, store, log: (m) => logs.push(m) });
+    expect(logs.some((l) => /discovery check .* 1 not known before/.test(l))).toBe(true);
+    expect(logs.some((l) => /those 1 hold: .*OI longs 50/.test(l))).toBe(true);
+    expect(logs.some((l) => l.includes('added 1 missed subaccounts to discovery'))).toBe(true);
+    const k = (await store.get('known.json')) as { nado: { subs: Record<string, string[]> } };
+    expect(k.nado.subs['0x6000000000000000000000000000000000000006']).toContain(MISSED_SUB);
+    // and the next full sweep reads it as a wallet: nothing left to find
+    const logs2: string[] = [];
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 100, missedSub: true }).client, store, full: true, log: (m) => logs2.push(m) });
+    expect(logs2.some((l) => /discovery check .* 0 not known before/.test(l))).toBe(true);
+    expect(logs2.some((l) => /^coverage: .*Nado open interest 50\.0% \(longs\)/.test(l))).toBe(true);
   });
 
   it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {

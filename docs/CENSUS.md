@@ -129,9 +129,9 @@ Since 2026-10-03 the page opens on a living colony (`apps/web/src/components/Col
 
 **The rim is the coverage, always labelled.** Lit arcs start at 12 o'clock and run clockwise.
 - Outer rim: Tydro supplied and borrowed. When both are 100%, it is one closed rim marked "outer rim · closed".
-- Middle rim: Nado deposits.
+- Middle rim: Nado deposits. Wallets are drawn in cyan, then the share held by Nado's own vault and accounts in grey (since 2026-10-03).
 - Inner rim: Nado open interest, as two thin arcs (longs, shorts).
-- The unlit remainder of each arc is dark and dashed. A hatched sector under it is labelled **NOT SEEN · deposits** or **NOT SEEN · open interest**.
+- The unlit remainder of each arc is dark and dashed, with a hatched sector under it. One **NOT SEEN** callout lists every dark arc with its percent. All Nado labels sit in callout columns beside the dish, with leader lines to the rim.
 - **Agents cannot enter the NOT SEEN sector.** From the smallest Nado share round to 12 o'clock they bounce off a shorter wall. The verification script samples the canvas there and expects zero lit pixels.
 - Without a coverage measurement, the rim stays dark and is labelled "NADO COVERAGE NOT MEASURED YET · RIM DARK".
 
@@ -189,7 +189,20 @@ The first run of that scan (2026-09-29, run #13) covered blocks 29.85M → 36.92
   - None was ever above 50%.
   - The dollars of longs and shorts we see nearly match (BTC $10.6M / $10.1M, ETH $8.2M / $8.4M, HYPE $3.8M / $4.0M). If whole groups of traders were missing, the two sides wouldn't keep balancing in every market.
 - **The fix.** From this date each side is compared with half of `openInterest`. That puts open-interest coverage at about **94%** on both sides, in line with deposits.
-- **Effect on the site.** The published shares and the Scan page's dark arcs update after the next full sweep that reads every wallet in one run.
+- **Confirmed on 2026-10-03 (next full sweep, 65,043 wallets in one run).**
+  - Wallets: Tydro 100% / 100%, Nado deposits 82.2%, Nado OI **94.5% (longs) / 93.6% (shorts)**.
+  - With protocol accounts and the NLP pools: deposits 94.2%, OI 94.5% / 93.7%.
+  - These are the shares now published, and the Scan page's dark OI arcs are down to about 6%.
+- **What's left, all small.**
+  - BTC-PERP shorts 91.3% (about $1M unseen).
+  - A few equity-perp shorts: SPY 55%, GOOGL 38%, NVDA 37%. These are a few hundred thousand dollars in total.
+  - USDT0 deposits: wallets hold 70.1%, and the NLP pools and protocol accounts hold most of the rest.
+  - The NLP "borrows" ($7.8M) are the vault's issued shares, held by the pools.
+  - The short-side remainder is what the discovery check below is for.
+- **Since 2026-10-03, every full sweep also does two more things.**
+  - **Publishes Nado's own share.** It publishes `nadoDepositsNadoOwn`: the share of Nado deposits held by the NLP pools and protocol accounts. That's a share only, no dollars.
+  - **Runs a discovery check.** It reads every subaccount whose balance changed in the last ~6 hours, from both engines: BalanceUpdate, plus the Nado-only `SpotBalance` event, which discovery never scanned. Any subaccount the census didn't already know is logged with what it holds. Those subaccounts are added to discovery, because they're real chain-named subaccounts, and every run reads them from then on.
+- **On the Scan page.** The deposits rim draws wallets in cyan and Nado's own vault and accounts in a quieter grey. The NOT SEEN arc covers only what nobody accounts for. All Nado labels sit in callout columns beside the dish, with leader lines, so they never overlap.
 
 **What the next coverage line should look like (written before the answer above):**
 - If 2 was the cause, open interest coverage jumps and the log reports wallets with `exists=false` balances.

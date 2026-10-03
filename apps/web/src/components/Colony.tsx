@@ -69,9 +69,12 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
 
   // coverage → which part of the rim is NOT SEEN (as clockwise fractions from 12 o'clock)
   const dep = frac01(s?.nadoDeposits);
+  // deposits held by Nado itself (its NLP vault and protocol accounts): seen, not wallets. Drawn after the wallets' arc.
+  const own = frac01(s?.nadoDepositsNadoOwn);
+  const depSeen = Math.min(1, dep + own);
   const oiL = frac01(s?.nadoOpenInterestLongs);
   const oiS = frac01(s?.nadoOpenInterestShorts);
-  const unseenFrom = cov ? Math.min(dep, oiL, oiS) : 0; // the colony is held back from here round to 12 o'clock
+  const unseenFrom = cov ? Math.min(depSeen, oiL, oiS) : 0; // the colony is held back from here round to 12 o'clock
   const anyUnseen = unseenFrom < 0.9995;
 
   // food morsels on an inner ring, biggest first from 12 o'clock
@@ -197,23 +200,65 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
     };
   }, [morsels, unseenFrom]);
 
-  // the SVG frame round the 400×400 dish: room for rim labels on every side (more on phones, where they wrap)
-  const vb = compact ? ([-178, -46, 756, 516] as const) : ([-150, -34, 700, 468] as const);
   const pickedM = picked ? morsels.find((m) => m.k === picked) ?? null : null;
   const scanAt = cov ? `full scan at block ${cov.block.toLocaleString('en-US')} · ${fmtAge(Date.parse(cov.at), now)} ago` : 'not measured yet: the next full scan measures it';
   const unseenTxt = (x: number | null | undefined) => (x !== null && x !== undefined && x < 0.9995 ? ` · ${((1 - x) * 100).toFixed(1)}% not seen` : '');
   const sw = snap.sweep;
   const disc = snap.discovery;
 
-  // rim label anchors
-  const lab = (f: number, r: number) => {
-    const [x, y] = pt(r, f);
-    return { x, y, anchor: (Math.sin(f * Math.PI * 2) >= 0 ? 'start' : 'end') as 'start' | 'end' };
-  };
-  const depEnd = lab(dep, 200);
-  const oiEnd = lab(Math.max(oiL, oiS), 200);
-  const depGap = lab((dep + 1) / 2, 200);
-  const oiGap = lab((Math.max(oiL, oiS) + Math.min(dep, 1)) / 2, 200);
+  // the SVG frame round the 400×400 dish: room for the callout columns on both sides
+  const vb = compact ? ([-200, -46, 800, 516] as const) : ([-160, -34, 720, 468] as const);
+
+  // ─── rim callouts ───
+  // Nado's labels sit in a column beside the dish (left or right of the rim point they describe), stacked so they never
+  // overlap, each with a thin leader line to its arc. Tydro's label stays at the top.
+  const pctOf = (x: number) => `${(x * 100).toFixed(1)}%`;
+  const depUnseen = 1 - depSeen;
+  const callouts = useMemo(() => {
+    if (!cov) return [];
+    const items: { key: string; f: number; r: number; lines: string[]; cls: string; testid?: string }[] = [];
+    items.push({ key: 'dep', f: Math.max(0.002, dep), r: R_DEP, cls: 'colony-rim-lbl', lines: compact ? ['DEPOSITS', `wallets ${pctOf(dep)}`] : ['NADO DEPOSITS', `wallets ${pctOf(dep)}`] });
+    if (own > 0.0005) items.push({ key: 'own', f: (dep + depSeen) / 2, r: R_DEP, cls: 'colony-own-lbl', testid: 'rim-own-label', lines: compact ? ["NADO'S OWN", `vault ${pctOf(own)}`] : ["NADO'S OWN VAULT", `& accounts ${pctOf(own)}`] });
+    items.push({ key: 'oi', f: Math.max(0.002, Math.max(oiL, oiS)), r: R_OI_L, cls: 'colony-rim-lbl', lines: compact ? ['OPEN INT.', `longs ${pctOf(oiL)}`, `shorts ${pctOf(oiS)}`] : ['NADO OPEN INTEREST', `longs ${pctOf(oiL)}`, `shorts ${pctOf(oiS)}`] });
+    const ns = [
+      ...(depUnseen > 0.0005 ? [`deposits ${pctOf(depUnseen)}`] : []),
+      ...(oiL < 0.9995 ? [`longs ${pctOf(1 - oiL)}`] : []),
+      ...(oiS < 0.9995 ? [`shorts ${pctOf(1 - oiS)}`] : []),
+    ];
+    if (ns.length) items.push({ key: 'ns', f: (unseenFrom + 1) / 2, r: DISH_R + 18, cls: 'colony-notseen', testid: 'not-seen-label', lines: ['NOT SEEN', ...ns] });
+    const lh = compact ? 21 : 12.5;
+    const top = vb[1] + lh + 4;
+    const bottom = vb[1] + vb[3] - 6;
+    const colL = compact ? -10 : -12;
+    const colR = 410 + (compact ? 10 : 12);
+    const out: { key: string; x: number; y: number; anchor: 'start' | 'end'; lines: string[]; cls: string; testid?: string; px: number; py: number; lx: number; ly: number }[] = [];
+    for (const side of ['L', 'R'] as const) {
+      const list = items
+        .map((it) => {
+          const [px, py] = pt(it.r + 3, it.f);
+          return { ...it, px, py, h: it.lines.length * lh };
+        })
+        .filter((it) => (side === 'L' ? it.px < CX : it.px >= CX))
+        .sort((p, q) => p.py - q.py);
+      let y = top;
+      const placed = list.map((it) => {
+        const y0 = Math.max(it.py - it.h / 2, y);
+        y = y0 + it.h + (compact ? 10 : 8);
+        return { it, y0 };
+      });
+      // too low? slide the whole stack up
+      const over = placed.length ? placed[placed.length - 1]!.y0 + placed[placed.length - 1]!.it.h - bottom : 0;
+      for (const p of placed) {
+        const y0 = over > 0 ? p.y0 - over : p.y0;
+        const x = side === 'L' ? colL : colR;
+        out.push({
+          key: p.it.key, x, y: y0, anchor: side === 'L' ? 'end' : 'start', lines: p.it.lines, cls: p.it.cls, testid: p.it.testid,
+          px: p.it.px, py: p.it.py, lx: side === 'L' ? x + 4 : x - 4, ly: y0 + p.it.h / 2 - lh * 0.35,
+        });
+      }
+    }
+    return out;
+  }, [cov, compact, dep, own, depSeen, depUnseen, oiL, oiS, unseenFrom, vb]);
 
   return (
     <section className={`panel colony${compact ? ' compact' : ''}`} style={{ ['--rail' as string]: 'var(--cyan)' }} data-testid="colony">
@@ -251,7 +296,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
                 <RimArc r={R_TYDRO + 2} w={2.5} share={s?.tydroSupply ?? null} id="tydro-supplied" />
                 <RimArc r={R_TYDRO - 2} w={2.5} share={s?.tydroDebt ?? null} id="tydro-borrowed" />
                 {/* middle: Nado deposits */}
-                <RimArc r={R_DEP} w={5} share={s?.nadoDeposits ?? null} id="nado-deposits" />
+                <RimArc r={R_DEP} w={5} share={s?.nadoDeposits ?? null} id="nado-deposits" own={own} />
                 {/* inner: Nado open interest, longs + shorts */}
                 <RimArc r={R_OI_L} w={2} share={s?.nadoOpenInterestLongs ?? null} id="nado-oi-longs" />
                 <RimArc r={R_OI_S} w={2} share={s?.nadoOpenInterestShorts ?? null} id="nado-oi-shorts" />
@@ -272,26 +317,12 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
                 )}
                 {cov ? (
                   <>
-                    <Lines x={depEnd.x - (compact ? 6 : 0)} y={depEnd.y - (compact ? 16 : 0)} anchor={depEnd.anchor} cls="colony-rim-lbl" lines={compact ? ['NADO DEPOSITS', sharePct(s?.nadoDeposits ?? null)] : [`NADO DEPOSITS ${sharePct(s?.nadoDeposits ?? null)}`]} />
-                    {compact ? null : <text x={depEnd.x} y={depEnd.y + 12} textAnchor={depEnd.anchor} className="colony-rim-sub">middle rim</text>}
-                    <Lines
-                      x={oiEnd.x}
-                      y={oiEnd.y}
-                      anchor={oiEnd.anchor}
-                      cls="colony-rim-lbl"
-                      lines={
-                        compact
-                          ? ['NADO OPEN', `LONGS ${sharePct(s?.nadoOpenInterestLongs ?? null)}`, `SHORTS ${sharePct(s?.nadoOpenInterestShorts ?? null)}`]
-                          : [`NADO OPEN LONGS ${sharePct(s?.nadoOpenInterestLongs ?? null)} · SHORTS ${sharePct(s?.nadoOpenInterestShorts ?? null)}`]
-                      }
-                    />
-                    {compact ? null : <text x={oiEnd.x} y={oiEnd.y + 12} textAnchor={oiEnd.anchor} className="colony-rim-sub">inner rim</text>}
-                    {dep < 0.9995 ? (
-                      <Lines x={depGap.x} y={depGap.y} anchor={depGap.anchor} cls="colony-notseen" testid="not-seen-label" lines={compact ? ['NOT SEEN', 'deposits'] : ['NOT SEEN · deposits']} />
-                    ) : null}
-                    {Math.max(oiL, oiS) < 0.9995 ? (
-                      <Lines x={oiGap.x} y={oiGap.y} anchor={oiGap.anchor} cls="colony-notseen" testid="not-seen-label" lines={compact ? ['NOT SEEN', 'open interest'] : ['NOT SEEN · open interest']} />
-                    ) : null}
+                    {callouts.map((c) => (
+                      <g key={c.key}>
+                        <polyline points={`${c.px.toFixed(1)},${c.py.toFixed(1)} ${c.lx.toFixed(1)},${c.ly.toFixed(1)}`} fill="none" stroke="rgba(160,175,190,0.32)" strokeWidth="1" />
+                        <Lines x={c.x} y={c.y + (compact ? 16 : 9.5)} anchor={c.anchor} cls={c.cls} testid={c.testid} lines={c.lines} />
+                      </g>
+                    ))}
                   </>
                 ) : (
                   <Lines x={CX} y={418} anchor="middle" cls="colony-notseen" lines={compact ? ['NADO COVERAGE NOT MEASURED', 'RIM DARK'] : ['NADO COVERAGE NOT MEASURED YET · RIM DARK']} />
@@ -361,7 +392,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
             <dl className="kv tight">
               <dt>tydro supplied</dt><dd className="num" data-testid="cov-tydro-supplied">{sharePct(s?.tydroSupply ?? null)}</dd>
               <dt>tydro borrowed</dt><dd className="num" data-testid="cov-tydro-borrowed">{sharePct(s?.tydroDebt ?? null)}</dd>
-              <dt>nado deposits</dt><dd className="num" data-testid="cov-nado-deposits">{sharePct(s?.nadoDeposits ?? null)}<span className="faint">{unseenTxt(s?.nadoDeposits)}</span></dd>
+              <dt>nado deposits</dt><dd className="num" data-testid="cov-nado-deposits">{sharePct(s?.nadoDeposits ?? null)}<span className="faint">{own > 0.0005 ? ` · ${pctOf(own)} Nado's own vault` : ''}{cov ? unseenTxt(depSeen) : ''}</span></dd>
               <dt>nado open longs</dt><dd className="num" data-testid="cov-nado-longs">{sharePct(s?.nadoOpenInterestLongs ?? null)}<span className="faint">{unseenTxt(s?.nadoOpenInterestLongs)}</span></dd>
               <dt>nado open shorts</dt><dd className="num" data-testid="cov-nado-shorts">{sharePct(s?.nadoOpenInterestShorts ?? null)}<span className="faint">{unseenTxt(s?.nadoOpenInterestShorts)}</span></dd>
             </dl>
@@ -512,15 +543,20 @@ function Lines({ x, y, anchor, cls, lines, testid }: { x: number; y: number; anc
 }
 
 /** One coverage mark on the rim: lit arc from 12 o'clock for the share seen, a dark track for the rest. */
-function RimArc({ r, w, share, id }: { r: number; w: number; share: number | null; id: string }) {
-  const f = frac01(share);
+function RimArc({ r, w, share, id, own = 0 }: { r: number; w: number; share: number | null; id: string; own?: number }) {
+  const f0 = frac01(share);
+  const f = Math.min(1, f0 + own); // seen = wallets + Nado's own accounts
   return (
     <g data-testid={`rim-${id}`} data-share={share === null ? '' : share.toFixed(4)}>
       {f < 0.9995 ? (
         // the NOT SEEN remainder: dark, dashed, never lit
         <path d={f > 0 ? arc(r, f, 1) : arc(r, 0, 0.99999)} fill="none" stroke="rgba(160,175,190,0.28)" strokeWidth={w} strokeDasharray="1.5 3" data-testid={`rim-${id}-dark`} />
       ) : null}
-      {f > 0 ? <path d={f >= 0.9995 ? arc(r, 0, 0.99999) : arc(r, 0, f)} fill="none" stroke="var(--cyan)" strokeWidth={w} data-testid={`rim-${id}-lit`} /> : null}
+      {f0 > 0 ? <path d={f0 >= 0.9995 ? arc(r, 0, 0.99999) : arc(r, 0, f0)} fill="none" stroke="var(--cyan)" strokeWidth={w} data-testid={`rim-${id}-lit`} /> : null}
+      {own > 0.0005 ? (
+        // seen, but held by Nado itself, not by wallets: same rim, a quieter colour
+        <path d={arc(r, f0, f)} fill="none" stroke="rgba(160,175,190,0.6)" strokeWidth={w} data-testid={`rim-${id}-own`} />
+      ) : null}
     </g>
   );
 }

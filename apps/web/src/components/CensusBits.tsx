@@ -125,6 +125,7 @@ export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: numbe
         {row('Tydro supplied', c.share.tydroSupply)}
         {row('Tydro borrowed', c.share.tydroDebt)}
         {row('Nado deposits', c.share.nadoDeposits)}
+        {c.share.nadoDepositsNadoOwn ? row("Nado deposits held by Nado's own vault and accounts (not wallets)", c.share.nadoDepositsNadoOwn) : null}
         {row('Nado open longs', c.share.nadoOpenInterestLongs)}
         {row('Nado open shorts', c.share.nadoOpenInterestShorts)}
       </dl>
