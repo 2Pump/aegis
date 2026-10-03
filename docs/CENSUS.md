@@ -161,7 +161,7 @@ A gap would mean accounts the discovery doesn't see yet.
 
 ### Why Nado was at ~46%: what we checked, in order
 
-**How Nado counts open interest.** Nado is a Vertex fork. In Vertex's `PerpEngineState._updateBalance`, `openInterest` goes up only when a balance is positive, so it's the sum of **longs** (plus base in any AMM LP pool). Every long has a short on the other side, so comparing longs seen with it, and shorts seen with it, is right. The 46% was a real gap, not a formula mistake.
+**How Nado counts open interest.** Nado is a Vertex fork. In Vertex's `PerpEngineState._updateBalance`, `openInterest` goes up only when a balance is positive, so it's the sum of **longs** (plus base in any AMM LP pool). We first assumed Nado does the same. **It does not; see 5 below:** Nado counts both sides, and the ~46% was the formula, not a real gap.
 
 **1. Isolated subaccounts: discovery was not the problem.** Nado's engine creates a separate subaccount for each isolated-margin position and funds it from the owner's main account. Its name ends in `…69736f` ("iso"). Census v1.2 scans every trade since launch once to find them (`nado.tradeHistory` in `known.json`, resumable, within the 60% backfill share of each run), and the forward trade scan no longer caps itself at 6 hours.
 
@@ -181,7 +181,17 @@ The first run of that scan (2026-09-29, run #13) covered blocks 29.85M → 36.92
 - **Where the numbers go.** These lines go to the job log only. NLP pools are not drawn and not added to the public shares; whether to show them is an owner decision.
 - **On wallet pages.** Product 11 now reads **NLP** instead of SPOT#11. Classification is unchanged: like any unlisted spot, it is its own family and never hedges a perp.
 
-**What the next coverage line should look like:**
+**5. The answer (measured 2026-10-03, block ~57.57M, first full sweep with the NLP lines).**
+- **The measurement.** Wallets: deposits 82.2%, OI 47.2% (longs) / 46.8% (shorts). Protocol accounts: deposits 2.0%, OI 0%. NLP pools: there are 3 on-chain, none of them already a known wallet. Pool 0 has a zero owner, and their balance weights are 1.00, 3.75 and 0.25. They hold deposits 10.0% and OI 0%. All together: deposits 94.2%, OI 47.3% / 46.8%.
+- **The NLP pools explain the deposits gap.** They hold 10% of Nado deposits and the NLP issued, and they're not traders: they hold no perp positions at all.
+- **The open-interest gap was the formula, not missing wallets.** Nado's perp `openInterest` counts both sides (longs + shorts), not longs only as in Vertex. The evidence:
+  - In every market, our longs and our shorts were each just under half of it: BTC 48.2% / 45.7%, ETH 48.5% / 49.5%, HYPE 48.1% / 49.9%.
+  - None was ever above 50%.
+  - The dollars of longs and shorts we see nearly match (BTC $10.6M / $10.1M, ETH $8.2M / $8.4M, HYPE $3.8M / $4.0M). If whole groups of traders were missing, the two sides wouldn't keep balancing in every market.
+- **The fix.** From this date each side is compared with half of `openInterest`. That puts open-interest coverage at about **94%** on both sides, in line with deposits.
+- **Effect on the site.** The published shares and the Scan page's dark arcs update after the next full sweep that reads every wallet in one run.
+
+**What the next coverage line should look like (written before the answer above):**
 - If 2 was the cause, open interest coverage jumps and the log reports wallets with `exists=false` balances.
 - If 3 holds the rest, the "wallets + protocol accounts" line closes the gap.
 - If the NLP pools hold it, the "wallets + protocol accounts + NLP pools" line closes the gap. Then the census misses no one: the rest of the open interest is the vault, not wallets.

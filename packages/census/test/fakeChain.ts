@@ -107,7 +107,7 @@ export function fakeChain(o: FakeOpts) {
         spotBalances: [],
         perpBalances: [{ productId: 2, balance: { amount: e18 / 20n, vQuoteBalance: -5_000n * e18, lastCumulativeFundingX18: 0n } }],
         spotProducts: [],
-        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
+        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 5n } }],
       };
     }
     if (o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB) {
@@ -130,7 +130,7 @@ export function fakeChain(o: FakeOpts) {
         spotProducts: [
           { productId: 0, oraclePriceX18: e18, state: { cumulativeDepositsMultiplierX18: e18, cumulativeBorrowsMultiplierX18: e18, totalDepositsNormalized: 500n * e18, totalBorrowsNormalized: 0n } },
         ],
-        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
+        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 5n } }],
       };
     }
     if (sub.toLowerCase() !== sCarry) throw new Error('fake: getSubaccountInfo called for an empty subaccount (health filter should have skipped it)');
@@ -148,7 +148,7 @@ export function fakeChain(o: FakeOpts) {
       perpCount: 1,
       spotBalances: [{ productId: 1, balance: { amount: e18 / 10n } }],
       perpBalances: [{ productId: 2, balance: { amount: -(e18 / 10n), vQuoteBalance: 10_000n * e18, lastCumulativeFundingX18: 0n } }],
-      // protocol-wide state: 0.2 KBTC deposited in total (we know 0.1), perp OI 0.1 BTC
+      // protocol-wide state: 0.2 KBTC deposited in total (we know 0.1), perp OI 0.2 BTC (Nado counts both sides: 0.1 long + 0.1 short)
       spotProducts: [
         {
           productId: 1,
@@ -156,7 +156,7 @@ export function fakeChain(o: FakeOpts) {
           state: { cumulativeDepositsMultiplierX18: e18, cumulativeBorrowsMultiplierX18: e18, totalDepositsNormalized: e18 / 5n, totalBorrowsNormalized: 0n },
         },
       ],
-      perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
+      perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 5n } }],
     };
   };
 

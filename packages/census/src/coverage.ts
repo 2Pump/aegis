@@ -90,7 +90,11 @@ export function buildCoverage(acc: CoverageAcc, t: ProtocolTotals, at = new Date
   }
   let oiTotal = 0, oiLong = 0, oiShort = 0;
   for (const r of t.nadoPerp) {
-    const total = r.openInterest * r.priceUsd;
+    // Nado's perp `openInterest` counts BOTH sides (longs + shorts), unlike Vertex's longs-only counter. Measured
+    // 2026-10-03 at block ~57.57M: every market's wallet longs and shorts were each just under half of it (BTC 48.2% /
+    // 45.7%, ETH 48.5% / 49.5%, HYPE 48.1% / 49.9%), never above 50%, while the dollars of longs and shorts we see were
+    // nearly equal (BTC $10.6M / $10.1M). So each side is compared with half of it.
+    const total = (r.openInterest * r.priceUsd) / 2;
     const longs = (acc.nadoLongs.get(r.productId) ?? 0) * r.priceUsd;
     const shorts = (acc.nadoShorts.get(r.productId) ?? 0) * r.priceUsd;
     oiTotal += total;

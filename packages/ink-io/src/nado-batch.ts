@@ -114,7 +114,7 @@ export interface NlpPool {
   poolId: number;
   subaccount: `0x${string}`;
   owner: `0x${string}`;
-  /** share of NLP capital routed to this pool (0..1) */
+  /** the pool's balance weight (relative; 1 = 1.0). Seen 2026-10-03: 1.00, 3.75, 0.25 */
   weight: number;
 }
 

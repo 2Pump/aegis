@@ -589,7 +589,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         log(
           `  NLP pools (${pools.value.length} on-chain, ${pools.value.length - fresh.length} already among known wallets, ${holding} more holding balances${unread ? `, ${unread} unreadable` : ''}; not drawn): Nado deposits ${coveragePct(nc.nadoDeposits.oursUsd, nc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(nc.nadoOpenInterest.oursLongUsd, nc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(nc.nadoOpenInterest.oursShortUsd, nc.nadoOpenInterest.totalUsd)}`,
         );
-        for (const p of pools.value) log(`    pool ${p.poolId}: owner ${p.owner.slice(0, 10)}… weight ${(p.weight * 100).toFixed(1)}%${knownSubs.has(p.subaccount) ? ' (already a known wallet)' : ''}`);
+        for (const p of pools.value) log(`    pool ${p.poolId}: owner ${p.owner.slice(0, 10)}… weight ${p.weight.toFixed(2)}${knownSubs.has(p.subaccount) ? ' (already a known wallet)' : ''}`);
         log(
           `  wallets + protocol accounts + NLP pools: Nado deposits ${coveragePct(all.nadoDeposits.oursUsd, all.nadoDeposits.totalUsd)} · OI longs ${coveragePct(all.nadoOpenInterest.oursLongUsd, all.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(all.nadoOpenInterest.oursShortUsd, all.nadoOpenInterest.totalUsd)}`,
         );
