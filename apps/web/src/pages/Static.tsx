@@ -1,14 +1,16 @@
 import { COPY } from '@aegis/glyphs';
-import { ScanInstrument } from '../components/ScanInstrument';
+import { Colony } from '../components/Colony';
+import { useLiveWell } from '../lib/live';
 import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
-import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { Panel } from '../components/bits';
 
 export function CensusPage() {
   const census = useCensus();
   const now = useNow(5000);
+  // the live layer only drops specks into the dish when a wallet's type changes; it never adds wallets
+  const lw = useLiveWell(census, WELL_ON);
   if (!WELL_ON) {
     return (
       <div className="stack">
@@ -24,32 +26,7 @@ export function CensusPage() {
       {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
       {census.status === 'missing' || census.status === 'error' ? <div className="banner">{census.message}</div> : null}
       {census.status === 'ok' ? (
-        <>
-          <ScanInstrument snap={census.snap} now={now} />
-          <div className="grid two scan-under">
-            <Panel title="Last scan" rail="var(--slate)">
-              <dl className="kv tight">
-                <dt>block</dt><dd className="num">{census.snap.block.toLocaleString('en-US')}</dd>
-                <dt>age</dt><dd className="mono">{fmtAge(Date.parse(census.snap.generatedAt), now)} ago</dd>
-                <dt>type</dt><dd className="mono">{census.snap.sweep.kind === 'full' ? 'full re-read' : 'hourly'}{census.snap.sweep.complete === false ? ' (partial — continues next run)' : ''} · {census.snap.sweep.reread.toLocaleString('en-US')} wallets re-read · {census.snap.sweep.carried.toLocaleString('en-US')} kept from earlier · {Math.round(census.snap.sweep.ms / 1000)}s</dd>
-                <dt>history</dt>
-                <dd className="mono">
-                  {census.snap.discovery.backfillComplete
-                    ? 'complete — every Tydro and Nado wallet since launch'
-                    : `backfilling — Tydro to ${census.snap.discovery.tydroScannedTo.toLocaleString('en-US')}, Nado to ${census.snap.discovery.nadoScannedTo.toLocaleString('en-US')} of ${census.snap.discovery.head.toLocaleString('en-US')}`}
-                </dd>
-                <dt>rules</dt><dd className="mono">{census.snap.rulesVersion}</dd>
-              </dl>
-            </Panel>
-            <Panel title="Limits" rail="var(--slate)">
-            <ul className="dim scan-limits">
-              <li>Counts wallets, not money. A $5 account and a $5M account each count once.</li>
-              <li>Nado isolated-margin positions are found from every trade since launch.</li>
-              <li>Wallets near danger, Tydro borrowers and anything that moved are re-read every hour, and live while the well is open. Quiet, healthy wallets are re-read in the weekly full scan.</li>
-            </ul>
-            </Panel>
-          </div>
-        </>
+        <Colony snap={census.snap} now={now} changes={lw.changes} />
       ) : null}
     </div>
   );

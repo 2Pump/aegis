@@ -117,12 +117,32 @@ A full sweep reads wallets in address order and saves a cursor (`fullSweep` in `
 
 ## The Scan page (`/census`)
 
-Since 2026-10-02 the page opens on one instrument (`apps/web/src/components/ScanInstrument.tsx`):
-- **Three nested rings:** outer = Tydro supplied + borrowed (one closed ring when both are 100%), middle = Nado deposits, inner = Nado open interest as two thin arcs (longs outside, shorts inside). The lit arc is the share seen, from 12 o'clock clockwise. The dark arc, with dashed edges, is what was not seen. It is drawn empty, never filled with made-up wallets.
-- **Hover or tap a ring** for its share and the block of the last full scan.
-- **One tick per position type** around the rings, its length = that type's share of drawn wallets. A click keeps that type lit, dims the others and reads out its count and percent underneath; click again or Clear. This filters the ticks only, never the well.
-- **The readout** beside the rings holds the same numbers the page had before: the five coverage percentages (plus "% not seen" for the Nado lines) and the wallet counts. Last scan and Limits sit underneath in tighter type.
-- Phones stack the rings above the readout. Shares and wallet counts only: no dollars, no health factors.
+Since 2026-10-03 the page opens on a living colony (`apps/web/src/components/Colony.tsx`). It replaced the rings instrument, which had replaced the mix bar and coverage stack.
+
+**What it is.** A Physarum (slime-mould) simulation in a dish. It is decoration over real numbers: **the agents are not wallets**, and nothing in the dish is invented data.
+- The agents sense ahead, turn toward the stronger scent and lay a trail that spreads and fades.
+- **Food morsels** are the position types. Each morsel's size is that type's share of drawn wallets, and its colour is the type colour. Morsels sit on two staggered rings, so the colony branches into a network between them.
+- An agent takes the colour of the last morsel it touched. Each morsel keeps sending out agents in proportion to its share, so no type goes unfed.
+- **Click a morsel, or a type in the list:** the colony leans toward it (its food is ×4), and the line under the dish reads "name · n wallets · x% of drawn". Click again or press Clear to undo. This changes only the dish. It never filters the well.
+- **A live type change** (a wallet newly typed, or one that changed type, seen by the live layer while the page is open) drops a bright speck on that type's morsel.
+- **Freezes** when the tab is hidden or the dish is off-screen. With reduced motion it settles out of sight and shows one still frame. Capped at 30 fps. Phones run 2,600 agents; desktops run 6,500.
+
+**The rim is the coverage, always labelled.** Lit arcs start at 12 o'clock and run clockwise.
+- Outer rim: Tydro supplied and borrowed. When both are 100%, it is one closed rim marked "outer rim · closed".
+- Middle rim: Nado deposits.
+- Inner rim: Nado open interest, as two thin arcs (longs, shorts).
+- The unlit remainder of each arc is dark and dashed. A hatched sector under it is labelled **NOT SEEN · deposits** or **NOT SEEN · open interest**.
+- **Agents cannot enter the NOT SEEN sector.** From the smallest Nado share round to 12 o'clock they bounce off a shorter wall. The verification script samples the canvas there and expects zero lit pixels.
+- Without a coverage measurement, the rim stays dark and is labelled "NADO COVERAGE NOT MEASURED YET · RIM DARK".
+
+**Readout, always visible, no clicking needed.** It sits beside the dish, or under it on screens narrower than 860 px.
+- Coverage: the five percentages, with "% not seen" on the Nado lines, plus the block and age of that full scan.
+- Wallets: found, with a position, empty, on Tydro, on Nado, near liquidation, couldn't read.
+- Position types: count and percent for each.
+- Last scan: block, age, hourly or full, re-read, kept from earlier, seconds taken, history, rules version.
+- Under the dish: the three Limits lines and "Counts wallets, not money. Not advice."
+
+**Phones** (dish narrower than 520 px): rim labels break onto short lines in bigger type, and morsels show only their percent. The names sit in the type list right below. Shares and wallet counts only: no dollars, no health factors.
 
 ## Coverage check (is anyone missing?)
 
