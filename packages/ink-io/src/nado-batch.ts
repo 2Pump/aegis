@@ -2,7 +2,7 @@ import type { NadoBook } from '@aegis/pose';
 import type { PublicClient } from 'viem';
 import { multicallAdaptive, type Call } from './batch.js';
 import { chainInfoToGatewayShape } from './nado-chain.js';
-import { NADO_CONTRACTS, NADO_PRODUCTS, QUERIER_GET_SUBACCOUNT_INFO_ABI } from './nado-registry.js';
+import { ENDPOINT_GET_NLP_POOLS_ABI, NADO_CONTRACTS, NADO_PRODUCTS, QUERIER_GET_SUBACCOUNT_INFO_ABI } from './nado-registry.js';
 import { aggregate, parseSubaccountInfo, type ParsedSub } from './nado.js';
 import type { Result } from './result.js';
 
@@ -108,4 +108,35 @@ export function nadoBooksByOwner(
     out.set(owner, { ok: true, value: aggregate(v.subs, notes) });
   }
   return out;
+}
+
+export interface NlpPool {
+  poolId: number;
+  subaccount: `0x${string}`;
+  owner: `0x${string}`;
+  /** share of NLP capital routed to this pool (0..1) */
+  weight: number;
+}
+
+/** The NLP vault's pool subaccounts, straight from Endpoint.getNlpPools() at one block. Read only. */
+export async function readNlpPools(client: PublicClient, blockNumber: bigint): Promise<Result<NlpPool[]>> {
+  try {
+    const raw = (await client.readContract({
+      address: NADO_CONTRACTS.endpoint,
+      abi: ENDPOINT_GET_NLP_POOLS_ABI,
+      functionName: 'getNlpPools',
+      blockNumber,
+    })) as readonly { poolId: bigint; subaccount: `0x${string}`; owner: `0x${string}`; balanceWeightX18: bigint }[];
+    return {
+      ok: true,
+      value: raw.map((p) => ({
+        poolId: Number(p.poolId),
+        subaccount: p.subaccount.toLowerCase() as `0x${string}`,
+        owner: p.owner.toLowerCase() as `0x${string}`,
+        weight: Number(p.balanceWeightX18) / 1e18,
+      })),
+    };
+  } catch (e) {
+    return { ok: false, error: { code: 'RPC_DEAD', message: `getNlpPools: ${String(e).slice(0, 160)}` } };
+  }
 }

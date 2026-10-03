@@ -118,6 +118,7 @@ Status: **PROVEN by arithmetic on the docs example** — the example's liabiliti
 | KBTC | 1 | BTC-PERP 2 | LIVE |
 | WETH | 3 | ETH-PERP 4 | LIVE |
 | USDC | 5 | — | LIVE |
+| NLP (vault share) | 11 | — | PROVEN 2026-10-03: `NLP_PRODUCT_ID = 11` in nado-typescript-sdk @ aa288c6 `packages/shared/src/consts/productIds.ts`. Absent from `symbols`, so it showed as SPOT#11 until then. Pools listed on-chain by `Endpoint.getNlpPools()` |
 | wQQQx | 115 | QQQ-PERP 98 | LIVE |
 | wSPYx | 117 | SPY-PERP 100 | LIVE |
 | wAAPLx | 143 | AAPL-PERP 102 | LIVE |

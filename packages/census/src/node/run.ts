@@ -7,6 +7,7 @@ import {
   decodeNadoSubaccounts,
   decodeTydroTransfers,
   readNadoSubsMany,
+  readNlpPools,
   nadoSubaccount,
   readBooksMany,
   readProtocolTotals,
@@ -554,6 +555,43 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         );
       } catch (e) {
         log(`  protocol accounts not measured: ${String(e).slice(0, 160)}`);
+      }
+      // the NLP vault (Nado Liquidity Provider): its pools are subaccounts that make markets and take over liquidated
+      // positions, so they can hold a large share of open interest. They are listed on-chain (Endpoint.getNlpPools), so
+      // measure them directly. Job log only; nothing here is drawn or published. Pools already among the known
+      // wallets are counted once.
+      try {
+        const pools = await readNlpPools(client, readBlock);
+        if (!pools.ok) throw new Error(pools.error.message);
+        const knownSubs = new Set(Object.values(state.nado.subs).flat().map((x) => x.toLowerCase()));
+        const fresh = pools.value.filter((p) => !knownSubs.has(p.subaccount));
+        const parsed = fresh.length ? await readNadoSubsMany(client, fresh.map((p) => p.subaccount), readBlock) : new Map();
+        const nAcc = new CoverageAcc();
+        let holding = 0;
+        let unread = 0;
+        for (const r of parsed.values()) {
+          if (!r.ok) {
+            unread++;
+            continue;
+          }
+          if (!r.value.spots.length && !r.value.perps.length) continue;
+          holding++;
+          nAcc.addNado(r.value.spots, r.value.perps);
+        }
+        const nc = buildCoverage(nAcc, totals.value).totals;
+        const protoAcc = new CoverageAcc();
+        const protoParsed = await readNadoSubsMany(client, [...new Set([...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])])] as `0x${string}`[], readBlock);
+        for (const r of protoParsed.values()) if (r.ok && (r.value.spots.length || r.value.perps.length)) protoAcc.addNado(r.value.spots, r.value.perps);
+        const all = buildCoverage(mergeAcc(mergeAcc(cov, protoAcc), nAcc), totals.value).totals;
+        log(
+          `  NLP pools (${pools.value.length} on-chain, ${pools.value.length - fresh.length} already among known wallets, ${holding} more holding balances${unread ? `, ${unread} unreadable` : ''}; not drawn): Nado deposits ${coveragePct(nc.nadoDeposits.oursUsd, nc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(nc.nadoOpenInterest.oursLongUsd, nc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(nc.nadoOpenInterest.oursShortUsd, nc.nadoOpenInterest.totalUsd)}`,
+        );
+        for (const p of pools.value) log(`    pool ${p.poolId}: owner ${p.owner.slice(0, 10)}… weight ${(p.weight * 100).toFixed(1)}%${knownSubs.has(p.subaccount) ? ' (already a known wallet)' : ''}`);
+        log(
+          `  wallets + protocol accounts + NLP pools: Nado deposits ${coveragePct(all.nadoDeposits.oursUsd, all.nadoDeposits.totalUsd)} · OI longs ${coveragePct(all.nadoOpenInterest.oursLongUsd, all.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(all.nadoOpenInterest.oursShortUsd, all.nadoOpenInterest.totalUsd)}`,
+        );
+      } catch (e) {
+        log(`  NLP pools not measured: ${String(e).slice(0, 160)}`);
       }
       if (unregistered) log(`  ${unregistered} wallets hold balances in subaccounts that report exists=false on-chain (counted since census v1.2)`);
     } else {

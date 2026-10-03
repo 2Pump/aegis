@@ -171,10 +171,21 @@ The first run of that scan (2026-09-29, run #13) covered blocks 29.85M → 36.92
 
 **3. Protocol accounts are now measured.** Nado's own accounts have a zero owner (Vertex: FEES_ACCOUNT = 0, X_ACCOUNT = 1, V_ACCOUNT = 2), and the census deliberately never draws them. On every coverage sweep they are now read, for the log only, so it's clear how much of the open interest sits with the protocol itself rather than with wallets we missed.
 
+**4. The NLP vault (found 2026-10-03).** Nado's own liquidity vault (Nado Liquidity Provider) is the most likely holder of the missing open interest.
+- **What it is.** It is a set of pool subaccounts that make markets and take over liquidated positions, so they sit on the other side of a lot of trades.
+- **Where it shows up.** Its share token is spot product **11**, the "SPOT#11" seen on wallet pages. The Nado SDK says `NLP_PRODUCT_ID = 11` (nado-typescript-sdk @ aa288c6).
+- **The $7.7M borrow gap.** The coverage log showed product 11 borrows at 0% of about $7.7M. That fits NLP shares issued by the pools: a pool holds them as a negative balance, and we never read the pools.
+- **What the census does now.** The pools are listed on-chain by `Endpoint.getNlpPools()`, so every coverage sweep reads them directly, and two lines are logged:
+  - an "NLP pools" line (how many there are, which are already known wallets, their share of deposits and open interest)
+  - a "wallets + protocol accounts + NLP pools" line
+- **Where the numbers go.** These lines go to the job log only. NLP pools are not drawn and not added to the public shares; whether to show them is an owner decision.
+- **On wallet pages.** Product 11 now reads **NLP** instead of SPOT#11. Classification is unchanged: like any unlisted spot, it is its own family and never hedges a perp.
+
 **What the next coverage line should look like:**
 - If 2 was the cause, open interest coverage jumps and the log reports wallets with `exists=false` balances.
 - If 3 holds the rest, the "wallets + protocol accounts" line closes the gap.
-- If neither does, the gap is accounts we still don't see, and the per-product gap lines show where to look next.
+- If the NLP pools hold it, the "wallets + protocol accounts + NLP pools" line closes the gap. Then the census misses no one: the rest of the open interest is the vault, not wallets.
+- If none of these do, the gap is accounts we still don't see, and the per-product gap lines show where to look next.
 
 The trade-history scan still completes once, so the old 6-hour gaps are covered too. When it finishes, the next run does a full sweep and measures coverage again.
 

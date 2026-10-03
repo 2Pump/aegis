@@ -7,7 +7,7 @@ beforeEach(() => resetLearnedMaxSpan());
 import { multicallAdaptive, scanTydro } from '@aegis/ink-io';
 import { decodeShip, decodeSnapshot, encodeShip, type CensusShip } from '../src/index.js';
 import { fileStore, runCensus } from '../src/node/index.js';
-import { ISO_SUB, U, fakeChain } from './fakeChain.js';
+import { ISO_SUB, NLP_OWNER, U, fakeChain } from './fakeChain.js';
 
 const HEAD = 57_200_000;
 
@@ -447,7 +447,7 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(k2.fullDue).toBe(true);
 
     // next run: full sweep; the owner's book now includes the isolated subaccount
-    const chain3 = fakeChain({ head: HEAD + 200, isolatedTradeAt: 30_500_000 });
+    const chain3 = fakeChain({ head: HEAD + 200, isolatedTradeAt: 30_500_000, nlpPool: true });
     const logs3: string[] = [];
     const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: chain3.client, store, log: (m) => logs3.push(m) });
     expect(snap.sweep.kind).toBe('full');
@@ -456,6 +456,11 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5);
     expect(logs3.some((l) => l.includes('report exists=false on-chain (counted since census v1.2)'))).toBe(true);
     expect(logs3.some((l) => l.includes('protocol accounts ('))).toBe(true);
+    // the NLP vault's pool (listed on-chain) holds the other 0.05 BTC long: measured in the log, never drawn or published
+    expect(logs3.some((l) => l.includes('NLP pools (1 on-chain, 0 already among known wallets, 1 more holding balances'))).toBe(true);
+    expect(logs3.some((l) => /wallets \+ protocol accounts \+ NLP pools: .*OI longs 100/.test(l))).toBe(true);
+    expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5); // the public share is still wallets only
+    expect(snap.ships.some((x) => x[0] === NLP_OWNER)).toBe(false);
   });
 
   it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {

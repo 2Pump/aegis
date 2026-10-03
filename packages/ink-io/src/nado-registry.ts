@@ -4,6 +4,9 @@
 //   both created by Nado deployer 0xC1cC56caB60e832665E6c3780BfEBe3C1C971603.
 // ABI: getSubaccountInfo copied verbatim from the same SDK commit (packages/shared/src/abis/Querier.ts).
 // Products: Nado gateway `symbols` snapshot 2026-09-28. Unknown product ids render as SPOT#n / PERP#n and never hedge anything.
+// Product 11 is the NLP vault share (Nado Liquidity Provider): `NLP_PRODUCT_ID = 11` in nadohq/nado-typescript-sdk @ aa288c6
+//   (2026-10-01), packages/shared/src/consts/productIds.ts. It is not in the gateway `symbols` list, so it used to show as SPOT#11.
+//   Naming it changes nothing in classification: like any unlisted spot it is its own family and never hedges a perp.
 import type { Abi, Address } from 'viem';
 
 export const NADO_SDK_COMMIT = '7a326cb';
@@ -23,7 +26,7 @@ export const QUERIER_GET_SUBACCOUNT_INFO_ABI = [{"inputs":[{"internalType":"byte
 type P = readonly [number, string, 'spot' | 'perp'];
 const RAW: readonly P[] = [
   [0, 'USDT0', 'spot'], [1, 'KBTC', 'spot'], [2, 'BTC-PERP', 'perp'], [3, 'WETH', 'spot'], [4, 'ETH-PERP', 'perp'],
-  [5, 'USDC', 'spot'], [8, 'SOL-PERP', 'perp'], [10, 'XRP-PERP', 'perp'], [14, 'BNB-PERP', 'perp'], [16, 'HYPE-PERP', 'perp'],
+  [5, 'USDC', 'spot'], [8, 'SOL-PERP', 'perp'], [11, 'NLP', 'spot'], [10, 'XRP-PERP', 'perp'], [14, 'BNB-PERP', 'perp'], [16, 'HYPE-PERP', 'perp'],
   [18, 'ZEC-PERP', 'perp'], [20, 'MON-PERP', 'perp'], [22, 'FARTCOIN-PERP', 'perp'], [24, 'SUI-PERP', 'perp'], [26, 'AAVE-PERP', 'perp'],
   [28, 'XAUT-PERP', 'perp'], [30, 'PUMP-PERP', 'perp'], [32, 'TAO-PERP', 'perp'], [34, 'XMR-PERP', 'perp'], [36, 'LIT-PERP', 'perp'],
   [38, 'kPEPE-PERP', 'perp'], [40, 'PENGU-PERP', 'perp'], [42, 'USELESS-PERP', 'perp'], [44, 'SKR-PERP', 'perp'], [46, 'UNI-PERP', 'perp'],
@@ -43,6 +46,15 @@ const RAW: readonly P[] = [
   [178, 'LLY-PERP', 'perp'], [180, 'ORCL-PERP', 'perp'], [182, 'SKHY-PERP', 'perp'], [184, 'ANSEM-PERP', 'perp'], [186, 'CASHCAT-PERP', 'perp'],
   [188, 'PONS-PERP', 'perp'],
 ];
+
+/** The NLP vault share's spot product id (see the header). */
+export const NLP_PRODUCT_ID = 11;
+
+/**
+ * Endpoint.getNlpPools(): the NLP vault's pool subaccounts (pool id, subaccount, owner, balance weight).
+ * ABI copied verbatim from nadohq/nado-typescript-sdk @ aa288c6, packages/shared/src/abis/Endpoint.ts. A view call: read only.
+ */
+export const ENDPOINT_GET_NLP_POOLS_ABI = [{"inputs":[],"name":"getNlpPools","outputs":[{"components":[{"internalType":"uint64","name":"poolId","type":"uint64"},{"internalType":"bytes32","name":"subaccount","type":"bytes32"},{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint128","name":"balanceWeightX18","type":"uint128"}],"internalType":"struct IEndpoint.NlpPool[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"}] as const satisfies Abi;
 
 export const NADO_PRODUCTS: ReadonlyMap<number, { symbol: string; type: 'spot' | 'perp' }> = new Map(
   RAW.map(([id, symbol, type]) => [id, { symbol, type }]),

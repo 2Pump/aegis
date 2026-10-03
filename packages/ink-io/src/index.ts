@@ -16,7 +16,7 @@ export {
 } from './nado.js';
 export { readBook, type BookRead, type SensorsConfig } from './book.js';
 export { readNadoChain, chainInfoToGatewayShape } from './nado-chain.js';
-export { NADO_CONTRACTS, NADO_PRODUCTS, NADO_SDK_COMMIT, NADO_PRODUCTS_FETCHED } from './nado-registry.js';
+export { NADO_CONTRACTS, NADO_PRODUCTS, NADO_SDK_COMMIT, NADO_PRODUCTS_FETCHED, NLP_PRODUCT_ID } from './nado-registry.js';
 export { multicallAdaptive, type Call, type CallResult } from './batch.js';
 export {
   TOPIC,
@@ -37,7 +37,7 @@ export {
   type ScanProgress,
 } from './logs.js';
 export { readTydroMany, readTydroPrices, type TydroPrices } from './tydro-batch.js';
-export { nadoHealthMany, readNadoSubsMany, nadoBooksByOwner } from './nado-batch.js';
+export { nadoHealthMany, readNadoSubsMany, nadoBooksByOwner, readNlpPools, type NlpPool } from './nado-batch.js';
 export { readBooksMany, type ReadManyInput, type ReadManyResult } from './books.js';
 export { classifyRpcError, describeRpcError, type RpcErrorKind } from './rpc-errors.js';
 export { seedTydroHolders, INK_EXPLORER_API, type SeedResult } from './explorer.js';

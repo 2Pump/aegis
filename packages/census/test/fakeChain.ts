@@ -38,7 +38,13 @@ export interface FakeOpts {
    * Nado's engine and funded from the main account — no ModifyCollateral, only trades (BalanceUpdate) name them.
    */
   isolatedTradeAt?: number;
+  /** Endpoint.getNlpPools() lists one NLP pool, holding a 0.05 BTC-PERP long (otherwise the list is empty) */
+  nlpPool?: boolean;
 }
+
+/** The NLP pool's subaccount in the fake chain: owner + name "nlp" (made-up test values, never published). */
+export const NLP_OWNER = '0x00000000000000000000000000000000000a11ce';
+export const NLP_SUB = `${NLP_OWNER}6e6c700000000000000000000000`.toLowerCase() as `0x${string}`;
 
 /** Isolated subaccount of the CARRY owner: name bytes 00 00 02 00 "iso" (layout from the Nado SDK bytes32 tests). */
 export const ISO_SUB = `${U.carry}0000020069736f0000000000`.toLowerCase() as `0x${string}`;
@@ -86,6 +92,24 @@ export function fakeChain(o: FakeOpts) {
   const health = (sub: string, type: number): bigint =>
     sub.toLowerCase() === sCarry ? (type === 1 ? 9_400n * e18 : 10_000n * e18) : o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB ? (type === 1 ? 400n * e18 : 500n * e18) : 0n;
   const subInfo = (sub: string) => {
+    if (o.nlpPool && sub.toLowerCase() === NLP_SUB) {
+      return {
+        subaccount: NLP_SUB,
+        exists: true,
+        healths: [
+          { assets: 500n * e18, liabilities: 0n, health: 450n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 400n * e18 },
+          { assets: 500n * e18, liabilities: 0n, health: 500n * e18 },
+        ],
+        healthContributions: [],
+        spotCount: 0,
+        perpCount: 1,
+        spotBalances: [],
+        perpBalances: [{ productId: 2, balance: { amount: e18 / 20n, vQuoteBalance: -5_000n * e18, lastCumulativeFundingX18: 0n } }],
+        spotProducts: [],
+        perpProducts: [{ productId: 2, oraclePriceX18: 100_000n * e18, state: { openInterest: e18 / 10n } }],
+      };
+    }
     if (o.isolatedTradeAt && sub.toLowerCase() === ISO_SUB) {
       stats.subaccountInfoCalls++;
       stats.isolatedReads++;
@@ -158,6 +182,8 @@ export function fakeChain(o: FakeOpts) {
         return 10n ** 8n;
       case 'getAssetsPrices':
         return prices;
+      case 'getNlpPools':
+        return o.nlpPool ? [{ poolId: 0n, subaccount: NLP_SUB, owner: NLP_OWNER, balanceWeightX18: e18 }] : [];
       default:
         throw new Error(`fake: unknown call ${c.functionName}`);
     }
