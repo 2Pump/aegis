@@ -30,6 +30,12 @@ const BANDS = ['dust', '<1k', '1–10k', '10–100k', '100k+'] as const;
 const FOV = 30;
 const HOME_AZ = 38;
 const HOME_EL = 18;
+/** the view the well opens on (and the 0 / reset key returns to), as the ZOOM the HUD shows. Phones fit the sphere to the width, so they open at 1×. */
+const START_ZOOM = 1.3;
+/** the slow turn of the whole sphere while nobody is touching it: one full turn in two minutes */
+const SPIN_DEG_PER_S = 3;
+/** after a drag, wheel or framing ends, wait this long before the turn resumes */
+const SPIN_IDLE_MS = 2500;
 const BREATH_MAX = 64;
 const EMBER_MS = 200;
 /** The nucleus and the NEAR LIQUIDATION shell breathe together: opacity and a hair of scale, eased, never a flash. */
@@ -660,7 +666,7 @@ export class SphereEngine {
 
   goHome(animate = true) {
     this.setFramed(null);
-    this.moveTo(this.orbitPos(this.home, HOME_AZ, HOME_EL), new THREE.Vector3(), animate);
+    this.moveTo(this.orbitPos(this.home / (this.opts.phone ? 1 : START_ZOOM), HOME_AZ, HOME_EL), new THREE.Vector3(), animate);
   }
 
   private moveTo(pos: THREE.Vector3, target: THREE.Vector3, animate: boolean) {
@@ -936,6 +942,27 @@ export class SphereEngine {
     (ring.material as THREE.MeshBasicMaterial).opacity = FALL_OPACITY * a;
   }
 
+  /* ───────────── the slow turn ───────────── */
+
+  private lastSpin = 0;
+  /**
+   * Turns the camera round the vertical axis through the core, so the whole sphere seems to rotate: one turn in two
+   * minutes. Only at overview zoom, with nothing framed, hovered or held, and a moment after the last touch. Not counted
+   * as "moving" (no phone resolution drop, no deferred live updates). Wallets keep their seats; only the view turns.
+   */
+  private spin(now: number) {
+    const dt = this.lastSpin ? Math.min(0.1, (now - this.lastSpin) / 1000) : 0;
+    this.lastSpin = now;
+    if (!dt || this.moving || this.down || this.tween || this.recentering) return;
+    if (this.framed !== null || this.hovered !== null || this.zoom() >= 1.8) return;
+    if (now - this.movedAt < SPIN_IDLE_MS) return;
+    const t = this.controls.target;
+    const off = this.camera.position.clone().sub(t);
+    off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (SPIN_DEG_PER_S * Math.PI * dt) / 180);
+    this.camera.position.copy(t).add(off);
+    this.controls.update(); // re-aim, and let the controls learn the new position so it doesn't read as a drag
+  }
+
   /* ───────────── frame loop (on demand) ───────────── */
 
   private touch() {
@@ -1023,6 +1050,7 @@ export class SphereEngine {
     if (!this.opts.reduceMotion && now - this.lastNucleus > (this.opts.phone ? NUCLEUS_FRAME_MS_PHONE : NUCLEUS_FRAME_MS)) {
       this.lastNucleus = now;
       this.breatheNucleus(now / 1000);
+      this.spin(now);
       this.dirty = true;
     }
     if (this.cb.onFps && now - this.fpsT0 >= 1000) {
