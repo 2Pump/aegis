@@ -382,7 +382,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
             <ul className="colony-limits dim" data-testid="colony-limits">
               <li>Counts wallets, not money. A $5 account and a $5M account each count once.</li>
               <li>Nado isolated-margin positions are found from every trade since launch.</li>
-              <li>Wallets near danger, Tydro borrowers and anything that moved are re-read every hour, and live while the well is open. Quiet, healthy wallets are re-read in the daily full scan.</li>
+              <li>Wallets near danger, Tydro borrowers and anything that moved are re-read every hour, and live while the well is open. Quiet, healthy wallets are re-read in the full scan every 8 hours.</li>
             </ul>
             <div className="faint mono colony-note">Counts wallets, not money. Not advice.</div>
           </div>

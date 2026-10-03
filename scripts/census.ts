@@ -3,7 +3,7 @@
  *
  *   pnpm census                              # local: writes apps/web/public/census/{census,known}.json
  *   pnpm census --since-blocks 200000        # quick local test: only wallets active in the last ~2.3 days
- *   pnpm census --full                       # re-read everyone (daily happens automatically)
+ *   pnpm census --full                       # re-read everyone (every 8 hours happens automatically)
  *   pnpm census --store blob                 # GitHub Action: publish to Vercel Blob (needs BLOB_READ_WRITE_TOKEN)
  *   pnpm census --rpc https://…              # custom Ink RPC (or env INK_RPC); several = comma-separated, rotated
  *                                            # default: all of Ink's public RPCs, rotated (a throttled one is rested)
@@ -104,8 +104,8 @@ async function main() {
     client: makeInkClient(rpcs, { stats }),
     store,
     full: has('--full'),
-    // daily (since 2026-10-03; was weekly): healthy Nado traders are carried between sweeps, and price alone can move them
-    fullIfOlderThanMs: 24 * 3600_000,
+    // every 8 hours (since 2026-10-03; was weekly): healthy Nado traders are carried between sweeps, and price alone can move them
+    fullIfOlderThanMs: 8 * 3600_000,
     budgetMs: Number(flag('--budget-min') ?? 40) * 60_000,
     sinceBlocks: flag('--since-blocks') ? Number(flag('--since-blocks')) : undefined,
     // several nodes can be a few blocks apart: stay a little further behind the tip so every node has every block we scan
