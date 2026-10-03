@@ -191,6 +191,11 @@ The trade-history scan still completes once, so the old 6-hour gaps are covered 
 
 The job log shows the coverage line only on full sweeps; the other runs republish the last full sweep's shares.
 
+**Measuring coverage now needs a full run started by hand (since 2026-10-03).**
+- **Why:** coverage is only measured when one run reads every wallet at one block. At about 19 wallets a second, 65,000 wallets take about an hour, which no longer fits the hourly runs' 40-minute budget. The weekly automatic sweep therefore spans several runs and doesn't measure coverage.
+- **What changed:** a full run started by hand (Actions → census → Run workflow, **full** ticked) now gets a 115-minute budget and a 130-minute job limit. It also restarts any sweep that paused part-way, so it reads everyone in one go.
+- **What it costs:** about an hour of GitHub Actions minutes per measurement. Hourly runs are unchanged.
+
 ## The lock
 
 The production well stays locked until `verification/status.json` is proven (see VERIFICATION.md).

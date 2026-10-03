@@ -463,6 +463,21 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(snap.ships.some((x) => x[0] === NLP_OWNER)).toBe(false);
   });
 
+  it('a full sweep started by hand restarts a paused one, so it reads everyone at one block and measures coverage', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-restart-'));
+    const store = fileStore(dir);
+    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD }).client, store });
+    // a sweep that paused part-way through an earlier run
+    const known = (await store.get('known.json')) as Record<string, unknown>;
+    known.fullSweep = { cursor: '0x5', startBlock: HEAD, startedAt: new Date().toISOString(), runs: 1 };
+    await store.put('known.json', known);
+    const logs: string[] = [];
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 100 }).client, store, full: true, log: (m) => logs.push(m) });
+    expect(logs.some((l) => l.includes('full sweep restarted by hand (the paused one had run 1 time(s))'))).toBe(true);
+    expect(snap.sweep.kind).toBe('full');
+    expect(logs.some((l) => l.startsWith('coverage: '))).toBe(true);
+  });
+
   it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aegis-gap-'));
     const store = fileStore(dir);

@@ -44,7 +44,9 @@ permissions:
 jobs:
   census:
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    # a full sweep you start by hand gets room to read every wallet in ONE run (coverage needs one block): at ~19
+    # wallets/s, 65,000 wallets take about an hour. Hourly runs keep the short budget.
+    timeout-minutes: ${{ inputs.full && 130 || 50 }}
     steps:
       # Cheap check before installing anything: skip if the census was published moments ago.
       #  - timer runs skip only if the last publish was < 15 min ago (a duplicate queued behind a long run)
@@ -98,7 +100,7 @@ jobs:
 
       - name: Run census
         if: steps.fresh.outputs.skip != 'true'
-        run: pnpm census --store blob --budget-min 40 ${{ inputs.full && '--full' || '' }}
+        run: pnpm census --store blob --budget-min ${{ inputs.full && 115 || 40 }} ${{ inputs.full && '--full' || '' }}
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           INK_RPC: ${{ secrets.INK_RPC }}

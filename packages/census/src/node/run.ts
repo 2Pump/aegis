@@ -395,7 +395,10 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const hasActiveNado = (a: string) => (state.nado.subs[a] ?? [nadoSubaccount(a)]).some((s) => activeSet.has(s)) || activeSet.has(nadoSubaccount(a));
   const stale = o.fullIfOlderThanMs !== undefined && (!state.lastFullAt || Date.now() - Date.parse(state.lastFullAt) > o.fullIfOlderThanMs);
   const startNow = o.full || prevShips.size === 0 || stale || historyJustDone || fullDueAtStart;
-  const createdNow = !state.fullSweep && startNow;
+  // a full sweep asked for by hand always starts fresh, even over one paused mid-way: only a sweep that reads every
+  // wallet in one run (one block) can measure coverage
+  const createdNow = startNow && (!state.fullSweep || o.full === true);
+  if (createdNow && state.fullSweep) log(`full sweep restarted by hand (the paused one had run ${state.fullSweep.runs} time(s))`);
   if (createdNow) {
     state.fullSweep = { cursor: '', startBlock: head, startedAt: new Date().toISOString(), runs: 0 };
     state.fullDue = false;
