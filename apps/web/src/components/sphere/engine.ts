@@ -30,8 +30,12 @@ const BANDS = ['dust', '<1k', '1–10k', '10–100k', '100k+'] as const;
 const FOV = 30;
 const HOME_AZ = 38;
 const HOME_EL = 18;
-/** the view the well opens on (and the 0 / reset key returns to), as the ZOOM the HUD shows. Phones fit the sphere to the width, so they open at 1×. */
-const START_ZOOM = 1.3;
+/**
+ * The view the well opens on is the widest it goes: the HUD reads it as ZOOM 1.0× and you can only zoom in from there.
+ * On desktop it sits 1.3× closer than the fitted sphere (the old "1.3×"). Phones keep the fit, because the sphere fills
+ * their width. Detail levels still key off the fitted distance, so they switch at the same places as before.
+ */
+const OPEN_CLOSER = 1.3;
 /** the slow turn of the whole sphere while nobody is touching it: one full turn in two minutes */
 const SPIN_DEG_PER_S = 3;
 /** after a drag, wheel or framing ends, wait this long before the turn resumes */
@@ -626,7 +630,7 @@ export class SphereEngine {
     this.camera.updateProjectionMatrix();
     const first = this.home === 5;
     this.home = sphereFitDistance(FOV, this.camera.aspect, this.opts.phone ? 0.86 : 0.7);
-    this.controls.maxDistance = this.home * 1.35;
+    this.controls.maxDistance = this.home / this.openCloser(); // never wider than the opening view
     this.uPx.value = (this.h * this.renderer.getPixelRatio()) / (2 * Math.tan((FOV * Math.PI) / 360));
     this.pointCaps();
     if (first) this.goHome(false);
@@ -654,6 +658,10 @@ export class SphereEngine {
     return this.moving;
   }
 
+  private openCloser() {
+    return this.opts.phone ? 1 : OPEN_CLOSER;
+  }
+
   private zoom() {
     return this.home / Math.max(1e-6, this.camera.position.distanceTo(new THREE.Vector3()));
   }
@@ -666,7 +674,7 @@ export class SphereEngine {
 
   goHome(animate = true) {
     this.setFramed(null);
-    this.moveTo(this.orbitPos(this.home / (this.opts.phone ? 1 : START_ZOOM), HOME_AZ, HOME_EL), new THREE.Vector3(), animate);
+    this.moveTo(this.orbitPos(this.home / this.openCloser(), HOME_AZ, HOME_EL), new THREE.Vector3(), animate);
   }
 
   private moveTo(pos: THREE.Vector3, target: THREE.Vector3, animate: boolean) {
@@ -1129,7 +1137,7 @@ export class SphereEngine {
     const az = (Math.atan2(p.x, p.z) * 180) / Math.PI;
     const el = (Math.asin(THREE.MathUtils.clamp(p.y / Math.max(p.length(), 1e-6), -1, 1)) * 180) / Math.PI;
     const focus = this.framed ?? this.hovered;
-    const hud = sphereHud({ az, el, r: focus !== null ? this.seats[focus]!.r : null, zoom, lod });
+    const hud = sphereHud({ az, el, r: focus !== null ? this.seats[focus]!.r : null, zoom: zoom / this.openCloser(), lod }); // the opening view reads 1.0×
     const pivot = this.framed !== null ? 'HULL' : this.controls.target.lengthSq() < 1e-4 ? 'CORE' : 'POINT';
     if (hud !== this.hudLast || lod !== this.lodLast || pivot !== this.pivotLast) {
       // the HUD is React text: while the camera moves it updates a few times a second, not every frame

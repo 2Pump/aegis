@@ -31,7 +31,7 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
   - Built in address-hash order, never risk order.
   - Caps: 3,500 at full orbit (2,000 on phones), 4,000 in the zoomed region.
 
-**Level of detail**, set by zoom (default distance ÷ current distance):
+**Level of detail**, set by zoom (fitted distance ÷ current distance; on desktop the HUD shows this ÷ 1.3):
 
 | LOD | When | Drawn |
 |---|---|---|
@@ -58,7 +58,10 @@ Glyphs shrink as you close in, so they stay beads.
 - **Default view:** 18° tilt, sphere at ~70% of the view (86% on phones).
 - **Mouse:** drag orbits (damped; it can't tip over the poles), the wheel zooms, right-drag pans. Double-click frames a hull.
 - **Keys:** ← → orbit, + − zoom, 0 or Esc resets, F frames.
-- **Opening view (since 2026-10-03):** desktop opens at ZOOM 1.3×, and 0 or Esc returns there. Phones open at 1×, because the sphere is fitted to the width there.
+- **Opening view (since 2026-10-03):** the well opens at its widest view, and the HUD reads it as ZOOM 1.0×. You can only zoom in from there; the − button, the wheel and pinch stop at it, and 0 or Esc return to it.
+  - On desktop that view is 1.3× closer than the fitted sphere (what the HUD used to call 1.3×).
+  - Phones keep the fitted sphere, because it already fills their width.
+  - The detail-level thresholds below still use the fitted distance, so the levels switch at the same camera distances as before. On desktop the HUD shows them about 1.3× lower (TISSUE from about 1.4×).
 - **The slow turn:** while nobody touches it, the whole sphere turns round its vertical axis, one full turn every two minutes (3°/s).
   - Only the camera moves; every wallet keeps its seat.
   - It pauses while you drag, zoom, hover a wallet or have one framed, at zoom 1.8× and closer, and for 2.5 s after the last touch.
