@@ -219,6 +219,9 @@ function decodeNadoSubaccountsAll(logs: readonly Log[]): Set<`0x${string}`> {
         const s = topicBytes32(t);
         if (s) out.add(s);
       }
+    } else if (t0 === TOPIC.spotBalance) {
+      const sub = topicBytes32(l.topics[1]);
+      if (sub) out.add(sub);
     } else if (t0 === TOPIC.balanceUpdate) {
       // data = abi.encode(uint32 productId, bytes32 subaccount)
       const d = (l.data ?? '0x').slice(2);
@@ -274,7 +277,8 @@ export function scanNadoActivity(client: PublicClient, fromBlock: number, toBloc
   return scanLogs(client, {
     ...o,
     address: [NADO_CONTRACTS.clearinghouse, NADO_CONTRACTS.spotEngine, NADO_CONTRACTS.perpEngine],
-    topics: [[TOPIC.modifyCollateral, TOPIC.liquidation, TOPIC.balanceUpdate]],
+    // SpotBalance (Nado-only) since 2026-10-03: a spot balance can change without a BalanceUpdate naming the subaccount
+    topics: [[TOPIC.modifyCollateral, TOPIC.liquidation, TOPIC.balanceUpdate, TOPIC.spotBalance]],
     fromBlock,
     toBlock,
   });

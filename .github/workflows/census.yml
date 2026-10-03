@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       full:
-        description: 'Re-read every known wallet (a full sweep also runs automatically once a week)'
+        description: 'Re-read every known wallet (a full sweep also runs automatically once a day)'
         type: boolean
         default: false
       source:
@@ -44,9 +44,10 @@ permissions:
 jobs:
   census:
     runs-on: ubuntu-24.04
-    # a full sweep you start by hand gets room to read every wallet in ONE run (coverage needs one block): at ~19
-    # wallets/s, 65,000 wallets take about an hour. Hourly runs keep the short budget.
-    timeout-minutes: ${{ inputs.full && 130 || 50 }}
+    # every run may take long enough to read every wallet in ONE run (coverage needs one block): ~45 min for 65,000
+    # wallets. Ordinary hourly runs still finish in ~5 min; only the daily full sweep uses the room, so it measures
+    # coverage by itself (no hand-started runs needed). Timer runs that arrive meanwhile wait, then skip as fresh.
+    timeout-minutes: 130
     steps:
       # Cheap check before installing anything: skip if the census was published moments ago.
       #  - timer runs skip only if the last publish was < 15 min ago (a duplicate queued behind a long run)
@@ -100,7 +101,7 @@ jobs:
 
       - name: Run census
         if: steps.fresh.outputs.skip != 'true'
-        run: pnpm census --store blob --budget-min ${{ inputs.full && 115 || 40 }} ${{ inputs.full && '--full' || '' }}
+        run: pnpm census --store blob --budget-min 115 ${{ inputs.full && '--full' || '' }}
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           INK_RPC: ${{ secrets.INK_RPC }}

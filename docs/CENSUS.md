@@ -30,9 +30,9 @@ On the site this is called **the scan** (nav: Scan). "Hourly update" = an increm
 | Anything that transacted since the last run | every hour |
 | At-risk (HF < 2, Nado buffer < 50%, ELEVATED/CRITICAL) | every hour, and every ~15 s live |
 | Tydro borrowers (ever touched a debt token) | every hour (price alone can move their HF) |
-| Quiet, healthy, active Nado accounts | weekly full sweep (they're expensive: the Querier returns ~100 products per call) |
-| Healthy wallets that never borrowed on Tydro | weekly full sweep (no debt → price can't wound them; any deposit, withdrawal or trade re-reads them at once) |
-| Empty wallets | weekly full sweep (they can only fill up through an event, which re-reads them at once) |
+| Quiet, healthy, active Nado accounts | daily full sweep (they're expensive: the Querier returns ~100 products per call) |
+| Healthy wallets that never borrowed on Tydro | daily full sweep (no debt → price can't wound them; any deposit, withdrawal or trade re-reads them at once) |
+| Empty wallets | daily full sweep (they can only fill up through an event, which re-reads them at once) |
 
 The first hourly run on this rule (2026-09-29, run #13) read 4,609 wallets in about 4 minutes and carried 60,265.
 
@@ -96,7 +96,7 @@ Fix (census v1.1):
 Most wallets the explorer lists hold nothing, or only dust. On the first backfill run, 22,991 of 32,499 were empty. So:
 - `census.json` carries only wallets worth drawing. It stays small enough for phones.
 - The empty ones are remembered in `known.json` as address → the block they were read at.
-- Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The weekly full sweep re-reads them anyway.
+- Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The daily full sweep re-reads them anyway.
 
 ## Reads once history is complete
 
@@ -146,7 +146,7 @@ Since 2026-10-03 the page opens on a living colony (`apps/web/src/components/Col
 
 ## Coverage check (is anyone missing?)
 
-On every **full** sweep (weekly, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:
+On every **full** sweep (daily, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:
 
 - **Tydro:** Σ wallet aToken / debt-token balances vs `aToken.totalSupply()` / `variableDebtToken.totalSupply()`, per reserve.
 - **Nado:** Σ wallet spot deposits vs each spot product's `totalDepositsNormalized × cumulativeDepositsMultiplierX18`, and Σ wallet longs and shorts vs each perp product's `openInterest`. Both come from the same FQuerier call the hull page uses.
@@ -201,7 +201,7 @@ The first run of that scan (2026-09-29, run #13) covered blocks 29.85M → 36.92
   - The short-side remainder is what the discovery check below is for.
 - **Since 2026-10-03, every full sweep also does two more things.**
   - **Publishes Nado's own share.** It publishes `nadoDepositsNadoOwn`: the share of Nado deposits held by the NLP pools and protocol accounts. That's a share only, no dollars.
-  - **Runs a discovery check.** It reads every subaccount whose balance changed in the last ~6 hours, from both engines: BalanceUpdate, plus the Nado-only `SpotBalance` event, which discovery never scanned. Any subaccount the census didn't already know is logged with what it holds. Those subaccounts are added to discovery, because they're real chain-named subaccounts, and every run reads them from then on.
+  - **Runs a discovery check.** It reads every subaccount whose balance changed in the last ~6 hours, from both engines: BalanceUpdate, plus the Nado-only `SpotBalance` event. The hourly discovery scan also reads `SpotBalance` now, so the check mostly confirms nothing is missing. Any subaccount the census didn't already know is logged with what it holds. Those subaccounts are added to discovery, because they're real chain-named subaccounts, and every run reads them from then on.
 - **On the Scan page.** The deposits rim draws wallets in cyan and Nado's own vault and accounts in a quieter grey. The NOT SEEN arc covers only what nobody accounts for. All Nado labels sit in callout columns beside the dish, with leader lines, so they never overlap.
 
 **What the next coverage line should look like (written before the answer above):**
@@ -214,10 +214,10 @@ The trade-history scan still completes once, so the old 6-hour gaps are covered 
 
 The job log shows the coverage line only on full sweeps; the other runs republish the last full sweep's shares.
 
-**Measuring coverage now needs a full run started by hand (since 2026-10-03).**
-- **Why:** coverage is only measured when one run reads every wallet at one block. At about 19 wallets a second, 65,000 wallets take about an hour, which no longer fits the hourly runs' 40-minute budget. The weekly automatic sweep therefore spans several runs and doesn't measure coverage.
-- **What changed:** a full run started by hand (Actions → census → Run workflow, **full** ticked) now gets a 115-minute budget and a 130-minute job limit. It also restarts any sweep that paused part-way, so it reads everyone in one go.
-- **What it costs:** about an hour of GitHub Actions minutes per measurement. Hourly runs are unchanged.
+**Coverage measures itself (since 2026-10-03).** Every run now has a 115-minute budget and a 130-minute job limit.
+- **Hourly runs** still finish in about 5 minutes.
+- **The daily automatic full sweep** (weekly before 2026-10-03) reads all ~65,000 wallets in one run, about 45 minutes. That's enough to measure coverage, run the NLP and protocol-account lines and the discovery check, and publish the shares. No hand-started runs are needed. Timer runs that arrive during it wait, then skip because the census is fresh.
+- **A hand-started full run** (Run workflow, **full** ticked) still works if you want a measurement sooner. It restarts any paused sweep.
 
 ## The lock
 

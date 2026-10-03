@@ -107,7 +107,7 @@ export function CensusStatusLine({ snap, stats, live, onToggle }: { snap: Census
 export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: number }) {
   const c = snap.coverage;
   if (!c) {
-    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">How much of each protocol the found wallets cover: measured on the next full scan (weekly).</div>;
+    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">How much of each protocol the found wallets cover: measured on the next full scan (daily).</div>;
   }
   const row = (label: string, x: number | null) => (
     <>

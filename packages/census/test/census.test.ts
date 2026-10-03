@@ -479,22 +479,15 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(logs.some((l) => l.startsWith('coverage: '))).toBe(true);
   });
 
-  it('the discovery check finds a subaccount discovery missed, says what it holds, and adds it', async () => {
+  it('a subaccount named only by a SpotBalance event is discovered, and the discovery check finds nothing missing', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aegis-missed-'));
     const store = fileStore(dir);
-    // the first run reads everyone (a full sweep) and runs the check
     const logs: string[] = [];
-    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD, missedSub: true }).client, store, log: (m) => logs.push(m) });
-    expect(logs.some((l) => /discovery check .* 1 not known before/.test(l))).toBe(true);
-    expect(logs.some((l) => /those 1 hold: .*OI longs 50/.test(l))).toBe(true);
-    expect(logs.some((l) => l.includes('added 1 missed subaccounts to discovery'))).toBe(true);
+    const snap = await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD, missedSub: true }).client, store, log: (m) => logs.push(m) });
     const k = (await store.get('known.json')) as { nado: { subs: Record<string, string[]> } };
     expect(k.nado.subs['0x6000000000000000000000000000000000000006']).toContain(MISSED_SUB);
-    // and the next full sweep reads it as a wallet: nothing left to find
-    const logs2: string[] = [];
-    await runCensus({ scanPaceMs: 0, explorer: false, client: fakeChain({ head: HEAD + 100, missedSub: true }).client, store, full: true, log: (m) => logs2.push(m) });
-    expect(logs2.some((l) => /discovery check .* 0 not known before/.test(l))).toBe(true);
-    expect(logs2.some((l) => /^coverage: .*Nado open interest 50\.0% \(longs\)/.test(l))).toBe(true);
+    expect(logs.some((l) => /discovery check .* 0 not known before/.test(l))).toBe(true);
+    expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5);
   });
 
   it('gaps between runs are no longer skipped: the forward trade scan resumes from its cursor', async () => {
