@@ -102,6 +102,28 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
     return () => ro.disconnect();
   }, []);
 
+  // the morsels drift slowly round the dish and bounce off its wall and off each other. Positions only:
+  // sizes, colours, counts and the NOT SEEN wall never change, and they never drift near the rim.
+  const mg = useRef<(SVGGElement | null)[]>([]);
+  const drift = useRef<Drift[]>([]);
+  useEffect(() => {
+    drift.current = morsels.map((m) => {
+      const a = Math.random() * Math.PI * 2;
+      const v = DRIFT_SPEED * (0.6 + Math.random() * 0.8);
+      return { x: m.x, y: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: m.r, w: 0, h: 16, v };
+    });
+  }, [morsels]);
+  // label widths follow the text actually shown (full names on desktop, % only on phones)
+  useEffect(() => {
+    drift.current.forEach((d, i) => {
+      const m = morsels[i];
+      if (!m) return;
+      const lines = labelLines(m, compact);
+      d.w = Math.max(...lines.map((l) => l.length)) * (compact ? 12.4 : 6.1) + 6;
+      d.h = lines.length * (compact ? 22 : 11.5) + 4;
+    });
+  }, [morsels, compact]);
+
   useEffect(() => {
     const phone = (wrap.current?.clientWidth ?? 600) < 520;
     sim.current = makeSim(morsels, unseenFrom, phone ? 2600 : 6500);
@@ -129,6 +151,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let raf = 0;
     let last = 0;
+    let frame = 0;
     let onScreen = true;
     const draw = () => {
       const S = sim.current;
@@ -156,7 +179,12 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
       raf = requestAnimationFrame(loop);
       if (document.hidden || !onScreen) return;
       if (t - last < 33) return; // ≤ 30 fps
+      const dt = last ? Math.min(0.1, (t - last) / 1000) : 0.033;
       last = t;
+      frame++;
+      stepDrift(drift.current, dt);
+      drift.current.forEach((d, i) => placeMorsel(mg.current[i], d.x, d.y, d.r));
+      sim.current?.move(drift.current, frame % 3 === 0);
       sim.current?.step();
       draw();
     };
@@ -270,16 +298,16 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
                 )}
 
                 {/* food morsels */}
-                {morsels.map((m) => {
+                {morsels.map((m, i) => {
                   const on = picked === null || picked === m.k;
                   const toggle = () => setPicked((p) => (p === m.k ? null : m.k));
-                  const dist = Math.hypot(m.x - CX, m.y - CX);
-                  const out = dist > 1;
-                  const lx = out ? m.x + ((m.x - CX) / dist) * (m.r + 6) : m.x;
-                  const ly = out ? m.y + ((m.y - CX) / dist) * (m.r + 6) : m.y + m.r + 12;
+                  const { lx, ly } = labelAt(m.x, m.y, m.r);
                   return (
                     <g
                       key={m.k}
+                      ref={(el) => {
+                        mg.current[i] = el;
+                      }}
                       role="button"
                       tabIndex={0}
                       aria-pressed={picked === m.k}
@@ -297,8 +325,12 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
                     >
                       <circle cx={m.x} cy={m.y} r={m.r} fill={colorOf(m.k)} fillOpacity={on ? 0.85 : 0.25} stroke={picked === m.k ? 'var(--ink)' : 'none'} strokeWidth="1.5" />
                       <circle cx={m.x} cy={m.y} r={Math.max(m.r, 12)} fill="transparent" />
-                      <text x={lx} y={ly + 3} textAnchor={!out ? 'middle' : m.x >= CX ? 'start' : 'end'} className="colony-morsel-lbl">
-                        {compact ? '' : `${nameOf(m.k)} `}{(m.share * 100).toFixed(1)}%
+                      <text x={lx} y={ly + 3} textAnchor="middle" className="colony-morsel-lbl">
+                        {labelLines(m, compact).map((l, j) => (
+                          <tspan key={j} x={lx} dy={j ? '1.1em' : 0} className={j ? 'pct' : undefined}>
+                            {l}
+                          </tspan>
+                        ))}
                       </text>
                     </g>
                   );
@@ -383,6 +415,87 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
       </div>
     </section>
   );
+}
+
+/** desktop: name over percent; phones: percent only (the names are in the type list right below) */
+const labelLines = (m: Morsel, compact: boolean) => (compact ? [`${(m.share * 100).toFixed(1)}%`] : [nameOf(m.k), `${(m.share * 100).toFixed(1)}%`]);
+
+/* ─── morsel drift ─── */
+const DRIFT_SPEED = 9; // dish units per second
+const DRIFT_WALL = 136; // dot edges stay inside this radius: clear of the NOT SEEN sector (from 148) and the rim
+const PAD = 4; // breathing room between two morsels' boxes
+
+type Drift = { x: number; y: number; vx: number; vy: number; r: number; w: number; h: number; v: number };
+
+/**
+ * Each morsel is a box: its dot with its label centred underneath. Boxes bounce off each other (equal-mass, on the
+ * axis they overlap least), so no two labels ever sit on top of one another; dots bounce off the dish wall.
+ */
+function stepDrift(ds: Drift[], dt: number) {
+  for (const d of ds) {
+    // a slow wander, back to cruising speed: crowding never settles into a standstill
+    const a = Math.atan2(d.vy, d.vx) + (Math.random() - 0.5) * 0.6 * dt * 10;
+    const sp = Math.hypot(d.vx, d.vy);
+    const ns = sp + (d.v - sp) * Math.min(1, dt * 1.5);
+    d.vx = Math.cos(a) * ns;
+    d.vy = Math.sin(a) * ns;
+    d.x += d.vx * dt;
+    d.y += d.vy * dt;
+    const dx = d.x - CX, dy = d.y - CX;
+    const dist = Math.hypot(dx, dy);
+    const lim = DRIFT_WALL - d.r;
+    if (dist > lim && dist > 0) {
+      const nx = dx / dist, ny = dy / dist;
+      d.x = CX + nx * lim;
+      d.y = CX + ny * lim;
+      const dot = d.vx * nx + d.vy * ny;
+      if (dot > 0) (d.vx -= 2 * dot * nx), (d.vy -= 2 * dot * ny);
+    }
+    // the label must not run off the dish sideways either
+    const half = Math.max(d.r, d.w / 2);
+    const xl = Math.sqrt(Math.max(0, (DRIFT_WALL + 14) ** 2 - (d.y - CX) ** 2)) + 10;
+    if (d.x - half < CX - xl) (d.x = CX - xl + half), (d.vx = Math.abs(d.vx));
+    if (d.x + half > CX + xl) (d.x = CX + xl - half), (d.vx = -Math.abs(d.vx));
+  }
+  for (let i = 0; i < 2; i++)
+    for (let a = 0; a < ds.length; a++)
+      for (let b = a + 1; b < ds.length; b++) {
+        const A = ds[a]!, B = ds[b]!;
+        const ax = A.x, ay = A.y + A.h / 2, bx = B.x, by = B.y + B.h / 2; // box centres (dot + label under it)
+        const ox = (Math.max(2 * A.r, A.w) + Math.max(2 * B.r, B.w)) / 2 + PAD - Math.abs(bx - ax);
+        const oy = (2 * A.r + A.h + 2 * B.r + B.h) / 2 + PAD - Math.abs(by - ay);
+        if (ox <= 0 || oy <= 0) continue;
+        if (ox < oy) {
+          const s = bx >= ax ? 1 : -1;
+          A.x -= (s * ox) / 2;
+          B.x += (s * ox) / 2;
+          if ((B.vx - A.vx) * s < 0) [A.vx, B.vx] = [B.vx, A.vx];
+        } else {
+          const s = by >= ay ? 1 : -1;
+          A.y -= (s * oy) / 2;
+          B.y += (s * oy) / 2;
+          if ((B.vy - A.vy) * s < 0) [A.vy, B.vy] = [B.vy, A.vy];
+        }
+      }
+}
+
+/** where a morsel's label goes: centred under its dot */
+const labelAt = (x: number, y: number, r: number) => ({ lx: x, ly: y + r + 12 });
+
+/** move one morsel's SVG (dot, hit area, label) without a React render */
+function placeMorsel(g: SVGGElement | null | undefined, x: number, y: number, r: number) {
+  if (!g) return;
+  const [c0, c1] = g.querySelectorAll('circle');
+  for (const c of [c0, c1]) {
+    c?.setAttribute('cx', x.toFixed(1));
+    c?.setAttribute('cy', y.toFixed(1));
+  }
+  const t = g.querySelector('text');
+  if (!t) return;
+  const { lx, ly } = labelAt(x, y, r);
+  t.setAttribute('x', lx.toFixed(1));
+  t.setAttribute('y', (ly + 3).toFixed(1));
+  t.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', lx.toFixed(1)));
 }
 
 /** SVG text over one or more lines (the first line sits at y) */
@@ -584,6 +697,14 @@ function makeSim(morsels: Morsel[], unseenFrom: number, count: number) {
   return {
     step,
     image,
+    /** the morsels drifted: move their touch zones every frame, their food scent when asked */
+    move(pos: readonly { x: number; y: number }[], food: boolean) {
+      pos.forEach((p, k) => {
+        const m = mc[k];
+        if (m) (m.x = p.x / CELL), (m.y = p.y / CELL);
+      });
+      if (food) buildFood();
+    },
     setBias(i: number) {
       bias = i;
       buildFood();

@@ -381,7 +381,7 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 .colony-notseen { font: 600 10px var(--mono); letter-spacing: 0.14em; fill: var(--ink-dim); }
 .colony-morsel { cursor: pointer; outline: none; transition: opacity 160ms; }
 .colony-morsel:focus-visible circle:first-of-type { stroke: var(--cyan); stroke-width: 2; }
-.colony-morsel-lbl { font: 600 10px var(--mono); fill: var(--ink); paint-order: stroke; stroke: #020406; stroke-width: 3px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
+.colony-morsel-lbl { font: 600 9.5px var(--mono); fill: var(--ink); paint-order: stroke; stroke: #020406; stroke-width: 3px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
 .colony-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--hair-2); font-size: 12px; min-height: 34px; }
 .colony-pick i { width: 8px; height: 8px; display: inline-block; }
 .colony-limits { margin: 12px 0 0; padding-left: 18px; line-height: 1.5; font-size: 12.5px; }

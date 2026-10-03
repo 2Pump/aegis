@@ -121,7 +121,7 @@ Since 2026-10-03 the page opens on a living colony (`apps/web/src/components/Col
 
 **What it is.** A Physarum (slime-mould) simulation in a dish. It is decoration over real numbers: **the agents are not wallets**, and nothing in the dish is invented data.
 - The agents sense ahead, turn toward the stronger scent and lay a trail that spreads and fades.
-- **Food morsels** are the position types. Each morsel's size is that type's share of drawn wallets, and its colour is the type colour. Morsels sit on two staggered rings, so the colony branches into a network between them.
+- **Food morsels** are the position types. Each morsel's size is that type's share of drawn wallets, and its colour is the type colour. The morsels drift slowly around the dish. They bounce off its wall (kept clear of the NOT SEEN sector and the rim) and off each other as boxes, dot plus label, so no two labels ever overlap. The colony follows their scent as they move. Only their positions change; size, colour and numbers never do. The name sits above the percent under each dot.
 - An agent takes the colour of the last morsel it touched. Each morsel keeps sending out agents in proportion to its share, so no type goes unfed.
 - **Click a morsel, or a type in the list:** the colony leans toward it (its food is ×4), and the line under the dish reads "name · n wallets · x% of drawn". Click again or press Clear to undo. This changes only the dish. It never filters the well.
 - **A live type change** (a wallet newly typed, or one that changed type, seen by the live layer while the page is open) drops a bright speck on that type's morsel.
