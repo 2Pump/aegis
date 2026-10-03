@@ -32,6 +32,19 @@ const HOME_AZ = 38;
 const HOME_EL = 18;
 const BREATH_MAX = 64;
 const EMBER_MS = 200;
+/** The nucleus and the NEAR LIQUIDATION shell breathe together: opacity and a hair of scale, eased, never a flash. */
+const NUCLEUS_CYCLE_S = 4;
+const NUCLEUS_GLOW = [0.82, 1.12] as const; // alpha multiplier at exhale / inhale
+const NUCLEUS_SCALE = 0.012; // ±1.2 % at the peak
+/** One thin dim ring at a time is born at the inner shell and falls to the nucleus, fading as it goes. Not aimed at a wallet. */
+const FALL_FROM = 0.32;
+const FALL_TO = 0.11;
+const FALL_S = 3.2;
+const FALL_EVERY_S = NUCLEUS_CYCLE_S * 2; // one ring every second breath
+const FALL_OPACITY = 0.2;
+/** ~30 fps for the breath on desktops, ~20 on phones (a 4 s cycle needs no more) */
+const NUCLEUS_FRAME_MS = 33;
+const NUCLEUS_FRAME_MS_PHONE = 50;
 /** Control feel: around the core, and (gentler, finer) around a framed hull a few hundredths of a unit away. */
 const SPEED = { core: { rotate: 0.55, zoom: 0.9, pan: 0.6 }, hull: { rotate: 0.32, zoom: 0.55, pan: 0.3 } } as const;
 
@@ -96,6 +109,15 @@ export class SphereEngine {
   private raf = 0;
   private dirty = true;
   private lastBreath = 0;
+  private lastNucleus = 0;
+  private nucleus?: THREE.Mesh;
+  private nearShell?: THREE.Mesh;
+  private fallRing?: THREE.Mesh;
+  private fallT0 = -1;
+  /** phones: the falling ring only while frames keep up (smoothed rAF interval, ms) */
+  private frameAvg = 16.7;
+  private lastRaf = 0;
+  private fallOk = true;
   private hudLast = '';
   private lodLast: SphereLod | null = null;
   private pivotLast: 'CORE' | 'HULL' | 'POINT' | null = null;
@@ -221,12 +243,12 @@ export class SphereEngine {
         transparent: true,
         depthWrite: false,
         side: o.side ?? THREE.FrontSide,
-        uniforms: { tint: { value: new THREE.Color(tint) }, base: { value: o.base }, rim: { value: o.rim }, power: { value: o.power }, spec: { value: o.spec }, dark: { value: o.dark ?? 0 }, keyDir: { value: new THREE.Vector3(3, 2.4, 2.2).normalize() } },
+        uniforms: { glow: { value: 1 }, tint: { value: new THREE.Color(tint) }, base: { value: o.base }, rim: { value: o.rim }, power: { value: o.power }, spec: { value: o.spec }, dark: { value: o.dark ?? 0 }, keyDir: { value: new THREE.Vector3(3, 2.4, 2.2).normalize() } },
         vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 w = modelMatrix*vec4(position,1.); vN = normalize(mat3(modelMatrix)*normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
-        fragmentShader: `uniform vec3 tint; uniform float base, rim, power, spec, dark; uniform vec3 keyDir; varying vec3 vN; varying vec3 vV;
+        fragmentShader: `uniform vec3 tint; uniform float base, rim, power, spec, dark, glow; uniform vec3 keyDir; varying vec3 vN; varying vec3 vV;
           void main(){ vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n; float f = pow(1.0 - abs(dot(n, vV)), power);
             float s = pow(max(dot(reflect(-keyDir, n), vV), 0.0), 60.0) * spec;
-            vec3 col = mix(tint * (0.35 + f) + vec3(0.8,0.9,1.0) * s, vec3(0.0), dark); gl_FragColor = vec4(col, base + rim * f + s * 0.6); }`,
+            vec3 col = mix(tint * (0.35 + f) + vec3(0.8,0.9,1.0) * s, vec3(0.0), dark); gl_FragColor = vec4(col, (base + rim * f + s * 0.6) * glow); }`,
       }),
     );
     m.renderOrder = order;
@@ -241,12 +263,20 @@ export class SphereEngine {
 
     this.scene.add(
       this.glass(1.0, '#6fa6b3', { base: 0.035, rim: 0.1, power: 2.0, spec: 0, side: THREE.BackSide }, 1),
-      this.glass(0.32, '#8a1c24', { base: 0.1, rim: 0.4, power: 2.2, spec: 0.25 }, 3),
+      (this.nearShell = this.glass(0.32, '#8a1c24', { base: 0.1, rim: 0.4, power: 2.2, spec: 0.25 }, 3)),
       this.glass(0.54, '#f5c14a', { base: 0, rim: 0.12, power: 3.0, spec: 0 }, 4),
       this.glass(0.84, '#4ce0d2', { base: 0, rim: 0.1, power: 3.2, spec: 0 }, 5),
       this.glass(1.0, '#78bfca', { base: 0.012, rim: 0.42, power: 3.0, spec: 0.55 }, 20),
-      this.glass(0.11, '#3a0d12', { base: 0.55, rim: 0.35, power: 1.6, spec: 0.1, dark: 0.35 }, 2), // the nucleus: a dim recessed well
+      (this.nucleus = this.glass(0.11, '#3a0d12', { base: 0.55, rim: 0.35, power: 1.6, spec: 0.1, dark: 0.35 }, 2)), // the nucleus: a dim recessed well
     );
+    // the falling ring: a thin circle that always faces the camera, centred on the core
+    this.fallRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.975, 1, this.opts.phone ? 72 : 128),
+      new THREE.MeshBasicMaterial({ color: '#ff6b6b', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    this.fallRing.renderOrder = 3;
+    this.fallRing.visible = false;
+    this.scene.add(this.fallRing);
 
     const P = (r: number, lat: number, lon: number) => new THREE.Vector3(r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon));
     const pts: number[] = [];
@@ -363,7 +393,7 @@ export class SphereEngine {
     const geo = phone ? new THREE.OctahedronGeometry(1, 0) : new THREE.IcosahedronGeometry(1, 0);
     this.glyphs = this.nodes(this.glyphIdx, geo, this.uGlyph);
     this.fine = this.nodes(this.fineIdx, geo, this.uFine);
-    this.coronaG = this.coronas(this.glyphIdx.filter((i) => seats[i]!.wounded), !phone, 0.5);
+    this.coronaG = this.coronas(this.glyphIdx.filter((i) => seats[i]!.wounded), false, 0.5); // still: no ship pulses on its own
     this.coronaF = this.coronas(this.fineIdx.filter((i) => seats[i]!.wounded), false, 0);
 
     const orbitSeats = this.glyphIdx.map((i) => seats[i]!);
@@ -777,6 +807,46 @@ export class SphereEngine {
     if (!document.hidden) this.touch();
   };
 
+  /* ───────────── the nucleus breath ───────────── */
+
+  private breatheNucleus(t: number) {
+    // eased 0 → 1 → 0 over one cycle (a raised cosine: slow at both ends, no flash)
+    const b = 0.5 - 0.5 * Math.cos((t / NUCLEUS_CYCLE_S) * Math.PI * 2);
+    const glow = NUCLEUS_GLOW[0] + (NUCLEUS_GLOW[1] - NUCLEUS_GLOW[0]) * b;
+    const sc = 1 + NUCLEUS_SCALE * (b - 0.5) * 2;
+    for (const m of [this.nucleus, this.nearShell]) {
+      if (!m) continue;
+      (m.material as THREE.ShaderMaterial).uniforms.glow!.value = glow;
+      m.scale.setScalar(sc);
+    }
+    const ring = this.fallRing;
+    if (!ring) return;
+    // phones: the ring only while frames keep up (off under ~42 fps, back on over ~52)
+    if (this.opts.phone) {
+      if (this.fallOk && this.frameAvg > 24) this.fallOk = false;
+      else if (!this.fallOk && this.frameAvg < 19) this.fallOk = true;
+    }
+    if (!this.fallOk) {
+      ring.visible = false;
+      this.fallT0 = -1;
+      return;
+    }
+    // one ring at a time, born at the top of every second inhale
+    if (this.fallT0 < 0 || t - this.fallT0 > FALL_EVERY_S || t < this.fallT0) this.fallT0 = Math.floor(t / FALL_EVERY_S) * FALL_EVERY_S;
+    const k = (t - this.fallT0) / FALL_S;
+    if (k < 0 || k >= 1) {
+      ring.visible = false;
+      return;
+    }
+    const e = k * k * (3 - 2 * k); // ease in and out
+    ring.visible = true;
+    ring.scale.setScalar(FALL_FROM + (FALL_TO - FALL_FROM) * e);
+    ring.quaternion.copy(this.camera.quaternion);
+    // fades in over the first 15 %, out over the last 45 %
+    const a = Math.min(1, k / 0.15) * Math.min(1, (1 - k) / 0.45);
+    (ring.material as THREE.MeshBasicMaterial).opacity = FALL_OPACITY * a;
+  }
+
   /* ───────────── frame loop (on demand) ───────────── */
 
   private touch() {
@@ -790,7 +860,12 @@ export class SphereEngine {
 
   private loop = (now: number) => {
     this.raf = requestAnimationFrame(this.loop);
-    if (document.hidden) return;
+    if (document.hidden) {
+      this.lastRaf = 0;
+      return;
+    }
+    if (this.lastRaf) this.frameAvg += (Math.min(100, now - this.lastRaf) - this.frameAvg) * 0.05;
+    this.lastRaf = now;
     if (this.tween) {
       const k = Math.min(1, (now - this.tween.t0) / this.tween.ms);
       const e = 1 - Math.pow(1 - k, 3);
@@ -854,6 +929,11 @@ export class SphereEngine {
     if (breathing && now - this.lastBreath > 33) {
       this.lastBreath = now;
       this.uTime.value = now / 1000;
+      this.dirty = true;
+    }
+    if (!this.opts.reduceMotion && now - this.lastNucleus > (this.opts.phone ? NUCLEUS_FRAME_MS_PHONE : NUCLEUS_FRAME_MS)) {
+      this.lastNucleus = now;
+      this.breatheNucleus(now / 1000);
       this.dirty = true;
     }
     if (this.cb.onFps && now - this.fpsT0 >= 1000) {

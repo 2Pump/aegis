@@ -23,7 +23,7 @@ A skin and a renderer only: pose, ink-io, the census job and census.json are unc
 | **Latitude** | A third hash of the address, spread evenly over the surface. The top and bottom ~26° stay empty so the lunes don't crush together at the poles. |
 
 **What's on the glass:**
-- **Shells:** nested glass shells at 0.84 / 0.54 / 0.32, labelled NOMINAL / WARN / LIQ ZONE at their visual top. The LIQ shell is dark ruby, and the core is a dim recessed nucleus.
+- **Shells:** nested glass shells at 0.84 / 0.54 / 0.32, labelled SAFE / WATCH / NEAR LIQUIDATION at their visual top. The NEAR LIQUIDATION shell is dark ruby, and the core is a dim recessed nucleus.
 - **Lunes:** meridian lines at the lune edges, pose-coloured brackets on the equator, and lune names on the equator that fade on the far side (and near the edges on phones).
 - **Threads:** decoration only (`buildThreads` in `packages/glyphs/src/sphere.ts`).
   - Same main pose only, and only among wallets currently drawn.
@@ -65,16 +65,20 @@ Glyphs shrink as you close in, so they stay beads.
 - **Nothing moves on its own:** no auto-spin.
 
 **Motion:**
-- Up to 64 wounded rings breathe on a 1.8 s cycle, at most 30 fps (desktop only — on phones the rings stay still, so an untouched phone draws nothing). The breathing set is picked by address hash, never by risk.
+- Near-liquidation rings stay still. Since 2026-10-03, no single wallet pulses on its own.
+- **The nucleus breathes.** The recessed nucleus and the inner NEAR LIQUIDATION shell breathe together on a 4 s eased cycle. Their opacity runs from 0.82× to 1.12× and their scale moves ±1.2%, with no flash.
+- **One falling ring at a time.** Every second breath, a thin dim ring (opacity at most 0.2) is born at the inner shell. It falls to the nucleus over 3.2 s and fades as it goes. It always faces the camera and is centred on the core, never aimed at a wallet. The shell label stays NEAR LIQUIDATION. There are no new words and no crosshair.
+- Frame rate: about 30 fps on desktop and 20 fps on phones.
+- Phones always breathe, but the falling ring only runs while frames keep up. It switches off when the frame rate drops under about 42 fps and back on above about 52 fps.
 - One 200 ms ember when a wallet changes live.
 - Camera eases.
 - A 160 ms fade on filter change.
-- With reduced motion switched on in the OS: no breath, no ember, no easing.
+- With reduced motion switched on in the OS: no breath, no falling ring, no ember, no easing.
 
 **Performance:**
 - **Draw calls:** about 24 whatever the fleet size (measured with 18,555 wallets). One Points haze, instanced nodes (icosahedra; octahedra on phones), coronas as Points, threads as LineSegments.
 - **Pixel density cap:** 1.5 on desktop, 2 on phones.
-- **Rendering on demand:** only when the camera moves or the capped breath ticks, and paused when the tab is hidden.
+- **Rendering on demand:** only when the camera moves or the capped nucleus breath ticks, and paused when the tab is hidden (the nucleus then holds still).
 - **Phones (since 2026-10-01):**
   - Pixel density is 1.5× at rest and drops to 1× while the camera moves. It sharpens again about a quarter-second after the camera stops.
   - The glass shells use fewer segments.
