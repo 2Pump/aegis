@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Book, NadoBook, Pose, TydroBook } from '@aegis/pose';
-import { COPY, HULL_COPY, RISK_LABEL, TAG_LABEL, darkReasonText, hullSigilSvg, reasonParts, summaryText } from '@aegis/glyphs';
+import { COPY, HULL_COPY, RISK_LABEL, TAG_LABEL, darkReasonText, reasonParts, summaryText } from '@aegis/glyphs';
 import { INK_EXPLORER, parseAddress, TYDRO_FETCHED } from '@aegis/ink-io';
 import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
-import { Lamp, Panel, TagChip, TEMP_RAIL, Usd } from './bits';
+import { Lamp, Panel, TEMP_RAIL, Usd } from './bits';
 import { SensorLog } from './SensorLog';
+import { WalletPlate } from './WalletPlate';
 import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
 import { setMyWallet, useMyWallet } from '../lib/myWallet';
 
@@ -24,7 +25,6 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
   const isFixture = book.source === 'FIXTURE';
   const parsed = parseAddress(book.address);
   const checksum = parsed.ok ? parsed.value.checksum : book.address;
-  const sigil = useMemo(() => hullSigilSvg(book.address, pose, 112), [book.address, pose]);
   const rail = TEMP_RAIL[pose.hullTemp];
 
   return (
@@ -41,34 +41,23 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         </div>
       ) : null}
 
-      {/* hero */}
-      <div className="hero">
-        <div className="sigil" dangerouslySetInnerHTML={{ __html: sigil }} />
-        <div className="stack" style={{ gap: 8, minWidth: 0 }}>
-          <div className="tags">
-            <TagChip tag={pose.primary} primary filled />
-            {pose.tags.filter((t) => t !== pose.primary).map((t) => (
-              <TagChip key={t} tag={t} />
-            ))}
-          </div>
-          <div className="mono dim" style={{ overflowWrap: 'anywhere' }}>{checksum}</div>
-          <div className="row">
-            <Lamp state={book.tydro.status === 'OK' ? 'ok' : 'dark'} label={book.tydro.status === 'OK' ? 'TYDRO OK' : "TYDRO COULDN'T READ"} />
-            <Lamp state={book.nado.status === 'OK' ? 'ok' : 'dark'} label={book.nado.status === 'OK' ? 'NADO OK' : "NADO COULDN'T READ"} />
-            {!isFixture ? (
-              <span className="faint mono" style={{ fontSize: 11 }}>
-                {loading ? 'reading…' : nextInMs !== null && nextInMs !== undefined ? `next read ${Math.ceil(nextInMs / 1000)}s` : ''}
-              </span>
-            ) : null}
-            {onRefresh && !isFixture ? (
-              <button className="pill-btn" onClick={onRefresh} disabled={loading} data-testid="refresh">
-                Re-read
-              </button>
-            ) : null}
-            {!isFixture ? <MyWalletToggle address={book.address} /> : null}
-          </div>
-        </div>
-      </div>
+      {/* the wallet plate: sigil · energy levels (types that fired) · risk rail */}
+      <WalletPlate address={book.address} pose={pose}>
+        <span className="mono dim" style={{ overflowWrap: 'anywhere' }}>{checksum}</span>
+        <Lamp state={book.tydro.status === 'OK' ? 'ok' : 'dark'} label={book.tydro.status === 'OK' ? 'TYDRO OK' : "TYDRO COULDN'T READ"} />
+        <Lamp state={book.nado.status === 'OK' ? 'ok' : 'dark'} label={book.nado.status === 'OK' ? 'NADO OK' : "NADO COULDN'T READ"} />
+        {!isFixture ? (
+          <span className="faint mono" style={{ fontSize: 11 }}>
+            {loading ? 'reading…' : nextInMs !== null && nextInMs !== undefined ? `next read ${Math.ceil(nextInMs / 1000)}s` : ''}
+          </span>
+        ) : null}
+        {onRefresh && !isFixture ? (
+          <button className="pill-btn" onClick={onRefresh} disabled={loading} data-testid="refresh">
+            Re-read
+          </button>
+        ) : null}
+        {!isFixture ? <MyWalletToggle address={book.address} /> : null}
+      </WalletPlate>
 
       <div className="grid two">
         {/* 1 WALLET */}

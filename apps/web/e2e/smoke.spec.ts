@@ -101,3 +101,33 @@ test('"My wallet" is remembered from a wallet page — and no wallet extension i
   await expect(page.getByTestId('my-wallet')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __walletCalls: string[] }).__walletCalls)).toEqual([]);
 });
+
+test('wallet plate: one line per type that fired, the dot on the main type, risk on the rail, no dollar amounts', async ({ page }) => {
+  // EX1 CARRY = Hedged (main) + Bitcoin-backed
+  await page.goto('/fixture/carry');
+  const plate = page.getByTestId('wallet-plate');
+  await expect(plate.locator('[data-testid="plate-main-level"], [data-testid="plate-level"]')).toHaveCount(2);
+  await expect(page.getByTestId('plate-main-level')).toHaveAttribute('data-tag', 'CARRY');
+  await expect(page.getByTestId('plate-main-level').locator('.plate-dot')).toHaveCount(1);
+  await expect(page.getByTestId('plate-level')).toHaveAttribute('data-tag', 'KBTC-CORE');
+  await expect(page.getByTestId('plate-level').locator('.plate-dot')).toHaveCount(0);
+  await expect(page.getByTestId('plate-risk-dot')).toHaveAttribute('data-stop', 'NOMINAL');
+  expect(await plate.innerText()).not.toMatch(/\$|health factor|\bhf\b/i);
+  for (const t of ['Wallet', 'Risk', 'Position type — why', 'Tydro lending', 'Nado account', 'Exposure', 'Share']) {
+    await expect(page.locator('h3.panel-title', { hasText: t }).first()).toBeVisible();
+  }
+  // near liquidation: the dot sits at the top of the rail, and only there is red
+  await page.goto('/fixture/wounded');
+  await expect(page.getByTestId('plate-risk-dot')).toHaveAttribute('data-stop', 'CRITICAL');
+  await expect(page.locator('.plate-stop.red')).toHaveCount(1);
+  // couldn't read: no made-up levels, the hollow mark is lit
+  await page.goto('/fixture/dark');
+  await expect(page.getByTestId('primary-tag')).toHaveText("Couldn't read");
+  await expect(page.locator('.plate-level')).toHaveCount(0);
+  // empty: no levels, the rail at SAFE
+  await page.goto('/fixture/empty');
+  await expect(page.getByTestId('primary-tag')).toHaveText('Empty');
+  await expect(page.locator('.plate-level')).toHaveCount(0);
+  await expect(page.getByTestId('plate-risk-dot')).toHaveAttribute('data-stop', 'NOMINAL');
+  await expect(page.getByTestId('fixture-banner')).toBeVisible();
+});

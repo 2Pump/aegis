@@ -321,3 +321,45 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
   position: absolute; z-index: 4; min-width: 220px; background: rgba(2, 4, 7, 0.94); border: 1px solid rgba(76, 224, 210, 0.45);
   padding: 9px 11px; font: 11px/1.5 var(--mono);
 }
+
+/* ───────── WALLET PLATE (wallet page hero) ───────── */
+.plate .body { padding-bottom: 12px; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-bottom: 10px; border-bottom: 1px solid var(--hair-2); margin-bottom: 12px; }
+.plate-grid { display: grid; grid-template-columns: 128px minmax(0, 1fr) 168px; gap: 0 20px; height: 220px; }
+.plate-sigil { align-self: center; justify-self: start; }
+.plate-cap { font: 500 9.5px/1 var(--mono); letter-spacing: 0.24em; color: var(--ink-faint); margin-bottom: 8px; }
+.plate-levels { position: relative; display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--hair-2); padding-left: 16px; }
+.plate-field { position: relative; flex: 1; }
+.plate-level { position: absolute; left: 0; right: 0; height: 0; display: flex; align-items: center; gap: 12px; color: var(--lc); opacity: 0.45; }
+.plate-level .plate-label { flex: 0 0 auto; font: 500 10.5px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); transform: translateY(-1px); }
+.plate-level .plate-line { flex: 1; height: 0; border-top: 1px solid var(--lc); }
+.plate-level.main { opacity: 1; }
+.plate-level.main .plate-label { font-size: 12.5px; font-weight: 600; color: var(--ink); letter-spacing: 0.2em; }
+.plate-level.main .plate-line { border-top-width: 2px; }
+.plate-dot { position: absolute; right: 22%; top: 0; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--lc); animation: plate-breathe 2.4s ease-in-out infinite; }
+@keyframes plate-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18); opacity: 0.8; } }
+.plate-state { flex: 1; display: flex; align-items: center; font: 600 15px/1 var(--mono); letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-dim); }
+.plate-rail { display: flex; flex-direction: column; border-left: 1px solid var(--hair-2); padding-left: 16px; }
+.plate-railbox { position: relative; flex: 1; }
+.plate-spine { position: absolute; left: 6px; top: 12%; bottom: 12%; border-left: 1px solid var(--hair); }
+.plate-stop { position: absolute; left: 0; right: 0; height: 0; display: flex; align-items: center; gap: 10px; }
+.plate-tick { width: 13px; border-top: 1px solid var(--ink-faint); }
+.plate-stop-label { font: 500 9.5px/1.25 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+.plate-stop.on .plate-stop-label { color: var(--ink); }
+.plate-stop.red .plate-stop-label { color: var(--red); }
+.plate-risk-dot { position: absolute; left: 6px; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; }
+.plate-off { position: absolute; left: -1px; bottom: -2px; display: flex; align-items: center; gap: 9px; }
+.plate-hollow { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--ink-faint); margin-left: 2px; }
+.plate-off.on .plate-hollow { border-color: var(--ink); border-width: 1.5px; }
+.plate-off.on .plate-stop-label { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .plate-dot { animation: none; } }
+/* phones: sigil on top, levels under it, the rail to the right of the levels */
+@media (max-width: 640px) {
+  .plate-grid { grid-template-columns: minmax(0, 1fr) 128px; grid-template-rows: auto 200px; height: auto; gap: 12px 14px; }
+  .plate-sigil { grid-column: 1 / -1; }
+  .plate-levels { border-left: 0; padding-left: 0; }
+  .plate-grid { grid-template-columns: minmax(0, 1fr) 148px; }
+  .plate-rail { padding-left: 12px; padding-bottom: 22px; }
+  .plate-stop-label { white-space: nowrap; font-size: 9px; letter-spacing: 0.1em; }
+  .plate-off { bottom: -22px; }
+}

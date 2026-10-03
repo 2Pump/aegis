@@ -190,3 +190,17 @@ Plain 2D canvas holds this, so no WebGL is used.
 ## Legacy
 
 `?well=legacy` now shows WELL GLASS (this 2D plot) for one release, so the sphere can be compared with it. The flag survives filter changes. The older donut well was retired on 2026-09-29.
+
+---
+
+# WALLET PLATE — the hero of a wallet page (2026-10-02)
+
+The top of `/hull/:address` is a state plate, read like a lab spectral plate (`apps/web/src/components/WalletPlate.tsx`). It replaced the sigil + chip row only; 01 Wallet → 07 Share, the data log, Re-read and Set as my wallet are unchanged, and the address, lamps, Re-read and My wallet sit in the plate's top row.
+
+- **Left:** the wallet's own sigil, coloured by its main type (never red, even when near liquidation).
+- **Centre: energy levels.** One line per type that fired on this wallet. The main type is the occupied line (bright, labelled, a breathing dot on it); extra types are faint lines with no dot; types that did not fire are not drawn. Each type always sits at the same height (its rule priority, near liquidation last), so two plates compare at a glance.
+- **Right: the risk rail.** NEAR LIQUIDATION at the top, WATCH in the middle, SAFE at the bottom, COULDN'T READ as a hollow mark off the rail. The dot's height is this wallet's risk. Red appears only when the wallet is near liquidation: that rail label and the dot.
+- **Empty wallet:** the plate says EMPTY, no levels, the dot at SAFE. **Couldn't read:** the plate says COULDN'T READ, no made-up levels, the hollow mark lit (a near-liquidation reading from the venue that did read still puts the dot at the top).
+- It reads the pose the page already has (no reclassification), adds nothing to census.json, and shows no balances, health factor or liquidation price. Those stay in 02, 04 and 05.
+- Desktop: full width, ~288 px tall. Phone: sigil on top, levels under it, the rail to their right. Reduced motion: the dot doesn't breathe.
+- Browser test: "wallet plate: one line per type that fired…".
