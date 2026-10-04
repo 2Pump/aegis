@@ -125,6 +125,20 @@ describe('Oracle Watch · checks', () => {
     expect(kinds(missing, 'kBTC').external).toBe('UNAVAILABLE');
   });
 
+  it('a dormant reference (not pushed for over a day) is shown but is not a check; a fixed $1 source says what it can\'t see', () => {
+    const w = buildOracleWatch({
+      snap: snap({
+        pyth: [{ key: 'ETH', id: 'x', price: 1500, conf: 1, publishTime: T0 - 160 * 24 * H, error: null }],
+        tydro: { GHO: { source: { address: '0x20fd5f3f00000000000000000000000000000000', answer: 1, decimals: 8, description: null, updatedAt: null, error: null, kind: 'answer-only' } } },
+      }),
+    });
+    expect(kinds(w, 'WETH').external).toBeUndefined();
+    expect(row(w, 'WETH').external?.note).toMatch(/dormant — last pushed 160 days ago/);
+    expect(row(w, 'WETH').status).toBe('OK');
+    expect(row(w, 'GHO').status).toBe('OK');
+    expect(row(w, 'GHO').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/fixed-price source.*market depeg would not show/);
+  });
+
   it('a sudden jump against the previous run', () => {
     const prev = buildOracleWatch({ snap: snap() });
     const w = buildOracleWatch({ snap: snap({ tydro: { WETH: { priceUsd: 1800 } }, at: T0 + H, block: 2000 }), prev });

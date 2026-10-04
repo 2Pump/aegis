@@ -146,7 +146,7 @@ function AssetRowView({ r }: { r: AssetRow }) {
         <td className="num">{price(r.tydro?.price)}</td>
         <td className="num">{r.nado ? <>{price(r.nado.price)}<span className="faint">{sgn(pctOf('cross-venue'))}</span></> : <span className="faint">—</span>}</td>
         <td className="num">
-          {r.external ? (r.external.note ? <span className="faint" title={r.external.note}>not compared</span> : <>{price(r.external.price)}<span className="faint">{sgn(pctOf('external'))}</span></>) : <span className="faint">none on Ink</span>}
+          {r.external ? (r.external.note ? <span className="faint" title={r.external.note}>{/dormant/.test(r.external.note) ? 'dormant on Ink' : 'not compared'}</span> : <>{price(r.external.price)}<span className="faint">{sgn(pctOf('external'))}</span></>) : <span className="faint">none on Ink</span>}
         </td>
         <td className="hide-narrow"><StatusChip s={r.status} /></td>
       </tr>

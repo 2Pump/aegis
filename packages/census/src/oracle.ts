@@ -20,6 +20,8 @@ export const ORACLE = {
   STALE_H: 26,
   /** an external pull-oracle reference older than this isn't compared at all */
   REF_FRESH_H: 1,
+  /** a reference nobody has pushed for this long is dormant: shown, but not a check (it can't vouch for anything) */
+  REF_DORMANT_H: 24,
   /** cross-source deviation */
   WARN_PCT: 0.3,
   DIVERGE_PCT: 1,
@@ -144,6 +146,9 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
     const viaText = src?.via?.length ? ` over ${src.via.map((v) => v.description ?? `${v.address.slice(0, 10)}…`).join(' + ')}` : '';
     if (!src) checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: "Tydro's source for this asset couldn't be read", pct: null });
     else if (src.kind === 'none') checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: `source ${src.address.slice(0, 10)}… answers no price AEGIS can read`, pct: null });
+    else if (src.updatedAt === null && src.kind === 'answer-only' && src.answer === 1 && PEGGED.has(t.symbol))
+      // e.g. Aave's GhoOracle: a constant $1 by design — nothing to go stale, and nothing that could show a depeg
+      checks.push({ kind: 'source-age', status: 'OK', text: `fixed-price source: answers exactly $1 with no update time (Aave's GHO oracle works this way by design). Tydro values ${t.symbol} at $1 whatever it trades at, so a market depeg would not show in Tydro's price.`, pct: null });
     else if (src.updatedAt === null)
       checks.push({
         kind: 'source-age',
@@ -171,18 +176,28 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
       const st: OracleStatus = Math.abs(d) >= ORACLE.DIVERGE_PCT ? 'DIVERGENT' : Math.abs(d) >= ORACLE.WARN_PCT ? 'WARN' : 'OK';
       checks.push({ kind: 'cross-venue', status: st, text: `Tydro vs Nado on the same token: ${d >= 0 ? '+' : ''}${d.toFixed(2)}%`, pct: d });
     }
-    // external reference, only when it is itself fresh
+    // external reference, only when it is itself fresh; a dormant one is shown but isn't a check
     let external: AssetRow['external'] = null;
     if (ref) {
-      const fresh = py?.publishTime ? (now - py.publishTime) / 3_600_000 <= ORACLE.REF_FRESH_H : false;
-      const note = !py || py.error ? `Pyth unreadable${py?.error ? `: ${py.error}` : ''}` : !fresh ? `Pyth last published ${py.publishTime ? `${((now - py.publishTime) / 3_600_000).toFixed(1)} h` : '?'} ago — a pull oracle, updated only when someone pushes; not compared` : null;
+      const ageH = py?.publishTime ? (now - py.publishTime) / 3_600_000 : null;
+      const fresh = ageH !== null && ageH <= ORACLE.REF_FRESH_H;
+      const dormant = ageH !== null && ageH > ORACLE.REF_DORMANT_H;
+      const ago = ageH === null ? '?' : ageH >= 48 ? `${Math.round(ageH / 24)} days` : `${ageH.toFixed(1)} h`;
+      const note =
+        !py || py.error
+          ? `Pyth unreadable${py?.error ? `: ${py.error}` : ''}`
+          : dormant
+            ? `Pyth ${ref.pyth}/USD on Ink is dormant — last pushed ${ago} ago. Nobody keeps it updated on Ink, so it can't serve as a reference and isn't compared.`
+            : !fresh
+              ? `Pyth last published ${ago} ago — a pull oracle, updated only when someone pushes; not compared`
+              : null;
       external = { source: 'Pyth', key: ref.pyth, relation: ref.relation, price: py?.price ?? null, conf: py?.conf ?? null, publishTime: py?.publishTime ?? null, note };
       if (fresh && py?.price && t.priceUsd) {
         const d = pctDiff(t.priceUsd, py.price);
         const st: OracleStatus = Math.abs(d) >= ORACLE.DIVERGE_PCT ? 'DIVERGENT' : Math.abs(d) >= ORACLE.WARN_PCT ? 'WARN' : 'OK';
         const within = py.conf ? Math.abs(t.priceUsd - py.price) <= py.conf : false;
         checks.push({ kind: 'external', status: within ? 'OK' : st, text: `vs Pyth ${ref.pyth}/USD: ${d >= 0 ? '+' : ''}${d.toFixed(2)}%${py.conf ? ` (Pyth ±${fmt(py.conf)}${within ? ', inside its confidence band' : ''})` : ''}`, pct: d });
-      } else if (note) checks.push({ kind: 'external', status: 'UNAVAILABLE', text: note, pct: null });
+      } else if (note && !dormant) checks.push({ kind: 'external', status: 'UNAVAILABLE', text: note, pct: null });
     }
     // stablecoin peg, per venue
     if (PEGGED.has(t.symbol)) {

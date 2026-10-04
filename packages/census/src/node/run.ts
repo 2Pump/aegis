@@ -708,6 +708,13 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     await o.store.put('pressure.json', ps);
     log(`pressure map: ${ps.population.exposed} wallets with debt or perps simulated (${ps.population.approximate} approximate, ${ps.population.unsupported} unreadable) · ${Object.keys(ps.hist).length} cells (${ps.coarse.length} rounded for privacy) · ${Math.round(pressureMs / 1000)}s`);
   }
+  if (!pressureSnap) {
+    // why no Pressure Map (and so no forecast) this run — stated every run, so a long gap can't go unnoticed
+    const why = !sweep ? 'an hourly run (only a full sweep rebuilds it)' : !sweepDone ? 'the full sweep is paused and continues next run' : 'the full sweep spanned several runs, so it has no single-block reading to simulate';
+    const prevPs = await o.store.get('pressure.json').catch(() => null);
+    const prevAt = (prevPs as { at?: string } | null)?.at;
+    log(`pressure map + forecast: not rebuilt — ${why} · last built ${prevAt ? `${Math.round((Date.now() - Date.parse(prevAt)) / 3_600_000)} h ago (${prevAt.slice(0, 16)}Z)` : 'never'} · last full sweep ${state.lastFullAt ?? 'never'}`);
+  }
   const url = await o.store.put('census.json', snap);
   log(`published ${counts.drawn} ships (${counts.known} known, ${counts.empty} empty, ${counts.wounded} wounded) → ${url} in ${Math.round((Date.now() - t0) / 1000)}s`);
 

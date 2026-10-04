@@ -18,6 +18,8 @@ Every feed is an observation, not the truth. When two feeds disagree, one of the
 - **Assets are joined across venues by token contract address** (Nado spot `config.token` = Tydro underlying), never by ticker.
 - Nado doesn't expose an update time on-chain, so its age is shown as "not exposed".
 - Pyth is a pull oracle: it updates only when someone pushes a price on Ink. It's compared only when it was published in the last hour. Otherwise the check says "not compared" and why.
+- A Pyth feed not pushed for over **24 h is dormant**: it's shown with its last push time, but it isn't a check and doesn't make the asset UNAVAILABLE. On 2026-10-04 all three Pyth feeds on Ink were dormant (last pushed 160–400 days earlier), so the cross-venue Tydro-vs-Nado comparison is the live second source for WETH, kBTC and USDC.
+- A stablecoin source that answers exactly $1 with no update time is a **fixed-price source**, as Aave's GHO oracle is by design. It's OK (there's nothing to go stale), and the check says plainly that a market depeg would not show in Tydro's price.
 - External references are explicit: WETH→ETH, kBTC and SolvBTC→BTC (labelled *wrapped*, because the wrapper itself can lose its peg), and USDC→USDC.
 
 ### Checks and thresholds
@@ -94,6 +96,7 @@ A divergence is modelled with the Pressure engine as the protocol price convergi
 - **Unreached scenarios are neither hits nor misses.**
 - For reached scenarios, the page shows predicted near-liquidation counts next to the most the hourly scan recorded, plus the liquidations seen.
 - Forecasts made before prices were recorded are counted as *can't be judged*.
+- A forecast is recorded only when the Pressure Map is rebuilt, which needs a full sweep that reads every wallet in **one** run. A sweep that spans several runs builds no map and no forecast. Every run that doesn't build one says why in the log.
 - The result is written to `history/forecast-score.json`.
 
 ## What to look for in the census log
@@ -103,6 +106,7 @@ A divergence is modelled with the Pressure engine as the protocol price convergi
 oracles: Tydro sources — chainlink 3 · adapter 11
 oracles: 14 assets · OK 11 · UNAVAILABLE 2 · …
 changes: monitoring N parameters from now on (…)   ← first run only
+pressure map + forecast: not rebuilt — <why> · last built N h ago · last full sweep …   ← on every run without one
 forecasts: N recorded · … judged · … reached · … before prices were recorded · … pending · files: 2026-09 none, 2026-10 12
 ```
 
