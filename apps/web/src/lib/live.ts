@@ -16,6 +16,8 @@ export interface LiveWell {
   setLive: (on: boolean) => void;
   /** addresses updated by the live layer in the last few seconds → flash on the well */
   flashes: Map<string, number>;
+  /** the tab is visible (a hidden tab pauses live reads) */
+  visible: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
     live,
     setLive,
     flashes: flashes.current,
+    visible,
   };
 }
 

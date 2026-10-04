@@ -7,6 +7,7 @@ import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { TagChip } from './bits';
 import { SensorLog } from './SensorLog';
+import { liveBadge, type WellPhase } from '../lib/wellState';
 
 /** Ink makes ~1 block per second; block counts are exact, times derived from them are approximate (~). */
 export function blocksAgo(block: number, head: number | null): string {
@@ -62,9 +63,24 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
 }
 
 /** Telemetry strip: what the well is showing, how old it is, and whether the live layer is watching. */
-export function CensusStatusLine({ snap, stats, live, onToggle }: { snap: CensusSnapshot | null; stats: LiveStats; live: boolean; onToggle: () => void }) {
+export function CensusStatusLine({
+  snap,
+  stats,
+  live,
+  onToggle,
+  phase,
+  visible = true,
+}: {
+  snap: CensusSnapshot | null;
+  stats: LiveStats;
+  live: boolean;
+  onToggle: () => void;
+  phase: WellPhase;
+  visible?: boolean;
+}) {
   // the clock ticks here, not in Home: a once-a-second re-render of the whole page would re-walk 18k wallets
   const now = useNow(1000);
+  const badge = liveBadge({ running: stats.running, wantLive: live, visible, phase: phase.kind });
   const cell = (k: string, v: React.ReactNode, style?: React.CSSProperties) => (
     <div className="tele-cell" style={style}>
       {k} <b>{v}</b>
@@ -81,18 +97,22 @@ export function CensusStatusLine({ snap, stats, live, onToggle }: { snap: Census
           {cell('FOUND', snap.counts.known.toLocaleString('en-US'))}
           {cell('RULES', snap.rulesVersion.toUpperCase())}
           {!snap.discovery.backfillComplete ? <div className="tele-cell amber">HISTORY BACKFILL IN PROGRESS</div> : null}
+          {phase.kind === 'ok' && phase.stale ? <div className="tele-cell amber" data-testid="scan-stale">STALE SCAN</div> : null}
+          {phase.kind === 'ok' && phase.lastGood ? <div className="tele-cell amber" data-testid="scan-last-good">LAST GOOD SCAN</div> : null}
         </>
+      ) : phase.kind === 'loading' ? (
+        <div className="tele-cell" data-testid="scan-loading" role="status">LOADING LATEST SCAN…</div>
       ) : (
-        <div className="tele-cell">NO SCAN YET · LIVE UPDATES ONLY</div>
+        <div className="tele-cell amber" data-testid="scan-unavailable" role="status">SCAN UNAVAILABLE</div>
       )}
-      <div className={`tele-live${stats.running ? '' : ' off'}`}>
+      <div className={`tele-live${stats.running ? '' : ' off'}`} data-testid="live-badge">
         <i aria-hidden />
         <span>
-          {stats.running ? 'LIVE' : 'PAUSED'}
+          {badge.text}
           {stats.cursor ? <> <b>{stats.cursor.toLocaleString('en-US')}</b></> : null}
           {stats.lagBlocks !== null ? <> · LAG <b>{stats.lagBlocks}</b></> : null}
         </span>
-        <button className="sq-btn" onClick={onToggle} data-testid="live-toggle" aria-pressed={!live}>
+        <button className="sq-btn" onClick={onToggle} data-testid="live-toggle" aria-pressed={!live} disabled={phase.kind === 'loading' || phase.kind === 'unavailable'}>
           {live ? 'PAUSE' : 'RESUME'}
         </button>
       </div>
@@ -147,7 +167,8 @@ export function woundText(s: CensusShip): string {
 
 const FLOOR_SHORT: Record<Material, string> = { '0': 'All', '1k': '≥ $1k', '10k': '≥ $10k', '100k': '≥ $100k' };
 
-export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; head: number | null }) {
+/** `ready` false = the scan is still loading or unavailable: counts are not shown as zero, controls are disabled. */
+export function WoundedTape({ ships, head, ready = true, notReady }: { ships: readonly CensusShip[]; head: number | null; ready?: boolean; notReady?: string }) {
   // ordered by when they were first seen wounded — never by how close to liquidation
   const all = useMemo(
     () => ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0)),
@@ -165,11 +186,15 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
       <div className="panel-title" style={{ marginBottom: 6 }}>{COPY.woundedTape}</div>
       <div className="tape-floor" role="group" aria-label="Wallet size floor">
         {MATERIAL.map((m) => (
-          <button key={m} type="button" className={`sq-btn${floor === m ? ' on' : ''}`} aria-pressed={floor === m} onClick={() => setFloor(m)} data-testid={`tape-floor-${m}`}>
-            {FLOOR_SHORT[m]} <span className="num">{counts[m].toLocaleString('en-US')}</span>
+          <button key={m} type="button" className={`sq-btn${floor === m ? ' on' : ''}`} aria-pressed={floor === m} onClick={() => setFloor(m)} data-testid={`tape-floor-${m}`} disabled={!ready}>
+            {FLOOR_SHORT[m]} <span className="num">{ready ? counts[m].toLocaleString('en-US') : '—'}</span>
           </button>
         ))}
       </div>
+      {!ready ? (
+        <div className="dim tape-wait" data-testid="tape-not-ready" role="status">{notReady ?? 'Loading the latest scan…'}</div>
+      ) : (
+      <>
       <div className="faint tape-floor-note" data-testid="tape-floor-note">
         {all.length.toLocaleString('en-US')} near liquidation in all · showing <b>{MATERIAL_LABEL[floor].toLowerCase()}</b> ({list.length.toLocaleString('en-US')}). Size is a range from the wallet's
         positions, never its exact balance.
@@ -194,6 +219,8 @@ export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; hea
             ))}
           </ul>
         </>
+      )}
+      </>
       )}
     </div>
   );

@@ -45,3 +45,11 @@ export { seedTydroHolders, INK_EXPLORER_API, type SeedResult } from './explorer.
 export { parseRangeLimit, getLearnedMaxSpan, resetLearnedMaxSpan } from './logs.js';
 export type { FetchLike } from './http.js';
 export { readProtocolTotals, type ProtocolTotals } from './totals.js';
+
+/**
+ * Versions of the readers and the price sources, stamped on every historical record so a past reading can be
+ * audited against the code that made it. Bump on any change to what the readers return.
+ */
+export const READER_VERSION = 'ink-io-2026.10.04';
+/** Tydro: AaveOracle via the pool's price oracle · Nado: oracle prices read on-chain through FQuerier */
+export const PRICE_SOURCE_VERSION = 'tydro-aaveoracle+nado-fquerier-1';

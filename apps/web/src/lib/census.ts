@@ -22,7 +22,8 @@ export type CensusState =
   | { status: 'loading' }
   | { status: 'missing'; message: string }
   | { status: 'error'; message: string }
-  | { status: 'ok'; snap: CensusSnapshot; ships: CensusShip[]; loadedAt: number };
+  /** refreshError: a later reload failed — this is the LAST GOOD scan, and the page says so */
+  | { status: 'ok'; snap: CensusSnapshot; ships: CensusShip[]; loadedAt: number; refreshError?: string };
 
 const REFRESH_MS = 5 * 60_000;
 
@@ -50,7 +51,7 @@ export function useCensus(): CensusState {
         log('ok', 'live', `scan loaded · ${snap.counts.drawn} wallets · block ${snap.block} · ${snap.sweep.kind === 'full' ? 'full re-read' : 'hourly update'}${snap.sweep.complete === false ? ' (partial — continues next run)' : ''}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (alive) set((prev) => (prev.status === 'ok' ? prev : { status: 'error', message: msg }));
+        if (alive) set((prev) => (prev.status === 'ok' ? { ...prev, refreshError: msg } : { status: 'error', message: msg }));
         log('err', 'live', `scan load failed: ${msg}`);
       }
     };

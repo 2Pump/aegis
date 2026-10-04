@@ -9,12 +9,11 @@
  * Needs: TELEGRAM_BOT_TOKEN, ALERTS_STORE_KEY (+ BLOB_READ_WRITE_TOKEN for blob). Optional: INK_RPC, ALERTS_SITE_URL.
  * Read-only on the chain. Sends Telegram messages to people who asked for them; nothing else.
  */
-import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INK_PUBLIC_RPCS, makeInkClient, splitRpcList } from '@aegis/ink-io';
 import { emptyDb, runAlerts } from '@aegis/census/alerts';
-import { blobAlertsStore, blobStore, chatHasher, checkAlertsEnv, fileAlertsStore, fileStore, makeAlertsReader, parseStoreKey, telegramTransport } from '@aegis/census/node';
+import { blobAlertsStore, blobStore, chatHasher, checkAlertsEnv, fileAlertsStore, fileStore, fixtureAddresses, makeAlertsReader, parseStoreKey, telegramTransport } from '@aegis/census/node';
 
 const args = process.argv.slice(2);
 const flag = (k: string) => {
@@ -22,17 +21,6 @@ const flag = (k: string) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
-
-/** AEGIS's synthetic test wallets — never watchable. */
-function fixtureAddresses(): Set<string> {
-  const out = new Set<string>();
-  const dir = join(root, 'fixtures');
-  for (const f of readdirSync(dir)) {
-    if (!f.endsWith('.json')) continue;
-    for (const m of readFileSync(join(dir, f), 'utf8').matchAll(/0x[0-9a-fA-F]{40}\b/g)) out.add(m[0].toLowerCase());
-  }
-  return out;
-}
 
 async function main() {
   const storeKind = flag('--store') === 'blob' ? 'blob' : 'file';
@@ -57,7 +45,7 @@ async function main() {
     transport: telegramTransport({ token: process.env.TELEGRAM_BOT_TOKEN!.trim() }),
     read: makeAlertsReader(client, census),
     now: () => Date.now(),
-    fixtures: fixtureAddresses(),
+    fixtures: fixtureAddresses(root),
     siteUrl: process.env.ALERTS_SITE_URL?.trim() || 'https://aegis-web-lake.vercel.app',
     hashChat: chatHasher(key),
     log: (m) => console.log(`[alerts +${Math.round((Date.now() - t0) / 1000)}s] ${m}`),

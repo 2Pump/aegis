@@ -24,6 +24,9 @@ import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
 import { useHullCache } from '../lib/hulls';
 import { useLiveWell } from '../lib/live';
+import { wellPhase } from '../lib/wellState';
+import { useNow } from '../lib/hulls';
+import { fmtAge } from '../lib/fmt';
 
 export function Home() {
   const nav = useNavigate();
@@ -32,6 +35,9 @@ export function Home() {
   const lw = useLiveWell(census, WELL_ON);
   const snap = census.status === 'ok' ? census.snap : null;
   const head = lw.stats.head ?? snap?.block ?? null;
+  const now = useNow(60_000);
+  const phase = wellPhase(census, now);
+  const ready = phase.kind === 'ok' || phase.kind === 'empty';
 
   // the head moves every block; ships must not be rebuilt for that (18k objects → re-filter → re-seat), so the
   // "read N ago" line reads the head when a tooltip or row draws it
@@ -142,17 +148,35 @@ export function Home() {
               (Shown because this is a dev build or VITE_WELL_PREVIEW=1.)
             </div>
           ) : null}
-          {census.status === 'missing' || census.status === 'error' ? (
-            <div className="banner" data-testid="census-missing">{census.message}</div>
+          {phase.kind === 'unavailable' ? (
+            <div className="banner red" data-testid="census-missing" role="alert">
+              SCAN UNAVAILABLE — {phase.message}. Nothing is drawn rather than showing zeroes. Wallet pages still read live.
+            </div>
+          ) : null}
+          {phase.kind === 'ok' && phase.lastGood && snap ? (
+            <div className="banner" data-testid="census-last-good" role="status">
+              LAST GOOD SCAN — loading a newer one failed ({phase.refreshError}). Showing the scan from block {snap.block.toLocaleString('en-US')}, {fmtAge(Date.parse(snap.generatedAt), now)} ago.
+            </div>
           ) : null}
 
           <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado wallet found on-chain</span>}>
             <div className="stack" style={{ gap: 12 }}>
-              <CensusStatusLine snap={snap} stats={lw.stats} live={lw.live} onToggle={() => lw.setLive(!lw.live)} />
-              {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
-              {ships.length === 0 && census.status !== 'loading' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
-              {ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
-              {ships.length > 0 ? (
+              <CensusStatusLine snap={snap} stats={lw.stats} live={lw.live} onToggle={() => lw.setLive(!lw.live)} phase={phase} visible={lw.visible} />
+              {phase.kind === 'loading' ? (
+                <div className="well-wait" data-testid="well-loading" role="status" aria-live="polite">
+                  LOADING LATEST SCAN…
+                  <small>Counts and the well appear once the scan has loaded — nothing here is a zero.</small>
+                </div>
+              ) : null}
+              {phase.kind === 'unavailable' ? (
+                <div className="well-wait bad" data-testid="well-unavailable" role="status">
+                  SCAN UNAVAILABLE
+                  <small>The latest scan couldn't be loaded, so no wallet counts are shown. Paste an address above to read one wallet live.</small>
+                </div>
+              ) : null}
+              {phase.kind === 'empty' ? <div className="banner cyan">{COPY.wellEmpty}</div> : null}
+              {ready && ships.length > 0 ? <WellFilters filter={filter} onChange={setFilter} all={ships} shown={shown.length} counts={counts} /> : null}
+              {ready && ships.length > 0 ? (
                 <div className="view-switch" role="group" aria-label="Well view" data-testid="view-switch">
                   {VIEWS.map(([v, label]) => (
                     <button
@@ -170,20 +194,24 @@ export function Home() {
                   {!glOk ? <span className="faint mono" style={{ fontSize: 10, marginLeft: 8 }}>NO WEBGL · 2D WELL</span> : null}
                 </div>
               ) : null}
-              {ships.length > 0 && view === 'sphere' ? (
+              {ready && ships.length > 0 && view === 'sphere' ? (
                 <Suspense fallback={<div className="wg hs-loading-box">LOADING THE SPHERE…</div>}>
                   <HullSphere ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={open} />
                 </Suspense>
               ) : null}
-              {ships.length > 0 && view === '2d' ? <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={open} /> : null}
-              {ships.length > 0 && view === 'list' ? <ShipList ships={shown} onOpen={(href) => nav(href)} defaultOpen /> : null}
-              <MixBar mix={mix} label={COPY.censusFull} />
+              {ready && ships.length > 0 && view === '2d' ? <Well ships={shown} found={filter.find || null} resetKey={resetKey} onOpen={open} /> : null}
+              {ready && ships.length > 0 && view === 'list' ? <ShipList ships={shown} onOpen={(href) => nav(href)} defaultOpen /> : null}
+              {ready ? (
+                <MixBar mix={mix} label={COPY.censusFull} />
+              ) : (
+                <div className="mix-wait" data-testid="mix-wait">POSITION-TYPE MIX · {phase.kind === 'loading' ? 'WAITING FOR THE SCAN' : 'UNAVAILABLE'}</div>
+              )}
             </div>
           </Panel>
 
           <div className="grid two">
             <Panel title="Near liquidation" rail="var(--red)">
-              <WoundedTape ships={lw.ships} head={head} />
+              <WoundedTape ships={lw.ships} head={head} ready={ready} notReady={phase.kind === 'loading' ? 'Loading the latest scan…' : 'Scan unavailable — no counts shown.'} />
             </Panel>
             <Panel title="Activity" rail="var(--cyan)">
               <ActivityTape changes={lw.changes} />

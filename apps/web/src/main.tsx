@@ -8,6 +8,7 @@ import { Home } from './pages/Home';
 import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
 import { PressurePage } from './pages/Pressure';
+import { IntelPage } from './pages/Intel';
 import { CensusPage, NotFound, WatchPage } from './pages/Static';
 import './styles.css';
 
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: '/rules', element: <Navigate to="/?rules=1" replace /> },
       { path: '/calibration', element: <CalibrationPage /> },
       { path: '/pressure', element: <PressurePage /> },
+      { path: '/intel', element: <IntelPage /> },
       { path: '/census', element: <CensusPage /> },
       { path: '/watch', element: <WatchPage /> },
       { path: '*', element: <NotFound /> },

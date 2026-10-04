@@ -280,3 +280,7 @@ It went live on 2026-09-29. Run #12 failed on a bug in this check (`node -e` doe
    - **404:** the URL or the token's repository access is wrong.
    - **422:** the body or the branch name is wrong.
 5. **API version.** GitHub marks the `2022-11-28` API version as deprecated from 10 March 2026, with a sunset on 10 March 2028. When you renew the token, check GitHub's API versions page for the current version and update the header.
+
+## Flight Recorder (since 2026-10-04)
+
+After publishing, every run records history: one aggregate point (block hash, versions, risk counts per size floor, type mix, stress level on full scans) and a wallet row for every wallet whose type, risk, size range or venues changed. Wallets are split into 64 shards, with a baseline row for each wallet once a month. If history fails, the scan still publishes. Details, retention and rollback are in [HISTORY.md](HISTORY.md).

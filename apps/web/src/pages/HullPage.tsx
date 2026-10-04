@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { parseAddress } from '@aegis/ink-io';
 import { classify } from '@aegis/pose';
 import { HullPlate } from '../components/HullPlate';
+import { WalletHistory } from '../components/WalletHistory';
 import { PasteBar } from '../components/PasteBar';
 import { FIXTURES, FIXTURE_NAMES } from '../lib/fixtures';
 import { useLiveHull, useNow } from '../lib/hulls';
@@ -33,16 +34,20 @@ export function HullPage() {
     );
   }
   return (
-    <HullPlate
-      book={state.book}
-      pose={state.pose}
-      lastOk={state.lastOk}
-      firstSeen={state.firstSeen}
-      now={now}
-      loading={loading}
-      nextInMs={nextInMs}
-      onRefresh={refresh}
-    />
+    <div className="stack" style={{ gap: 16 }}>
+      <HullPlate
+        book={state.book}
+        pose={state.pose}
+        lastOk={state.lastOk}
+        firstSeen={state.firstSeen}
+        now={now}
+        loading={loading}
+        nextInMs={nextInMs}
+        onRefresh={refresh}
+      />
+      {/* real wallets only — test wallets (FixturePage) never get a history */}
+      <WalletHistory address={parsed.value.lower} />
+    </div>
   );
 }
 

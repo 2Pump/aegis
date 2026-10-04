@@ -8,10 +8,13 @@ import { dirname, join } from 'node:path';
  * Three objects: census.json (what the site draws), known.json (discovery cursors + address book for the job) and
  * pressure.json (Pressure Map aggregates, written by full sweeps only).
  */
+/** history/… = the Flight Recorder (history.ts); everything else is one fixed file */
+export type StoreName = 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json' | `history/${string}.json`;
+
 export interface CensusStore {
   describe: string;
-  get(name: 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json'): Promise<unknown | null>;
-  put(name: 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json', body: unknown): Promise<string>;
+  get(name: StoreName): Promise<unknown | null>;
+  put(name: StoreName, body: unknown): Promise<string>;
 }
 
 export function fileStore(dir: string): CensusStore {

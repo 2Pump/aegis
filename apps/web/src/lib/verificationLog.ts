@@ -9,7 +9,7 @@ export type VerifyLogState = { status: 'loading' } | { status: 'missing' } | { s
 
 const isRecord = (x: unknown): x is VerificationRecord => {
   const r = x as VerificationRecord;
-  return !!r && r.v === 1 && typeof r.at === 'string' && (r.venue === 'tydro' || r.venue === 'nado') && Array.isArray(r.fields) && ['PASS', 'FAIL', 'SOURCE_UNAVAILABLE'].includes(r.status);
+  return !!r && r.v === 1 && typeof r.at === 'string' && (r.venue === 'tydro' || r.venue === 'nado') && Array.isArray(r.fields) && ['PASS', 'FAIL', 'SOURCE_UNAVAILABLE', 'NOT_CHECKED'].includes(r.status);
 };
 
 export function useVerificationLog(): VerifyLogState {

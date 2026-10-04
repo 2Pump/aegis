@@ -39,8 +39,12 @@ import {
   summarize,
   type CensusShip,
   type CensusSnapshot,
+  stressLevel,
+  type PressureSnapshot,
+  type AggPoint,
 } from '../index.js';
 import type { CensusStore } from './store.js';
+import { recordHistory } from './history-write.js';
 
 /** Job state (known.json). Addresses only — public chain facts, no balances. */
 /**
@@ -107,6 +111,10 @@ export interface RunOpts {
   /** one-time Tydro seed from the explorer's holder lists (false = always scan the chain) */
   explorer?: false | { fetch?: FetchLike; base?: string; pageDelayMs?: number; backoffBaseMs?: number };
   log?: (msg: string) => void;
+  /** Flight Recorder (history.ts): record this run. Default true. */
+  history?: boolean;
+  /** addresses never recorded (AEGIS's synthetic test wallets) */
+  exclude?: ReadonlySet<string>;
 }
 
 /** Logs a progress line only when the percentage crosses a new 10% step. */
@@ -683,12 +691,44 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     for (const [k, n] of [...darkWhy.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6)) log(`  ${n}× ${k}`);
   }
   await o.store.put('known.json', state);
+  let pressureSnap: PressureSnapshot | null = null;
   if (pacc && sweptAll) {
     const ps = pacc.toSnapshot({ block: head, at: new Date().toISOString(), rulesVersion: RULES.RULES_VERSION });
+    pressureSnap = ps;
     await o.store.put('pressure.json', ps);
     log(`pressure map: ${ps.population.exposed} wallets with debt or perps simulated (${ps.population.approximate} approximate, ${ps.population.unsupported} unreadable) · ${Object.keys(ps.hist).length} cells (${ps.coarse.length} rounded for privacy) · ${Math.round(pressureMs / 1000)}s`);
   }
   const url = await o.store.put('census.json', snap);
   log(`published ${counts.drawn} ships (${counts.known} known, ${counts.empty} empty, ${counts.wounded} wounded) → ${url} in ${Math.round((Date.now() - t0) / 1000)}s`);
+
+  /* ── 5. Flight Recorder (after publishing: a history failure never holds back the scan) ── */
+  if (o.history !== false) {
+    try {
+      let stress: AggPoint['stress'] = null;
+      if (pressureSnap) {
+        const L = state.coverage?.share.nadoOpenInterestLongs ?? null;
+        const S = state.coverage?.share.nadoOpenInterestShorts ?? null;
+        const oi = L === null || S === null ? null : Math.min(L, S);
+        const r = stressLevel(pressureSnap, { nowMs: Date.now(), oiCoverage: oi });
+        stress = { level: r.level, confidence: r.confidence, version: r.version, population: r.inputs.population };
+      }
+      await recordHistory({
+        store: o.store,
+        client,
+        block: head,
+        at: snap.generatedAt,
+        sweep: snap.sweep.kind,
+        complete: snap.sweep.complete !== false,
+        ships: all,
+        prev: prevShips,
+        known: counts.known,
+        stress,
+        exclude: o.exclude,
+        log,
+      });
+    } catch (e) {
+      log(`history: not recorded this run: ${String(e).slice(0, 200)}`);
+    }
+  }
   return snap;
 }

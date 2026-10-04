@@ -5,3 +5,5 @@ export { telegramTransport, TELEGRAM_TOKEN_RE, type TelegramOpts } from './teleg
 export { blobAlertsStore, fileAlertsStore, memoryAlertsStore, parseStoreKey, seal, unseal, chatHasher, type AlertsStore } from './alerts-store.js';
 export { checkAlertsEnv, type AlertsEnvCheck } from './alerts-env.js';
 export { makeAlertsReader } from './alerts-read.js';
+export { recordHistory, type HistoryWriteOpts, type HistoryWriteResult } from './history-write.js';
+export { fixtureAddresses } from './fixtures.js';

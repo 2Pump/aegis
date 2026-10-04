@@ -46,6 +46,33 @@ export function loadBook(address: `0x${string}`): Promise<BookRead> {
   return readBook(address, { client: inkClient, nado: nadoConfig, nadoDiscovery });
 }
 
+/** The wallet as it was at a past block (both venues, same block). Needs an RPC that still holds that state. */
+export function loadBookAt(address: `0x${string}`, block: number): Promise<BookRead> {
+  return readBook(address, { client: inkClient, nado: nadoConfig, nadoDiscovery }, BigInt(block));
+}
+
 export function loadHead(): Promise<Result<ChainHead>> {
   return readHead(inkClient);
+}
+
+/** The first block at or after a time (Ink makes ~1 block/s): binary search on block timestamps, ~26 reads. */
+export async function blockAtTime(ms: number): Promise<{ block: number; at: number }> {
+  const head = await inkClient.getBlock();
+  const headT = Number(head.timestamp) * 1000;
+  if (ms >= headT) return { block: Number(head.number), at: headT };
+  let lo = 1n;
+  let hi = head.number;
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    const b = await inkClient.getBlock({ blockNumber: mid });
+    if (Number(b.timestamp) * 1000 < ms) lo = mid + 1n;
+    else hi = mid;
+  }
+  const b = await inkClient.getBlock({ blockNumber: lo });
+  return { block: Number(lo), at: Number(b.timestamp) * 1000 };
+}
+
+export async function blockTime(block: number): Promise<number> {
+  const b = await inkClient.getBlock({ blockNumber: BigInt(block) });
+  return Number(b.timestamp) * 1000;
 }

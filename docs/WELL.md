@@ -221,3 +221,14 @@ The top of `/hull/:address` is a state plate, read like a lab spectral plate (`a
 - It reads the pose the page already has (no reclassification), adds nothing to census.json, and shows no balances, health factor or liquidation price. Those stay in 02, 04 and 05.
 - Desktop: full width, ~288 px tall. Phone: sigil on top, levels under it, the rail to their right. Reduced motion: the dot doesn't breathe.
 - Browser test: "wallet plate: one line per type that fired…".
+
+## Loading states (2026-10-04)
+
+The well never presents a loading or failed scan as data:
+- **Loading:** `LOADING LATEST SCAN…` in the status strip, and a placeholder box the same height as the well. No counts, no "no wallets", and the size-floor buttons and live toggle are disabled. The live badge says `WAITING FOR SCAN`, not `PAUSED`.
+- **Failed with nothing loaded:** `SCAN UNAVAILABLE` (red banner and placeholder). Wallet pages still work.
+- **A later refresh failed:** the last scan stays, labelled `LAST GOOD SCAN` with the error and the scan's age.
+- **Stale:** a scan older than 3 h shows `STALE SCAN`.
+- **"No wallets yet"** appears only when a scan loaded and really holds none.
+- `PAUSED` appears only when the viewer paused live updates, or as `PAUSED · TAB HIDDEN`.
+Logic: `apps/web/src/lib/wellState.ts` (unit-tested).

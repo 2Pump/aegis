@@ -20,6 +20,8 @@ The site uses plain words. The code, `census.json`, share links and the rules ke
 | Stress test | `StressTest` | A wallet page's own scenarios: the moves that take it to Watch, Near liquidation, Liquidatable. |
 | Checks | calibration | Whether readings were matched against the official apps. |
 | Test wallet | fixture | A made-up example account. |
+| Intel | intel | History (Flight Recorder) now; Liquidations, Oracles, Changes and Carry are later releases, labelled NOT BUILT. |
+| Flight Recorder | — | What the hourly scan recorded over time: risk, type and size range per wallet, counts for all of Ink. Balance-free. docs/HISTORY.md |
 | Alerts | watch | Telegram alerts: built and tested, not live yet (docs/ALERTS.md). |
 | Data log | sensor log | On-page diagnostics. |
 | Couldn't read | DARK | A data source failed; the last good reading is kept. |

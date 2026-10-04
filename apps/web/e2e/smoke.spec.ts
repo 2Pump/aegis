@@ -132,10 +132,10 @@ test('wallet plate: one line per type that fired, the dot on the main type, risk
   await expect(page.getByTestId('fixture-banner')).toBeVisible();
 });
 
-test('Pressure Map: in the nav between Well and Scan; locked with the well until verified (no numbers shown)', async ({ page }) => {
+test('Pressure Map: in the nav after Well (then Intel); locked with the well until verified (no numbers shown)', async ({ page }) => {
   await page.goto('/');
   const links = await page.locator('nav.nav a').allInnerTexts();
-  expect(links.map((l) => l.trim().toUpperCase()).slice(0, 3)).toEqual(['WELL', 'PRESSURE', 'SCAN']);
+  expect(links.map((l) => l.trim().toUpperCase()).slice(0, 4)).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN']);
   await page.getByRole('link', { name: 'Pressure' }).click();
   await expect(page).toHaveURL(/\/pressure$/);
   await expect(page.getByTestId('pressure-locked')).toBeVisible();
@@ -173,4 +173,30 @@ test('Checks: versions in force are stated; the automatic-checks panel says when
   await expect(auto).toBeVisible();
   await expect(auto.getByText(/No automatic check has run yet|Couldn't load the check log/)).toBeVisible();
   await expect(auto.getByText('CURRENT', { exact: true })).toHaveCount(0);
+});
+
+test('INTEL: in the nav between Pressure and Scan; later sections say NOT BUILT, nothing shown in their place', async ({ page }) => {
+  await page.goto('/');
+  const links = await page.locator('nav[aria-label="Primary"] a').allTextContents();
+  expect(links.map((s) => s.trim().toUpperCase())).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
+  await page.goto('/intel');
+  await expect(page.getByTestId('intel-tabs')).toBeVisible();
+  for (const t of ['liquidations', 'oracles', 'changes', 'carry']) {
+    await page.getByTestId(`intel-tab-${t}`).click();
+    await expect(page.getByTestId('intel-not-built')).toContainText('NOT BUILT YET');
+  }
+});
+
+test('wallet page: a HISTORY section that never invents history (no recording → says so)', async ({ page }) => {
+  await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
+  const h = page.getByTestId('wallet-history');
+  await expect(h).toBeVisible({ timeout: 30_000 });
+  await expect(h.getByText(/NOT RECORDING YET|couldn't be loaded|Recorded live by the hourly scan since/)).toBeVisible();
+  await expect(h.getByTestId('history-past')).toBeVisible();
+  await expect(h.getByTestId('history-not-recorded')).toBeVisible();
+});
+
+test('test wallets never get a history section', async ({ page }) => {
+  await page.goto('/fixture/carry');
+  await expect(page.getByTestId('wallet-history')).toHaveCount(0);
 });

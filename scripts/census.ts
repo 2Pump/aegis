@@ -29,7 +29,7 @@ import {
   readTydro,
 } from '@aegis/ink-io';
 import { classify } from '@aegis/pose';
-import { blobStore, fileStore, runCensus } from '@aegis/census/node';
+import { blobStore, fileStore, fixtureAddresses, runCensus } from '@aegis/census/node';
 
 const args = process.argv.slice(2);
 const flag = (k: string) => {
@@ -110,6 +110,8 @@ async function main() {
     sinceBlocks: flag('--since-blocks') ? Number(flag('--since-blocks')) : undefined,
     // several nodes can be a few blocks apart: stay a little further behind the tip so every node has every block we scan
     confirmations: rpcs.length > 1 ? 12 : 2,
+    // the Flight Recorder never records AEGIS's synthetic test wallets
+    exclude: fixtureAddresses(root),
     log,
   });
   log(`mix ${Object.entries(snap.mix).map(([k, v]) => `${k}:${v}`).join(' ')}`);
