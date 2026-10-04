@@ -15,6 +15,9 @@ The site uses plain words. The code, `census.json`, share links and the rules ke
 | Hourly update / full re-read | incremental / full sweep | The two kinds of scan. |
 | Live updates | live layer (`LiveEngine`) | Your browser watching new blocks between scans. |
 | Near liquidation (list) | wounded tape | Wallets near liquidation, newest first. Not a hit list. |
+| Pressure Map | pressure map (`pressure.json`, `scenario.ts`) | Counts of wallets that would move toward liquidation if prices moved. A simulation, not a prediction. |
+| Ink stress level | `stressLevel()` (`stress-1.0.0`) | CALM / ELEVATED / HIGH / CRITICAL from three published shares of wallets ≥ $1,000 with debt or perps. |
+| Stress test | `StressTest` | A wallet page's own scenarios: the moves that take it to Watch, Near liquidation, Liquidatable. |
 | Checks | calibration | Whether readings were matched against the official apps. |
 | Test wallet | fixture | A made-up example account. |
 | Alerts | watch | Planned alerts; not built. |

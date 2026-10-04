@@ -7,6 +7,7 @@ import { installStaleBuildReload } from './lib/staleBuild';
 import { Home } from './pages/Home';
 import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
+import { PressurePage } from './pages/Pressure';
 import { CensusPage, NotFound, WatchPage } from './pages/Static';
 import './styles.css';
 
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       // the rules are the drawer now; old links to /rules open it over the well
       { path: '/rules', element: <Navigate to="/?rules=1" replace /> },
       { path: '/calibration', element: <CalibrationPage /> },
+      { path: '/pressure', element: <PressurePage /> },
       { path: '/census', element: <CensusPage /> },
       { path: '/watch', element: <WatchPage /> },
       { path: '*', element: <NotFound /> },

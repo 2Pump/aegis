@@ -7,6 +7,7 @@ import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
 import { Lamp, Panel, TEMP_RAIL, Usd } from './bits';
 import { SensorLog } from './SensorLog';
 import { WalletPlate } from './WalletPlate';
+import { StressTest } from './StressTest';
 import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
 import { setMyWallet, useMyWallet } from '../lib/myWallet';
 
@@ -173,7 +174,10 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         )}
       </Panel>
 
-      {/* 7 SHARE */}
+      {/* 7 STRESS TEST */}
+      <StressTest book={book} pose={pose} idx="07" />
+
+      {/* 8 SHARE */}
       <Share book={book} pose={pose} checksum={checksum} />
 
       <Panel idx="··" title="Data log" rail="var(--ink-faint)" right={<span className="mono">on-page diagnostics</span>}>
@@ -336,7 +340,7 @@ function Share({ book, pose, checksum }: { book: Book; pose: Pose; checksum: str
     setTimeout(() => setCopied(null), 2000);
   };
   return (
-    <Panel idx="07" title="Share" rail="var(--amber)">
+    <Panel idx="08" title="Share" rail="var(--amber)">
       <div className="stack" style={{ gap: 8 }}>
         <pre className="log" style={{ maxHeight: 'none', margin: 0 }} data-testid="share-text">{text}</pre>
         <div className="row">

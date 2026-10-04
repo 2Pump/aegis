@@ -105,7 +105,7 @@ export async function discoverSubaccounts(address: string, cfg: NadoConfig): Pro
 /* ─────────────── subaccount_info parse (pure; tested against the docs payload) ─────────────── */
 
 interface RawHealth { assets: string; liabilities: string; health: string }
-interface RawProduct { product_id: number; oracle_price_x18: string }
+interface RawProduct { product_id: number; oracle_price_x18: string; risk?: { long_weight_maintenance_x18?: string; short_weight_maintenance_x18?: string } }
 interface RawInfo {
   subaccount: string;
   exists: boolean;
@@ -137,7 +137,19 @@ export function parseSubaccountInfo(json: unknown, symbols: SymbolMap, priceSour
     return Err('PARSE_FAIL', 'subaccount_info: missing balances/healths arrays');
   }
   const priceOf = new Map<number, number>();
-  for (const p of [...(d.spot_products ?? []), ...(d.perp_products ?? [])]) priceOf.set(p.product_id, x18(p.oracle_price_x18));
+  const weightOf = new Map<number, { long: number; short: number }>();
+  for (const p of [...(d.spot_products ?? []), ...(d.perp_products ?? [])]) {
+    priceOf.set(p.product_id, x18(p.oracle_price_x18));
+    const lw = p.risk?.long_weight_maintenance_x18, sw = p.risk?.short_weight_maintenance_x18;
+    if (lw !== undefined && sw !== undefined) {
+      const w = { long: x18(lw), short: x18(sw) };
+      if (Number.isFinite(w.long) && Number.isFinite(w.short) && w.long > 0 && w.short > 0) weightOf.set(p.product_id, w);
+    }
+  }
+  const wFor = (id: number, signed: number) => {
+    const w = weightOf.get(id);
+    return w ? (signed >= 0 ? w.long : w.short) : undefined;
+  };
 
   const spots: NadoSpot[] = [];
   for (const b of d.spot_balances) {
@@ -148,7 +160,7 @@ export function parseSubaccountInfo(json: unknown, symbols: SymbolMap, priceSour
     if (price === undefined || !Number.isFinite(price)) return Err('PARSE_FAIL', `spot ${b.product_id}: no oracle price in response`);
     const symbol = symbols.get(b.product_id)?.symbol ?? `SPOT#${b.product_id}`;
     const { family, assetClass } = familyOf(symbol);
-    spots.push({ productId: b.product_id, subaccount: d.subaccount, symbol, family, assetClass, amount, usd: amount * price, priceUsd: price, priceSource });
+    spots.push({ productId: b.product_id, subaccount: d.subaccount, symbol, family, assetClass, amount, usd: amount * price, priceUsd: price, priceSource, maintWeight: wFor(b.product_id, amount) });
   }
 
   const perps: NadoPerp[] = [];
@@ -164,7 +176,7 @@ export function parseSubaccountInfo(json: unknown, symbols: SymbolMap, priceSour
     perps.push({
       productId: b.product_id, subaccount: d.subaccount, symbol, family, assetClass,
       sizeBase: size, notionalUsd: size * price, priceUsd: price, priceSource,
-      vQuoteUsd: vq, unsettledUsd: vq + size * price,
+      vQuoteUsd: vq, unsettledUsd: vq + size * price, maintWeight: wFor(b.product_id, size),
     });
   }
 
@@ -234,6 +246,7 @@ export function aggregate(subs: ParsedSub[], notes: string[]): NadoBook {
     unweighted,
     funding,
     notes,
+    subHealth: live.map((s) => ({ subaccount: s.subaccount, maintenance: s.maintenance })),
   };
 }
 

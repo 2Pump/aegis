@@ -27,9 +27,12 @@ interface ChainInfo {
   healths: readonly ChainHealth[];
   spotBalances: readonly { productId: number; balance: { amount: bigint } }[];
   perpBalances: readonly { productId: number; balance: { amount: bigint; vQuoteBalance: bigint } }[];
-  spotProducts: readonly { productId: number; oraclePriceX18: bigint }[];
-  perpProducts: readonly { productId: number; oraclePriceX18: bigint }[];
+  spotProducts: readonly { productId: number; oraclePriceX18: bigint; risk?: ChainRisk }[];
+  perpProducts: readonly { productId: number; oraclePriceX18: bigint; risk?: ChainRisk }[];
 }
+interface ChainRisk { longWeightMaintenanceX18: bigint; shortWeightMaintenanceX18: bigint }
+const risk = (r: ChainRisk | undefined) =>
+  r ? { long_weight_maintenance_x18: s(r.longWeightMaintenanceX18), short_weight_maintenance_x18: s(r.shortWeightMaintenanceX18) } : undefined;
 
 /** viem struct → the same JSON shape the gateway returns, so one tested parser serves both. */
 export function chainInfoToGatewayShape(info: ChainInfo): unknown {
@@ -44,8 +47,8 @@ export function chainInfoToGatewayShape(info: ChainInfo): unknown {
         product_id: b.productId,
         balance: { amount: s(b.balance.amount), v_quote_balance: s(b.balance.vQuoteBalance) },
       })),
-      spot_products: info.spotProducts.map((p) => ({ product_id: p.productId, oracle_price_x18: s(p.oraclePriceX18) })),
-      perp_products: info.perpProducts.map((p) => ({ product_id: p.productId, oracle_price_x18: s(p.oraclePriceX18) })),
+      spot_products: info.spotProducts.map((p) => ({ product_id: p.productId, oracle_price_x18: s(p.oraclePriceX18), risk: risk(p.risk) })),
+      perp_products: info.perpProducts.map((p) => ({ product_id: p.productId, oracle_price_x18: s(p.oraclePriceX18), risk: risk(p.risk) })),
     },
   };
 }

@@ -52,3 +52,17 @@ export function verificationText(): string {
   });
   return parts.join(' · ');
 }
+
+/** A check older than this is shown as STALE on the Checks page (the venues and the rules move on). */
+export const PROOF_STALE_DAYS = 30;
+
+export function proofAgeDays(p: Proof, nowMs = Date.now()): number | null {
+  const t = Date.parse(p.at);
+  return Number.isFinite(t) ? (nowMs - t) / 86_400_000 : null;
+}
+
+/** How a stored check is shown: under the rules it RAN with, flagged when older than today's rules or stale. */
+export function proofStatus(p: Proof, currentRules: string, nowMs = Date.now()): { ranUnder: string; olderRules: boolean; ageDays: number | null; stale: boolean } {
+  const ageDays = proofAgeDays(p, nowMs);
+  return { ranUnder: p.rulesVersion, olderRules: p.rulesVersion !== currentRules, ageDays, stale: ageDays === null || ageDays > PROOF_STALE_DAYS };
+}

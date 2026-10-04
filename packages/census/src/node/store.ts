@@ -5,12 +5,13 @@ import { dirname, join } from 'node:path';
  * Where the census lives between runs.
  *  - file: a folder (default apps/web/public/census) — for local runs; `pnpm dev` then serves it at /census/census.json
  *  - blob: Vercel Blob (public URLs) — for the hourly GitHub Action; the site fetches the public URL
- * Two objects: census.json (what the site draws) and known.json (discovery cursors + address book for the job).
+ * Three objects: census.json (what the site draws), known.json (discovery cursors + address book for the job) and
+ * pressure.json (Pressure Map aggregates, written by full sweeps only).
  */
 export interface CensusStore {
   describe: string;
-  get(name: 'census.json' | 'known.json'): Promise<unknown | null>;
-  put(name: 'census.json' | 'known.json', body: unknown): Promise<string>;
+  get(name: 'census.json' | 'known.json' | 'pressure.json'): Promise<unknown | null>;
+  put(name: 'census.json' | 'known.json' | 'pressure.json', body: unknown): Promise<string>;
 }
 
 export function fileStore(dir: string): CensusStore {

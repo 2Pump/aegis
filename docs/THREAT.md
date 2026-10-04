@@ -28,6 +28,13 @@
 - `robots.txt` disallows `/hull/` so search engines don't build an index of plates.
 - Recent addresses live in `sessionStorage` of the viewer's own tab only.
 
+- **Pressure Map (2026-10-03):**
+  - `pressure.json` holds counts only: no addresses, balances, health factors or per-wallet thresholds (tested).
+  - Any group of fewer than 5 wallets has its moves rounded up to 10%, so a lone large wallet's liquidation point can't be read off the chart.
+  - Nothing ranks wallets by how close they are to liquidation.
+  - The share text carries counts and labels only (tested).
+  - A wallet page's stress test runs in the viewer's browser on that wallet's reading. It's the same data the page already shows, and it's never published.
+
 ## C. How we get rate-limited
 
 - Nado: 2400 weight/min per IP. One hull read = symbols (2, cached 10 min) + archive subaccounts (2) + subaccount_info (2 × subaccounts, cap 8).

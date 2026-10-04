@@ -78,6 +78,8 @@ export interface TydroBook {
 export interface NadoSpot extends Leg {
   productId: number;
   subaccount: string;
+  /** Nado maintenance risk weight for this balance's side (long weight if amount > 0, short weight if < 0). From FQuerier; absent on old fixtures. Used only by the scenario engine. */
+  maintWeight?: number;
 }
 
 export interface NadoPerp {
@@ -96,6 +98,8 @@ export interface NadoPerp {
   vQuoteUsd: number;
   /** vQuote + sizeBase × price (unsettled PnL, before funding settle) */
   unsettledUsd: number;
+  /** Nado maintenance risk weight for this position's side. From FQuerier; absent on old fixtures. Used only by the scenario engine. */
+  maintWeight?: number;
 }
 
 export interface HealthTriple {
@@ -124,6 +128,8 @@ export interface NadoBook {
   unweighted: HealthTriple | null;
   funding: FundingSide[];
   notes: string[];
+  /** every live subaccount's own maintenance triple (isolated positions are liquidated on their own). Used only by the scenario engine. */
+  subHealth?: Array<{ subaccount: string; maintenance: HealthTriple | null }>;
 }
 
 export type Sensor<T> =

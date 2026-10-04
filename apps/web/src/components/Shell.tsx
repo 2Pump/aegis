@@ -49,6 +49,7 @@ export function Shell() {
         </div>
         <nav className="nav" aria-label="Primary">
           <NavLink to="/" end>Well</NavLink>
+          <NavLink to="/pressure">Pressure</NavLink>
           <NavLink to="/census">Scan</NavLink>
           <NavLink to="/watch">Alerts</NavLink>
           <NavLink to="/calibration">Checks</NavLink>

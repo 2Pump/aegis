@@ -174,3 +174,25 @@ export function decodeSnapshot(json: unknown): { snap: CensusSnapshot; ships: Ce
 }
 export { CoverageAcc, buildCoverage, coveragePct, coverageSummary, publicCoverage, sharePct, type Coverage, type CoverageLine, type CoveragePublic, type ProtocolTotals } from './coverage.js';
 export { LiveEngine, type LiveStats, type LiveChange, type LiveOpts } from './live.js';
+export {
+  PressureAcc,
+  queryPressure,
+  pressureCurve,
+  reachedBy,
+  clampQuery,
+  stressLevel,
+  shareText,
+  STRESS,
+  MATERIAL,
+  MATERIAL_LABEL,
+  MAX_PCT,
+  PRIVACY_MIN_CELL,
+  PRESSURE_VERSION,
+  type PressureSnapshot,
+  type PressureQuery,
+  type PressureResult,
+  type StressReading,
+  type StressLevel,
+  type Material,
+  type Sign,
+} from './pressure.js';

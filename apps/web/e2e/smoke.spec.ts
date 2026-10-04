@@ -131,3 +131,28 @@ test('wallet plate: one line per type that fired, the dot on the main type, risk
   await expect(page.getByTestId('plate-risk-dot')).toHaveAttribute('data-stop', 'NOMINAL');
   await expect(page.getByTestId('fixture-banner')).toBeVisible();
 });
+
+test('Pressure Map: in the nav between Well and Scan; locked with the well until verified (no numbers shown)', async ({ page }) => {
+  await page.goto('/');
+  const links = await page.locator('nav.nav a').allInnerTexts();
+  expect(links.map((l) => l.trim().toUpperCase()).slice(0, 3)).toEqual(['WELL', 'PRESSURE', 'SCAN']);
+  await page.getByRole('link', { name: 'Pressure' }).click();
+  await expect(page).toHaveURL(/\/pressure$/);
+  await expect(page.getByTestId('pressure-locked')).toBeVisible();
+  await expect(page.locator('footer, .footer').first()).toContainText('AEGIS is a camera. It cannot move your funds. Classifications can be wrong.');
+});
+
+test('stress test on a wallet page: thresholds per direction, a custom scenario, no network, nothing to stress when nothing can be liquidated', async ({ page }) => {
+  await page.goto('/fixture/naked');
+  const st = page.getByTestId('stress-test');
+  await expect(st).toBeVisible();
+  await expect(page.getByTestId('stress-lead')).toContainText(/approximately \d+% BTC decline/);
+  await expect(page.getByTestId('stress-rows').locator('tbody tr').first()).toContainText('BTC falls');
+  await st.locator('select').selectOption('BTC');
+  await st.locator('input[type="number"]').fill('-40');
+  await expect(page.getByTestId('stress-custom')).toHaveText(/liquidatable/i);
+  await page.goto('/fixture/empty');
+  await expect(page.getByTestId('stress-none')).toBeVisible();
+  await page.goto('/fixture/dark');
+  await expect(page.getByTestId('stress-confidence')).toContainText("can't simulate");
+});

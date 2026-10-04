@@ -105,22 +105,28 @@ function buildFamilies(t: TydroBook | null, n: NadoBook | null): Map<string, Acc
   return m;
 }
 
-/* ────────────────────────────── the classifier ────────────────────────────── */
+/* ────────────────────────────── risk lines (shared by classify and the scenario engine) ────────────────────────────── */
 
-export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
-  const reasons: string[] = [];
-  const darkReasons: string[] = [];
+interface RiskLines {
+  hf: number | null;
+  buf: number | null;
+  liq: number | null;
+  corr: string | null;
+  nCorr: string | null;
+  woundReasons: string[];
+  woundTydro: boolean;
+  woundNado: boolean;
+  wounded: boolean;
+  elevated: boolean;
+}
 
-  const t = book.tydro.status === 'OK' ? book.tydro.data : null;
-  const n = book.nado.status === 'OK' ? book.nado.data : null;
-  if (book.tydro.status === 'DARK') darkReasons.push(`TYDRO_SENSOR: ${book.tydro.code} — ${book.tydro.message}`);
-  if (book.nado.status === 'DARK') darkReasons.push(`NADO_SENSOR: ${book.nado.code} — ${book.nado.message}`);
-
+/** WOUNDED and ELEVATED, evaluated on whatever sensors ARE readable. The ONLY place these lines are applied. */
+function riskLines(t: TydroBook | null, n: NadoBook | null, cfg: RulesConfig): RiskLines {
   const hf = t ? t.hf : null;
   const buf = nadoBuffer(n);
   const liq = tydroLiqDistance(hf);
 
-  /* WOUNDED — evaluated on whatever sensors ARE readable. A wound seen on one venue is real. */
+  // A wound seen on one venue is real.
   const corr = correlatedLoopFamily(t, cfg.DUST_USD);
   const woundReasons: string[] = [];
   let woundTydro = false;
@@ -152,6 +158,41 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
     );
   }
   const wounded = woundReasons.length > 0;
+  const elevated = (hf !== null && hf < (corr !== null ? cfg.ELEVATED_HF_CORRELATED : cfg.ELEVATED_HF)) || (buf !== null && buf < (nCorr !== null ? cfg.NADO_BUFFER_WARN_CORRELATED : cfg.NADO_BUFFER_WARN));
+  return { hf, buf, liq, corr, nCorr, woundReasons, woundTydro, woundNado, wounded, elevated };
+}
+
+/**
+ * The risk the classifier would report (hullTemp), without the position-type work. Same lines, same order of checks
+ * (DARK → EMPTY → WOUNDED → ELEVATED) — a test pins riskTemp(book) === classify(book).hullTemp.
+ */
+export function riskTemp(book: Book, cfg: RulesConfig = RULES): HullTemp {
+  const t = book.tydro.status === 'OK' ? book.tydro.data : null;
+  const n = book.nado.status === 'OK' ? book.nado.data : null;
+  const r = riskLines(t, n, cfg);
+  if (book.tydro.status === 'DARK' || book.nado.status === 'DARK') return r.wounded ? 'CRITICAL' : 'UNKNOWN';
+  let gross = 0;
+  if (n) {
+    for (const p of n.perps) gross += Math.abs(p.notionalUsd);
+    for (const x of n.spots) gross += Math.abs(x.usd);
+  }
+  if (t) for (const x of [...t.supplies, ...t.debts]) gross += Math.abs(x.usd);
+  if (gross < cfg.DUST_USD) return 'NOMINAL';
+  return r.wounded ? 'CRITICAL' : r.elevated ? 'ELEVATED' : 'NOMINAL';
+}
+
+/* ────────────────────────────── the classifier ────────────────────────────── */
+
+export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
+  const reasons: string[] = [];
+  const darkReasons: string[] = [];
+
+  const t = book.tydro.status === 'OK' ? book.tydro.data : null;
+  const n = book.nado.status === 'OK' ? book.nado.data : null;
+  if (book.tydro.status === 'DARK') darkReasons.push(`TYDRO_SENSOR: ${book.tydro.code} — ${book.tydro.message}`);
+  if (book.nado.status === 'DARK') darkReasons.push(`NADO_SENSOR: ${book.nado.code} — ${book.nado.message}`);
+
+  const { hf, buf, liq, corr, nCorr, woundReasons, woundTydro, woundNado, wounded, elevated } = riskLines(t, n, cfg);
 
   /* metrics */
   const fam = buildFamilies(t, n);
@@ -286,9 +327,7 @@ export function classify(book: Book, cfg: RulesConfig = RULES): Pose {
   for (const tag of PRIMARY_PRIORITY) if (fired.has(tag) && tag !== primary) tags.push(tag);
   if (!primary) reasons.push('NO RULE FIRED · book is readable but matches no published pose');
 
-  let hullTemp: HullTemp = 'NOMINAL';
-  if (wounded) hullTemp = 'CRITICAL';
-  else if ((hf !== null && hf < (corr !== null ? cfg.ELEVATED_HF_CORRELATED : cfg.ELEVATED_HF)) || (buf !== null && buf < (nCorr !== null ? cfg.NADO_BUFFER_WARN_CORRELATED : cfg.NADO_BUFFER_WARN))) hullTemp = 'ELEVATED';
+  const hullTemp: HullTemp = wounded ? 'CRITICAL' : elevated ? 'ELEVATED' : 'NOMINAL';
 
   const residualDeltaUsd = sum(families.map((f) => f.residualUsd));
   const exposure = sum(families.map((f) => Math.abs(f.S) + f.L + f.P));

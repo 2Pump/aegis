@@ -22,10 +22,12 @@ import {
   type FetchLike,
 } from '@aegis/ink-io';
 import { RULES, classify } from '@aegis/pose';
+import { shipSizeUsd, sizeBand } from '@aegis/glyphs';
 import type { PublicClient } from 'viem';
 import {
   CENSUS_VERSION,
   CoverageAcc,
+  PressureAcc,
   buildCoverage,
   coveragePct,
   coverageSummary,
@@ -468,6 +470,9 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   const nadoComplete = state.nado.history.done && state.nado.accountsScannedTo >= head;
   // coverage is only meaningful when every known wallet is read at one block: a sweep that started this run
   const cov = sweep && sweep.runs === 1 ? new CoverageAcc() : null;
+  // Pressure Map: scenario thresholds for every wallet read at this one block (aggregated; nothing per wallet is kept)
+  const pacc = cov ? new PressureAcc() : null;
+  let pressureMs = 0;
   let budgetStopped = false;
   const SLICE = 1500;
   for (let i = 0; i < toRead.length; i += SLICE) {
@@ -497,6 +502,11 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       if (book.tydro.status === 'DARK') noteDark('TYDRO', book.tydro.message);
       if (book.nado.status === 'DARK') noteDark('NADO', book.nado.message);
       const pose = classify(book);
+      if (pacc) {
+        const tp = Date.now();
+        pacc.add(book, pose, sizeBand(shipSizeUsd(pose)));
+        pressureMs += Date.now() - tp;
+      }
       const prev = prevShips.get(a);
       if (pose.primary === 'DARK' && prev && prev.primary !== 'DARK') {
         darkNow++; // transient sensor failure: keep the last good reading (its readBlock shows its age)
@@ -671,6 +681,11 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
     for (const [k, n] of [...darkWhy.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6)) log(`  ${n}× ${k}`);
   }
   await o.store.put('known.json', state);
+  if (pacc && sweptAll) {
+    const ps = pacc.toSnapshot({ block: head, at: new Date().toISOString(), rulesVersion: RULES.RULES_VERSION });
+    await o.store.put('pressure.json', ps);
+    log(`pressure map: ${ps.population.exposed} wallets with debt or perps simulated (${ps.population.approximate} approximate, ${ps.population.unsupported} unreadable) · ${Object.keys(ps.hist).length} cells (${ps.coarse.length} rounded for privacy) · ${Math.round(pressureMs / 1000)}s`);
+  }
   const url = await o.store.put('census.json', snap);
   log(`published ${counts.drawn} ships (${counts.known} known, ${counts.empty} empty, ${counts.wounded} wounded) → ${url} in ${Math.round((Date.now() - t0) / 1000)}s`);
   return snap;

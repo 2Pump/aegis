@@ -214,6 +214,8 @@ The trade-history scan still completes once, so the old 6-hour gaps are covered 
 
 The job log shows the coverage line only on full sweeps; the other runs republish the last full sweep's shares.
 
+**Pressure Map (since 2026-10-03).** Every one-block full sweep also writes `pressure.json` (aggregates only; see docs/PRESSURE.md). The log line starts with `pressure map:`.
+
 **Coverage measures itself (since 2026-10-03).** Every run now has a 115-minute budget and a 130-minute job limit.
 - **Hourly runs** still finish in about 5 minutes.
 - **The automatic full sweep, every 8 hours** (weekly before 2026-10-03) reads all ~65,000 wallets in one run, about 45 minutes. That's enough to measure coverage, run the NLP and protocol-account lines and the discovery check, and publish the shares. No hand-started runs are needed. Timer runs that arrive during it wait, then skip because the census is fresh.

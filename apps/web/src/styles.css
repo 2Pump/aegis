@@ -64,9 +64,9 @@ code { font-size: 0.92em; color: var(--iron); }
 .nav .pill-btn { margin-left: 10px; }
 /* phones: the nav takes its own full-width row under the logo instead of squeezing into a column beside it */
 @media (max-width: 560px) {
-  .nav { flex-basis: 100%; }
-  .nav a { padding: 9px 10px; }
-  .nav .pill-btn { margin-left: auto; }
+  .nav { flex-basis: 100%; flex-wrap: nowrap; }
+  .nav a { padding: 9px 7px; letter-spacing: 0.08em; font-size: 10px; }
+  .nav .pill-btn { margin-left: auto; padding: 8px 8px; letter-spacing: 0.08em; font-size: 10px; }
 }
 
 /* stamped buttons (class name kept for compatibility — no pills anywhere) */
@@ -407,3 +407,71 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 .colony.compact .colony-notseen { font-size: 19px; letter-spacing: 0.06em; }
 .colony.compact .colony-own-lbl { font-size: 19px; letter-spacing: 0.04em; }
 .colony.compact .colony-morsel-lbl { font-size: 20px; stroke-width: 5px; }
+
+/* ───────── PRESSURE MAP (/pressure) ───────── */
+.pm-intro { margin: -4px 0 0; font-size: 13px; max-width: 780px; }
+.pm-stamp { font-size: 10.5px; letter-spacing: 0.04em; line-height: 1.6; }
+.pm-stress-row { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.pm-level { font: 600 34px/1 var(--mono); letter-spacing: 0.14em; min-width: 220px; }
+.pm-why { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; flex: 1 1 320px; }
+.pm-conf { margin-top: 10px; }
+.pm-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pm-presets .sq-btn.on, .pm-seg .sq-btn.on { background: var(--cyan); color: var(--void); border-color: var(--cyan); }
+.pm-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px 16px; align-items: end; }
+.pm-controls label, .pm-seg { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pm-seg > div { display: flex; }
+.pm-seg .sq-btn + .sq-btn { margin-left: -1px; }
+.pm-cap, .st-cap { font: 500 9.5px/1.3 var(--mono); letter-spacing: 0.2em; color: var(--ink-faint); text-transform: uppercase; }
+.pm-controls select, .st-custom select, .st-custom input {
+  background: #020406; color: var(--ink); border: 1px solid var(--hair); padding: 7px 8px; font: 12px var(--mono); min-width: 0;
+}
+.pm-controls input[type='range'] { width: 100%; accent-color: var(--red); }
+.pm-note, .pm-sub { font-size: 12px; margin: 8px 0 6px; }
+.pm-big { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.pm-big > div:first-child { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pm-big b { font: 600 34px/1 var(--mono); color: var(--red); }
+.pm-big .faint { font-size: 12px; }
+.pm-kv { font-size: 13px; grid-template-columns: minmax(0, 1fr) auto; }
+.pm-kv dd { text-align: right; white-space: nowrap; }
+.pm-chart { width: 100%; height: auto; display: block; }
+.pm-axis { font: 10px var(--mono); fill: var(--ink-faint); }
+.pm-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; }
+.pm-legend i { display: inline-block; width: 12px; height: 3px; margin-right: 6px; vertical-align: middle; }
+.pm-table { margin-top: 10px; font-size: 12px; }
+.pm-table summary { cursor: pointer; color: var(--ink-dim); font: 11px var(--mono); }
+.pm-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.pm-bar {
+  width: 100%; display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 52px; align-items: center; gap: 10px;
+  background: transparent; border: 1px solid transparent; color: var(--ink); padding: 4px 6px; font: 12px var(--mono); text-align: left; cursor: pointer;
+}
+.pm-bar.static { cursor: default; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 52px 70px; }
+button.pm-bar:hover { border-color: var(--hair); }
+.pm-bar.on { border-color: rgba(255, 77, 77, 0.45); background: rgba(255, 77, 77, 0.06); }
+.pm-bar-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-bar-t { height: 6px; background: rgba(160, 175, 190, 0.08); position: relative; }
+.pm-bar-t i { position: absolute; inset: 0 auto 0 0; background: var(--red); opacity: 0.75; }
+.pm-bar b { text-align: right; }
+.pm-of { font-size: 11px; text-align: right; }
+.pm-share { white-space: pre-wrap; font-size: 11.5px; background: #020406; border: 1px solid var(--hair-2); padding: 10px; margin: 0 0 10px; color: var(--ink-dim); }
+.proof-old { color: var(--amber); font-weight: 500; }
+.proof-stale { color: var(--red); font-weight: 500; }
+@media (max-width: 520px) {
+  .pm-level { font-size: 26px; min-width: 0; }
+  .pm-big b { font-size: 28px; }
+  .pm-bar, .pm-bar.static { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr) 44px; }
+  .pm-bar .pm-of { display: none; }
+}
+
+/* ───────── STRESS TEST (wallet page, section 07) ───────── */
+.st-lead { margin: 12px 0; font-size: 14px; line-height: 1.55; }
+.st-note { margin-top: 10px; font-size: 12px; }
+.st-cap { margin: 14px 0 6px; }
+.st-presets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 16px; font-size: 12px; }
+.st-presets li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--hair-3); padding: 4px 0; }
+.st-state { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.st-state.NOMINAL { color: var(--cyan); }
+.st-state.ELEVATED { color: var(--amber); }
+.st-state.CRITICAL, .st-state.liq { color: var(--red); }
+.st-state.UNKNOWN { color: var(--ink-dim); }
+.st-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.st-custom input { width: 80px; }
