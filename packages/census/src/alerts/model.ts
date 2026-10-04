@@ -76,6 +76,12 @@ export interface Chat {
   sentAt: number[];
   /** alerts held back by the rate limit since the last delivered message */
   held: number;
+  /** opted in to Ink-wide protocol alerts (oracle problems, protocol parameter changes) with /protocol on */
+  protocol?: boolean;
+  /** protocol events already delivered (ids, newest last, bounded) */
+  seenProtocol?: string[];
+  /** only protocol events from this time on (no backlog when someone opts in) */
+  protocolSince?: number;
 }
 
 /** Risk level used by alerts — the same ladder as the well and the Pressure Map. */

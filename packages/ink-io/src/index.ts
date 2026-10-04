@@ -54,3 +54,4 @@ export const READER_VERSION = 'ink-io-2026.10.04';
 /** Tydro: AaveOracle via the pool's price oracle · Nado: oracle prices read on-chain through FQuerier */
 export const PRICE_SOURCE_VERSION = 'tydro-aaveoracle+nado-fquerier-1';
 export { LIQ_TOPIC, LIQ_SOURCES, decodeLiquidations, scanLiquidations, type RawLiquidation } from './liquidations.js';
+export { PYTH, EIP1967_IMPL_SLOT, readOracleSnapshot, readProtocolParams, type OracleSnapshot, type AggregatorRead, type ParamRead, type ParamSnapshot } from './oracles.js';

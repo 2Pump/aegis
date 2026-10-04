@@ -47,6 +47,7 @@ import {
 import type { CensusStore } from './store.js';
 import { recordHistory } from './history-write.js';
 import { recordLiquidations, rescoreAccountability } from './ledger-write.js';
+import { recordChanges, recordOracles, rescoreForecasts } from './intel-write.js';
 import { appendForecast, forecastPath, type ForecastRecord } from '../ledger.js';
 
 /** Job state (known.json). Addresses only — public chain facts, no balances. */
@@ -122,6 +123,8 @@ export interface RunOpts {
   ledger?: boolean;
   /** time the ledger backfill may use per run. Default 8 minutes. */
   ledgerBudgetMs?: number;
+  /** Oracle Watch, Protocol Change Monitor, forecast scoring (Release 3). Default true. */
+  intel?: boolean;
 }
 
 /** Logs a progress line only when the percentage crosses a new 10% step. */
@@ -759,6 +762,21 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         log(`accountability: not updated this run: ${String(e).slice(0, 200)}`);
       }
     }
+
+    /* ── 7. Oracle Watch + Protocol Change Monitor + forecast scoring (Release 3) ── */
+    if (o.intel !== false) {
+      const io = { store: o.store, client, head, pressure: pressureSnap, log, scan: { paceMs: o.scanPaceMs, backoffBaseMs: o.scanBackoffMs } };
+      for (const [name, step] of [
+        ['oracles', () => recordOracles(io)],
+        ['changes', () => recordChanges(io)],
+      ] as const) {
+        try {
+          await step();
+        } catch (e) {
+          log(`${name}: not updated this run: ${String(e).slice(0, 200)}`);
+        }
+      }
+    }
     if (pressureSnap) {
       try {
         const L = state.coverage?.share.nadoOpenInterestLongs ?? null;
@@ -775,9 +793,16 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         const rec: ForecastRecord = { at: snap.generatedAt, block: head, v: { rules: RULES.RULES_VERSION, engine: pressureSnap.engine, stress: sr.version }, coverage: oi, population: pressureSnap.population.exposed, confidence: sr.confidence, scenarios };
         const m = snap.generatedAt.slice(0, 7);
         await o.store.put(forecastPath(m), appendForecast(await o.store.get(forecastPath(m)), m, rec));
-        log(`forecast: recorded ${scenarios.length} scenario results at block ${head} (scored once prices are recorded)`);
+        log(`forecast: recorded ${scenarios.length} scenario results at block ${head}`);
       } catch (e) {
         log(`forecast: not recorded this run: ${String(e).slice(0, 200)}`);
+      }
+    }
+    if (o.intel !== false) {
+      try {
+        await rescoreForecasts(o.store, Date.now(), log);
+      } catch (e) {
+        log(`forecasts: not scored this run: ${String(e).slice(0, 200)}`);
       }
     }
   }

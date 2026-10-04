@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
 
 test('home boots gated: no well, no fixture stars, camera footer', async ({ page }) => {
   await page.goto('/');
@@ -175,20 +176,78 @@ test('Checks: versions in force are stated; the automatic-checks panel says when
   await expect(auto.getByText('CURRENT', { exact: true })).toHaveCount(0);
 });
 
-test('INTEL: in the nav between Pressure and Scan; later sections say NOT BUILT, nothing shown in their place', async ({ page }) => {
+test('INTEL: in the nav between Pressure and Scan; CARRY says NOT BUILT; oracles and changes never invent data', async ({ page }) => {
   await page.goto('/');
   const links = await page.locator('nav[aria-label="Primary"] a').allTextContents();
   expect(links.map((s) => s.trim().toUpperCase())).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
   await page.goto('/intel');
   await expect(page.getByTestId('intel-tabs')).toBeVisible();
-  for (const t of ['oracles', 'changes', 'carry']) {
-    await page.getByTestId(`intel-tab-${t}`).click();
-    await expect(page.getByTestId('intel-not-built')).toContainText('NOT BUILT YET');
-  }
+  await page.getByTestId('intel-tab-carry').click();
+  await expect(page.getByTestId('intel-not-built')).toContainText('NOT BUILT YET');
+  // built in Release 3: with nothing recorded they say so — never a table of made-up prices
+  await page.getByTestId('intel-tab-oracles').click();
+  await expect(page.getByTestId('intel-oracles').getByText(/NOT RECORDING YET|Couldn't load/).first()).toBeVisible();
+  await expect(page.getByTestId('oracles-table')).toHaveCount(0);
+  await page.getByTestId('intel-tab-changes').click();
+  await expect(page.getByTestId('intel-changes').getByText(/NOT MONITORING YET|Couldn't load/).first()).toBeVisible();
+  await expect(page.getByTestId('intel-not-built')).toHaveCount(0);
   // the Liquidation Ledger is built; in a locked build it is locked with the well (no numbers)
   await page.getByTestId('intel-tab-liquidations').click();
   await expect(page.getByText(/Locked with the well|NOT RECORDING YET|Liquidation ledger/).first()).toBeVisible();
   await expect(page.getByTestId('intel-not-built')).toHaveCount(0);
+});
+
+/* Release 3 with recorded (synthetic) files served in place of the census store */
+const R3 = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), 'utf8');
+async function serveRelease3(page: Page) {
+  const month = new Date().toISOString().slice(0, 7);
+  const json = (body: string) => ({ status: 200, contentType: 'application/json', body });
+  await page.route('**/census/history/**', (route) => {
+    const u = new URL(route.request().url()).pathname;
+    if (u.endsWith('/history/index.json')) return route.fulfill(json(JSON.stringify({ v: 1, kind: 'aegis-history-index', version: 'hist-1.0.0', shards: 64, months: [], baselined: [], compacted: [], firstAt: null, firstBlock: null, changeMonths: [month] })));
+    if (u.endsWith('/history/oracle/latest.json')) return route.fulfill(json(R3('oracle-latest.json')));
+    if (u.endsWith(`/history/prices/${month}.json`)) return route.fulfill(json(R3('prices.json')));
+    if (u.endsWith('/history/params/latest.json')) return route.fulfill(json(R3('params-latest.json')));
+    if (u.endsWith(`/history/changes/${month}.json`)) return route.fulfill(json(R3('changes.json')));
+    if (u.endsWith('/history/forecast-score.json')) return route.fulfill(json(R3('forecast-score.json')));
+    return route.fulfill({ status: 404, body: '' });
+  });
+}
+
+test('ORACLES: every asset with its status; a depeg is an event; details show checks and modelled impact', async ({ page }) => {
+  await serveRelease3(page);
+  await page.goto('/intel?tab=oracles');
+  const t = page.getByTestId('oracles-table');
+  await expect(t).toBeVisible();
+  await expect(page.getByTestId('oracle-row-USDe')).toContainText('DEPEG');
+  await expect(page.getByTestId('oracles-events')).toContainText('USDe');
+  await page.getByTestId('oracle-row-USDe').getByRole('button').click();
+  // the modelled impact (wallet counts) shows only when the well is on; otherwise it says it is locked
+  await expect(page.getByText(/Approximate — not a prediction|locked with the well until the readings are verified \(no counts shown\)/).first()).toBeVisible();
+  await expect(page.getByTestId('oracles-history').locator('svg')).toBeVisible();
+  await expect(page.getByText(/guaranteed|AI-powered/i)).toHaveCount(0);
+});
+
+test('CHANGES: old → new between two blocks, transaction candidates, before/after labelled not isolated', async ({ page }) => {
+  await serveRelease3(page);
+  await page.goto('/intel?tab=changes');
+  const list = page.getByTestId('changes-list');
+  await expect(list).toBeVisible();
+  await expect(list).toContainText('8300');
+  await expect(list).toContainText('8250');
+  await expect(list).toContainText(/not isolated|locked with the well/);
+  await expect(list.locator('a[href*="/tx/"]')).toHaveCount(1);
+  await page.getByTestId('changes-filter').fill('implementation');
+  await expect(page.getByTestId('changes-params')).toContainText('Pool implementation');
+});
+
+test('Checks: Pressure forecasts are scored only where prices were recorded', async ({ page }) => {
+  await serveRelease3(page);
+  await page.goto('/calibration');
+  const f = page.getByTestId('forecast-track');
+  await expect(f).toBeVisible();
+  await expect(f.getByTestId('forecast-table')).toBeVisible();
+  await expect(f).toContainText(/neither hits nor misses/);
 });
 
 test('wallet page: a HISTORY section that never invents history (no recording → says so)', async ({ page }) => {

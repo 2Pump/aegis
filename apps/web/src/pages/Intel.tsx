@@ -1,7 +1,10 @@
 /**
  * INTEL — history and ecosystem intelligence. One top-level section, with tabs:
  *   HISTORY       ecosystem risk over time (Flight Recorder aggregates) — built
- *   LIQUIDATIONS, ORACLES, CHANGES, CARRY — later releases; shown as NOT BUILT, never as working
+ *   LIQUIDATIONS  the liquidation ledger (Release 2)
+ *   ORACLES       Oracle Watch (Release 3)
+ *   CHANGES       Protocol Change Monitor (Release 3)
+ *   CARRY         Release 4 — shown as NOT BUILT, never as working
  */
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -10,6 +13,8 @@ import { NO_TYPE_LABEL, TAG_LABEL } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { Panel } from '../components/bits';
 import { LiquidationsPanel } from '../components/Liquidations';
+import { OraclesPanel } from '../components/Oracles';
+import { ChangesPanel } from '../components/Changes';
 import { CountChart, RangePicker, RiskStrip, when } from '../components/HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useAggHistory, useHistoryIndex, type Range } from '../lib/history';
@@ -47,20 +52,8 @@ export function IntelPage() {
       </div>
       {tab === 'history' ? (WELL_ON ? <EcosystemHistory /> : <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>) : null}
       {tab === 'liquidations' ? (WELL_ON ? <LiquidationsPanel /> : <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>) : null}
-      {tab === 'oracles' ? (
-        <NotBuilt
-          title="Oracle Watch"
-          release="Release 3"
-          what="The prices Tydro and Nado actually use, next to independent feeds where they exist on Ink — age, deviation, stablecoin pegs — and which wallets a divergence would move. Each feed is an observation, not the truth."
-        />
-      ) : null}
-      {tab === 'changes' ? (
-        <NotBuilt
-          title="Protocol Change Monitor"
-          release="Release 3"
-          what="Risk-relevant parameter changes (liquidation thresholds, caps, weights, oracles, upgrades), read from the protocols' own contracts, with before-and-after impact where the history to compute it exists."
-        />
-      ) : null}
+      {tab === 'oracles' ? <OraclesPanel /> : null}
+      {tab === 'changes' ? <ChangesPanel /> : null}
       {tab === 'carry' ? (
         <NotBuilt
           title="Yield and carry"
@@ -125,7 +118,7 @@ function EcosystemHistory() {
             <details className="hist-notyet">
               <summary className="mono dim">Not in this history yet</summary>
               <ul className="dim">
-                <li>Actual liquidations: see the LIQUIDATIONS tab. Oracle divergence over time arrives with Oracle Watch; Pressure forecasts are recorded and scored once prices are recorded.</li>
+                <li>Actual liquidations: see the LIQUIDATIONS tab. Oracle prices and events: see ORACLES. Parameter changes: see CHANGES. Pressure forecast scoring: see CHECKS → Track record.</li>
                 <li>Anything before recording began. AEGIS doesn't backfill risk it didn't observe.</li>
               </ul>
             </details>

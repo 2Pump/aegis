@@ -20,7 +20,10 @@ The site uses plain words. The code, `census.json`, share links and the rules ke
 | Stress test | `StressTest` | A wallet page's own scenarios: the moves that take it to Watch, Near liquidation, Liquidatable. |
 | Checks | calibration | Whether readings were matched against the official apps. |
 | Test wallet | fixture | A made-up example account. |
-| Intel | intel | History (Flight Recorder) now; Liquidations, Oracles, Changes and Carry are later releases, labelled NOT BUILT. |
+| Intel | intel | History, Liquidations, Oracles and Changes are built; Carry is a later release, labelled NOT BUILT. |
+| Oracle Watch | intel?tab=oracles (`oracle-1.0.0`) | The prices Tydro and Nado use, next to Tydro's source contract and Pyth where it exists on Ink; staleness, divergence, pegs, jumps. docs/ORACLES.md |
+| Protocol Change Monitor | intel?tab=changes (`changes-1.0.0`) | Risk parameters read hourly from the contracts; a difference is a change record, old → new between two blocks. |
+| Forecast scoring | calibration (`forecast-score-1.0.0`) | Pressure forecasts checked against recorded prices; unreached scenarios are neither hits nor misses. |
 | Flight Recorder | — | What the hourly scan recorded over time: risk, type and size range per wallet, counts for all of Ink. Balance-free. docs/HISTORY.md |
 | Liquidation ledger | intel?tab=liquidations | Every actual Tydro and Nado liquidation on Ink, from on-chain events, with what AEGIS had recorded before it. docs/LEDGER.md |
 | Cascade | — | 3+ liquidations each within 30 min of the one before (cascade-1.0.0). Grouped by timing, not by cause. |

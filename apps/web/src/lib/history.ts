@@ -6,6 +6,19 @@
 import { useEffect, useState } from 'react';
 import {
   ACCOUNT_PATH,
+  ORACLE_LATEST,
+  PARAMS_LATEST,
+  FORECAST_SCORE_PATH,
+  changesPath,
+  pricePath,
+  isParamsLatest,
+  type OracleWatch,
+  type PricePoint,
+  type PriceFile,
+  type ParamsLatest,
+  type ChangeRecord,
+  type ChangesFile,
+  type ForecastScore,
   isLedgerFile,
   ledgerPath,
   type Accountability,
@@ -208,4 +221,80 @@ export async function aggAround(fromMs: number, toMs: number, index: HistoryInde
   const months = monthsBetween(fromMs, toMs).filter((m) => index.months.includes(m));
   const files = await Promise.all(months.map((m) => getJson(aggPath(m), m === thisMonth()).catch(() => null)));
   return files.flatMap((f) => (isAggFile(f) ? f.points : [])).filter((p) => Date.parse(p.at) >= fromMs && Date.parse(p.at) <= toMs);
+}
+
+/* ───────────────────────── Release 3: oracle watch, protocol changes, forecast scoring ───────────────────────── */
+
+/** One JSON file that the census rewrites every run; `ok` only when `accept` recognises it. */
+function useLatest<T>(path: string, accept: (j: unknown) => j is T): Loaded<{ v: T }> {
+  const [s, set] = useState<Loaded<{ v: T }>>({ status: 'loading' });
+  useEffect(() => {
+    let alive = true;
+    getJson(path, true)
+      .then((j) => alive && set(accept(j) ? { status: 'ok', v: j } : { status: 'none' }))
+      .catch((e: unknown) => alive && set({ status: 'error', message: String(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  return s;
+}
+
+const isWatch = (j: unknown): j is OracleWatch => (j as OracleWatch)?.kind === 'aegis-oracle-watch' && Array.isArray((j as OracleWatch).rows);
+const isScore = (j: unknown): j is ForecastScore => (j as ForecastScore)?.kind === 'aegis-forecast-score';
+
+export const useOracleWatch = () => useLatest(ORACLE_LATEST, isWatch);
+export const useParams = () => useLatest(PARAMS_LATEST, isParamsLatest as (j: unknown) => j is ParamsLatest);
+export const useForecastScore = () => useLatest(FORECAST_SCORE_PATH, isScore);
+
+/** Recorded oracle prices (one point per census run) within the range — recording began with Release 3. */
+export function usePrices(range: Range): Loaded<{ points: PricePoint[]; from: number; to: number }> {
+  type S = Loaded<{ points: PricePoint[]; from: number; to: number }>;
+  const [s, set] = useState<S>({ status: 'loading' });
+  useEffect(() => {
+    let alive = true;
+    const to = Date.now();
+    const from = range === 'all' ? to - 365 * 86_400_000 : to - ({ '24h': 1, '7d': 7, '30d': 30 } as const)[range] * 86_400_000;
+    const months = monthsBetween(from, to, 12);
+    set({ status: 'loading' });
+    Promise.all(months.map((m) => getJson(pricePath(m), m === thisMonth()).catch(() => null)))
+      .then((files) => {
+        if (!alive) return;
+        const points = files
+          .flatMap((f) => ((f as PriceFile)?.kind === 'aegis-prices' ? (f as PriceFile).points : []))
+          .filter((p) => p.at >= from && p.at <= to)
+          .sort((a, b) => a.at - b.at);
+        set(points.length ? { status: 'ok', points, from: range === 'all' ? points[0]!.at : from, to } : { status: 'none' });
+      })
+      .catch((e: unknown) => alive && set({ status: 'error', message: String(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [range]);
+  return s;
+}
+
+/** Every recorded parameter change (months listed in the index). */
+export function useChanges(index: HistoryIndex | null): Loaded<{ records: ChangeRecord[] }> {
+  const [s, set] = useState<Loaded<{ records: ChangeRecord[] }>>({ status: 'loading' });
+  useEffect(() => {
+    if (!index) return;
+    let alive = true;
+    const months = (index.changeMonths ?? []).slice(-24);
+    if (!months.length) {
+      set({ status: 'ok', records: [] });
+      return;
+    }
+    Promise.all(months.map((m) => getJson(changesPath(m), m === thisMonth())))
+      .then((files) => {
+        if (!alive) return;
+        const records = files.flatMap((f) => ((f as ChangesFile)?.kind === 'aegis-changes' ? (f as ChangesFile).records : [])).sort((a, b) => b.between.toBlock - a.between.toBlock);
+        set({ status: 'ok', records });
+      })
+      .catch((e: unknown) => alive && set({ status: 'error', message: String(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [index]);
+  return s;
 }

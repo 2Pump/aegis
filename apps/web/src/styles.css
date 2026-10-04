@@ -551,3 +551,25 @@ button.pm-bar:hover { border-color: var(--hair); }
 .wrap-text { white-space: normal; overflow-wrap: anywhere; }
 .liq-tile .panel-title { overflow-wrap: anywhere; }
 .stack { grid-template-columns: minmax(0, 1fr); } /* single column that may shrink below its widest child (tables scroll inside .table-wrap instead) */
+
+/* Oracle Watch + Protocol Change Monitor (Release 3) */
+.oracle-chip { display: inline-block; border: 1px solid; padding: 0 5px; font-size: 10px; letter-spacing: 0.08em; line-height: 16px; white-space: nowrap; }
+.linklike { background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer; text-align: left; }
+.linklike:hover, .linklike:focus-visible { color: var(--cyan); text-decoration: underline; }
+.oracle-detail > td { background: rgba(76, 224, 210, 0.03); white-space: normal; }
+.oracle-checks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; overflow-wrap: anywhere; }
+.oracle-impact { border-left: 2px solid var(--amber); padding: 4px 0 4px 10px; }
+.change-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.change-item { border: 1px solid var(--hair-2); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.change-val { font: 500 12.5px var(--mono); }
+.change-val del { color: var(--ink-faint); }
+.change-val ins { text-decoration: none; color: var(--cyan); }
+.param-filter { background: transparent; border: 1px solid var(--hair-2); color: var(--ink); font: 12px var(--mono); padding: 5px 8px; min-width: 0; width: min(320px, 100%); }
+@media (max-width: 560px) { .hide-narrow { display: none; } }
+.oracle-table > tbody > tr.oracle-row > td, .oracle-table th { white-space: nowrap; }
+.oracle-event-text { min-width: 200px; }
+.show-narrow { display: none; }
+@media (max-width: 560px) {
+  .show-narrow { display: inline; }
+  .oracle-detail-body { position: sticky; left: 0; max-width: calc(100vw - 72px); }
+}

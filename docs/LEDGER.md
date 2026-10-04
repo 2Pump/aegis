@@ -65,7 +65,7 @@ The same input always gives the same groups. Each cascade lists why it was group
 Cascades without a dominant family, or spanning both venues, are labelled **uncertain**. Every cascade says that grouping shows the liquidations happened together, not why.
 
 **Replay** steps through seven parts, from what was actually recorded:
-1. The price or oracle move: not recorded until Oracle Watch, Release 3.
+1. The price or oracle move: recorded hourly since Oracle Watch (Release 3); see INTEL → ORACLES for the time of the liquidation.
 2. The first wallet AEGIS had in danger.
 3. AEGIS's near-liquidation count and Ink Stress Level around the cascade (6 hours either side).
 4. The first liquidation.
@@ -84,7 +84,7 @@ Where something wasn't recorded, the step says so.
   - Breakdowns by venue, size range, position type at the time, asset family and **rules version, never pooled**.
 - **Every rate** is shown as *n of N*. Under 30 cases it's marked "too few to judge".
 - **No false-alarm %:** a warning that wasn't followed by a liquidation may simply have been acted on (the owner added collateral), so the page shows counts instead.
-- **Forecasts:** every full scan records the Pressure Map's scenario results (`history/forecast/<YYYY-MM>.json`: crypto, ETH, BTC and stablecoins at −10% and −20%, for all sizes and for ≥ $1k). They are **not scored yet**, because scoring needs recorded prices (Oracle Watch, Release 3).
+- **Forecasts:** every full scan records the Pressure Map's scenario results (`history/forecast/<YYYY-MM>.json`: crypto, ETH, BTC and stablecoins at −10% and −20%, for all sizes and for ≥ $1k). Since Release 3 they are scored against recorded prices in `history/forecast-score.json` (see [ORACLES.md](ORACLES.md#pressure-forecast-scoring-forecast-score-100)); forecasts made before prices were recorded can't be judged.
 
 ## Privacy
 

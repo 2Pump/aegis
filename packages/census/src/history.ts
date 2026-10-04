@@ -335,6 +335,8 @@ export interface HistoryIndex {
   ledger?: LedgerCursor;
   /** when AEGIS began recording its own NEAR LIQUIDATION warnings (the track record starts here) */
   warningsSince?: string;
+  /** Protocol Change Monitor: months with a change file */
+  changeMonths?: string[];
 }
 
 /** Where the liquidation scans have got (kept in the index so any run can resume). */

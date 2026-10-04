@@ -19,7 +19,7 @@ import { evaluate } from './engine.js';
 import { riskLine, provenance, short, watchLine } from './format.js';
 import { ALERTS, audit, checkWatchAddress, freshState, stateKey, type AlertsConfig, type AlertsDb, type Chat, type Observation, type Watch } from './model.js';
 
-export const COMMANDS = ['start', 'watch', 'unwatch', 'list', 'pause', 'resume', 'status', 'hf', 'buffer', 'scenario', 'help', 'delete'] as const;
+export const COMMANDS = ['start', 'watch', 'unwatch', 'list', 'pause', 'resume', 'status', 'hf', 'buffer', 'scenario', 'protocol', 'help', 'delete'] as const;
 export type Command = (typeof COMMANDS)[number];
 
 export type Parsed = { ok: true; cmd: Command; args: string[] } | { ok: false; why: string };
@@ -56,6 +56,7 @@ export const HELP_TEXT = [
   '/hf <address> <1.0–5 | off> — alert when Tydro HF falls below',
   '/buffer <address> <1–90 | off> — alert when the worst Nado margin buffer (%) falls below',
   `/scenario <address> <${DIRECTIONS.map((d) => d.id).join('|')}> <±pct | off> — alert when that move would liquidate it`,
+  '/protocol <on | off> — also tell me about Ink-wide oracle problems and Tydro/Nado parameter changes',
   '/pause, /resume — hold or restart your alerts',
   '/delete — erase this chat and everything stored for it',
   '',
@@ -92,6 +93,18 @@ export async function handleCommand(db: AlertsDb, chatId: string, text: string, 
     delete db.chats[chatId];
     audit(db, { at: deps.now, chat: h, kind: 'deleted', detail: 'chat and all its watches erased' }, cfg);
     return 'Erased: this chat and every wallet it watched. Nothing about it remains in AEGIS alerts. /start to begin again.';
+  }
+  if (p.cmd === 'protocol') {
+    const v = (p.args[0] ?? '').toLowerCase();
+    if (v !== 'on' && v !== 'off') return `Protocol alerts are ${chat.protocol ? 'ON' : 'OFF'}. /protocol on or /protocol off.`;
+    chat.protocol = v === 'on';
+    if (chat.protocol) {
+      chat.protocolSince = deps.now;
+      chat.seenProtocol = [];
+    }
+    return chat.protocol
+      ? 'Protocol alerts ON: oracle problems (stale, diverging or depegged prices, sudden jumps) and Tydro/Nado parameter changes, from now on. /protocol off to stop.'
+      : 'Protocol alerts OFF.';
   }
   if (p.cmd === 'pause') {
     chat.paused = true;

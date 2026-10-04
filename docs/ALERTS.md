@@ -33,7 +33,9 @@ age and block, APPROXIMATE / PARTIAL labels, rules / engine / alerts versions, a
 position sizes.**
 
 ## Commands
-`/start` `/watch <addr> [tydro|nado]` `/unwatch <addr>` `/list` `/pause` `/resume` `/status [addr]`
+`/start` `/watch <addr> [tydro|nado]` `/unwatch <addr>` `/list` `/pause` `/resume` `/status [addr]` `/protocol on|off`
+
+`/protocol on` also sends Ink-wide Oracle Watch events and Tydro/Nado parameter changes (docs/ORACLES.md), from the moment it's turned on, once each, inside the same rate limit. Off by default.
 `/hf <addr> <1.0–5|off>` `/buffer <addr> <1–90|off>` `/scenario <addr> <DIR> <±pct|off>` `/help` `/delete`
 
 Nothing is stored before `/start`. Private chats only (groups are ignored). Rejected: malformed addresses, the zero

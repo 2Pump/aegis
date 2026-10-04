@@ -42,6 +42,7 @@ const ALERT_COMMANDS: Array<[string, string]> = [
   ['/hf <address> <1.0–5 | off>', 'alert when Tydro HF falls below'],
   ['/buffer <address> <1–90 | off>', 'alert when the worst Nado margin buffer (%) falls below'],
   ['/scenario <address> <BTC|ETH|…> <±pct | off>', 'alert when that move would liquidate it'],
+  ['/protocol <on | off>', 'also Ink-wide oracle problems and Tydro/Nado parameter changes'],
   ['/pause · /resume', 'hold or restart your alerts'],
   ['/delete', 'erase your chat and everything stored for it'],
 ];

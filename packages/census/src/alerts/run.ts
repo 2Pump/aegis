@@ -11,6 +11,7 @@ import { handleCommand } from './commands.js';
 import { formatAlert, short } from './format.js';
 import { ALERTS, audit, freshState, stateKey, type AlertsConfig, type AlertsDb, type Observation, type Watch } from './model.js';
 import type { AlertsTransport } from './transport.js';
+import { FOOTER_TEXT } from './text.js';
 
 export interface RunDeps {
   transport: AlertsTransport;
@@ -22,6 +23,8 @@ export interface RunDeps {
   hashChat: (chatId: string) => string;
   cfg?: AlertsConfig;
   log?: (m: string) => void;
+  /** Ink-wide events (Oracle Watch, Protocol Change Monitor), already deduplicated with cooldowns at their source */
+  protocolEvents?: ReadonlyArray<{ id: string; at: number; text: string; urgent?: boolean }>;
 }
 
 export interface RunReport {
@@ -174,6 +177,30 @@ export async function runAlerts(dbIn: AlertsDb, deps: RunDeps): Promise<{ db: Al
       }
     }
   }
+  /* 5 ── Ink-wide protocol events, to chats that opted in (/protocol on) */
+  for (const chat of Object.values(db.chats)) {
+    if (chat.paused || !chat.protocol) continue;
+    const seen = new Set(chat.seenProtocol ?? []);
+    for (const e of deps.protocolEvents ?? []) {
+      if (seen.has(e.id) || e.at < (chat.protocolSince ?? Infinity)) continue;
+      const now = deps.now();
+      seen.add(e.id);
+      if (!rateAllow(chat, now, !!e.urgent, cfg)) {
+        chat.held += 1;
+        rep.held += 1;
+        audit(db, { at: now, chat: deps.hashChat(chat.id), kind: 'held', detail: 'protocol event (rate limit)' }, cfg);
+        continue;
+      }
+      const text = [`AEGIS · Ink protocol watch`, e.text, '', `${deps.siteUrl.replace(/\/$/, '')}/intel`, FOOTER_TEXT].join('\n');
+      if (await deliver(chat.id, text, 'alert')) {
+        rep.sent++;
+        chat.sentAt.push(now);
+        audit(db, { at: now, chat: deps.hashChat(chat.id), kind: 'alert', detail: `protocol: ${e.id.slice(0, 60)}` }, cfg);
+      }
+    }
+    if (db.chats[chat.id]) db.chats[chat.id]!.seenProtocol = [...seen].slice(-300);
+  }
+
   // state for wallets no chat watches any more is dropped (nothing kept that isn't needed)
   for (const k of Object.keys(db.state)) {
     const [c, a] = k.split('|');

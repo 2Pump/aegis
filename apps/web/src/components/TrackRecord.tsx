@@ -2,12 +2,12 @@
  * CHECKS → Track record: AEGIS's own warnings scored against what actually happened (acct-1.0.0).
  * Every rate is shown with its numerator and denominator; small samples say so; versions are never pooled.
  */
-import { LEDGER, type Accountability, type Breakdown, type Rate } from '@aegis/census';
+import { FORECAST_SCORE, LEDGER, type Accountability, type Breakdown, type ForecastScore, type Rate } from '@aegis/census';
 import { NO_TYPE_LABEL, SIZE_LABEL, TAG_LABEL } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { Panel } from './bits';
 import { when } from './HistoryBits';
-import { useAccountability } from '../lib/history';
+import { useAccountability, useForecastScore } from '../lib/history';
 
 export function RateCell({ r }: { r: Rate }) {
   if (!r.den) return <span className="faint">— (0 cases)</span>;
@@ -148,6 +148,60 @@ function Scores({ a }: { a: Accountability }) {
           {a.limitations.map((l) => <li key={l}>{l}</li>)}
         </ul>
       </details>
+    </div>
+  );
+}
+
+/** Pressure forecasts scored against recorded prices (forecast-score-1.0.0). */
+export function ForecastTrack() {
+  const s = useForecastScore();
+  return (
+    <Panel title="Pressure forecasts — did the scenarios happen?" rail="var(--violet)" testId="forecast-track" right={<span className="mono">{FORECAST_SCORE.VERSION}</span>}>
+      {s.status === 'loading' ? <div className="dim" role="status">Loading…</div> : null}
+      {s.status === 'error' ? <div className="banner red" role="alert">Couldn&apos;t load ({s.message}). Nothing is shown rather than a guess.</div> : null}
+      {s.status === 'none' ? (
+        <div className="banner" data-testid="forecast-not-started">
+          NOT SCORED YET — forecasts can only be checked against prices AEGIS recorded, and price recording starts with Oracle Watch. Scores appear once a forecast&apos;s 24 hours have passed with prices recorded throughout.
+        </div>
+      ) : null}
+      {s.status === 'ok' ? <ForecastBody f={s.v} /> : null}
+    </Panel>
+  );
+}
+
+function ForecastBody({ f }: { f: ForecastScore }) {
+  const judged = f.scenarios.reduce((a, x) => a + x.judged, 0);
+  return (
+    <div className="stack" style={{ gap: 12 }}>
+      <div className="faint mono" style={{ fontSize: 11 }} data-testid="forecast-counts">
+        {f.forecasts.toLocaleString('en-US')} forecasts recorded · {f.pending} still inside their {f.horizonH} h window · {f.unjudgeable} can&apos;t be judged (made before prices were recorded, or a gap in the prices) · scored {when(Date.parse(f.generatedAt))}
+      </div>
+      {!judged ? (
+        <div className="dim">No forecast has been judged yet.</div>
+      ) : (
+        <div className="table-wrap">
+          <table className="t" data-testid="forecast-table">
+            <thead><tr><th>Scenario</th><th>Judged</th><th>Move happened within {f.horizonH} h</th><th>When it did: predicted near · most recorded near · liquidations seen</th></tr></thead>
+            <tbody>
+              {f.scenarios.map((x) => (
+                <tr key={x.key}>
+                  <td className="mono">{x.key}</td>
+                  <td className="num">{x.judged}</td>
+                  <td className="num">{x.reached}</td>
+                  <td className="wrap-text" style={{ fontSize: 12 }}>
+                    {x.comparisons.length
+                      ? x.comparisons.slice(-3).map((c) => `${c.at.slice(0, 16).replace('T', ' ')}: ${c.predictedNear} · ${c.observedNear ?? '—'} · ${c.liquidationsSeen}`).join('; ')
+                      : <span className="faint">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <ul className="dim" style={{ fontSize: 12.5, lineHeight: 1.55, margin: 0 }}>
+        {f.notes.map((n) => <li key={n}>{n}</li>)}
+      </ul>
     </div>
   );
 }

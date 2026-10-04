@@ -285,3 +285,40 @@ export {
   type ForecastRecord,
   type ForecastFile,
 } from './ledger.js';
+
+export {
+  ORACLE,
+  REFERENCES,
+  PEGGED,
+  ORACLE_LATEST,
+  pricePath,
+  buildOracleWatch,
+  impactOf,
+  pricePoint,
+  appendPrices,
+  type OracleWatch,
+  type AssetRow,
+  type Check,
+  type OracleStatus,
+  type OracleEvent,
+  type Impact,
+  type PricePoint,
+  type PriceFile,
+} from './oracle.js';
+export {
+  CHANGES,
+  PARAMS_LATEST,
+  changesPath,
+  toLatest,
+  isParamsLatest,
+  diffParams,
+  summarize as summarizeAgg,
+  appendChanges,
+  paramLabel,
+  PARAM_LABEL,
+  type ParamsLatest,
+  type ChangeRecord,
+  type ChangesFile,
+  type AggSummary,
+} from './changes.js';
+export { FORECAST_SCORE, FORECAST_SCORE_PATH, scoreForecasts, worstMove, type ForecastScore, type ScenarioScore } from './forecast.js';
