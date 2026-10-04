@@ -241,7 +241,7 @@ The production well stays locked until `verification/status.json` is proven (see
 
 - **A snapshot row holds only:** address, tags, hull temp, size band, a watch flag, read block, "wounded since" block, and any isolated Nado subaccount ids.
 - **It never holds:** balances, HF, or liquidation prices. A test enforces this.
-- **Wounded tape:** ordered by when a book was first seen wounded, never by closeness to liquidation.
+- **Wounded tape:** ordered by when a book was first seen wounded, never by closeness to liquidation. A size floor (All / ≥ $1k default / ≥ $10k / ≥ $100k) uses the size bands; each button shows its count, the total stays visible, and small wallets are always one click away under All.
 
 ## Hourly start (outside timer)
 

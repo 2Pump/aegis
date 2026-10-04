@@ -156,3 +156,21 @@ test('stress test on a wallet page: thresholds per direction, a custom scenario,
   await page.goto('/fixture/dark');
   await expect(page.getByTestId('stress-confidence')).toContainText("can't simulate");
 });
+
+test('Alerts: labelled NOT LIVE, no sign-up form, no bot link, privacy stated', async ({ page }) => {
+  await page.goto('/watch');
+  await expect(page.getByTestId('alerts-unavailable')).toContainText('NOT LIVE YET');
+  await expect(page.getByTestId('alerts-page')).toHaveAttribute('data-live', 'no');
+  await expect(page.locator('input, form, a[href*="t.me"]')).toHaveCount(0);
+  await expect(page.locator('dt', { hasText: '/delete' })).toBeVisible();
+  await expect(page.getByText(/never balances or position sizes/)).toBeVisible();
+});
+
+test('Checks: versions in force are stated; the automatic-checks panel says when nothing has run (never a pass)', async ({ page }) => {
+  await page.goto('/calibration');
+  await expect(page.getByTestId('versions-now')).toContainText('scenario engine');
+  const auto = page.getByTestId('auto-checks');
+  await expect(auto).toBeVisible();
+  await expect(auto.getByText(/No automatic check has run yet|Couldn't load the check log/)).toBeVisible();
+  await expect(auto.getByText('CURRENT', { exact: true })).toHaveCount(0);
+});

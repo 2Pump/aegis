@@ -19,7 +19,9 @@
     "fixtures": "node scripts/make-fixtures.mjs",
     "sync:tydro": "node scripts/sync-tydro-registry.mjs",
     "prove": "tsx scripts/prove.ts",
-    "census": "tsx scripts/census.ts"
+    "census": "tsx scripts/census.ts",
+    "verify:auto": "tsx scripts/verify-auto.ts",
+    "alerts": "tsx scripts/alerts.ts"
   },
   "devDependencies": {
     "@aegis/ink-io": "workspace:*",

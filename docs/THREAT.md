@@ -8,7 +8,7 @@
 | Parser silently reads 0 on a schema change | Missing price / non-numeric amount → PARSE_FAIL → DARK. Never a zero. |
 | `healths[]` index wrong | Every read re-checks `healths[2]` against computed equity; a mismatch is printed on the plate. |
 | Stale Tydro registry (new reserve listed) | `Pool.getReservesList()` diff and Σ debt vs `totalDebtBase` check — both flagged on the plate. |
-| Isolated Nado positions missed | Archive subaccount discovery; if it fails, plate says “read 'default' only; isolated positions not shown”. |
+| Isolated Nado positions missed | Chain discovery (every trade and deposit since launch, by the census) plus a scan of trades since the census on the wallet page. If either is missing, the wallet page shows a red PARTIAL banner at the top, and the stress test is marked approximate. |
 | Two venues, two prices | Every USD number carries a source chip (TYDRO ORACLE / NADO ORACLE / FIXTURE). No off-chain prices. |
 | Unknown token hedging a known perp | Unknown symbols become their own family; they can never make a CARRY. |
 | Rules drift from docs | `rules-doc.test.ts` fails if RULES.md constants ≠ `config.ts`. the rules drawer renders from the same constants. |

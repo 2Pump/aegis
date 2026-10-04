@@ -108,3 +108,15 @@ A large USDC borrower, taken from the top holders of the USDC variable-debt toke
 
 Expected pose if Nado is empty: primary **KBTC-CORE** (kBTC is 100% of margin). LOCKED is also listed. HF is whatever the Pool says. `pnpm prove 0x0B3f…` must show the three legs above within indexer lag, with the Blockscout rows PASS or WARN.
 This vector cannot pass the human step unless you control that wallet. It proves the Tydro decoding only. **The gate needs your own address.**
+
+## Automatic checks (`verify-1.0.0`)
+
+`pnpm verify:auto` — run daily by `.github/workflows/verify.yml` (06:23 UTC, or Actions → verify → Run workflow), same secrets as the census.
+- Picks real wallets from the latest census (rotating daily): a Tydro borrower, a Nado default-only wallet, a Nado wallet with an isolated subaccount.
+- Reads each with the site's own readers and compares with sources AEGIS does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
+- Tries Nado's official API with a plain request. It sits behind Cloudflare, so it is recorded as SOURCE UNAVAILABLE — never a pass, never worked around.
+- Each record: venue, short wallet, case, source + type, time, block, rules and engine versions, fields (expected / AEGIS / tolerance / pass), status, failure reason.
+- Appended to `verification-log.json` on Blob; history is never deleted.
+- Checks page: per case the latest status — CURRENT, STALE (> 24 h), FAILED, SOURCE UNAVAILABLE — plus the last success, versions (older flagged) and the full history. A FAIL makes the workflow run red.
+
+`pnpm prove` records now also carry the same structured form (`structured`), and a stated failure can never finalize as a pass.

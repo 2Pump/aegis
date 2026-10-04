@@ -1,5 +1,5 @@
 export * from './result.js';
-export { parseAddress, shortAddr, nadoSubaccount, type ParsedAddress } from './address.js';
+export { parseAddress, shortAddr, nadoSubaccount, subaccountKind, type ParsedAddress } from './address.js';
 export { INK_CHAIN_ID, INK_DEFAULT_RPC, INK_EXPLORER, ink, makeInkClient, checkInkEndpoints, isZeroData, readHead, stableHead, type ChainHead } from './chain.js';
 export { INK_PUBLIC_RPCS, splitRpcList, maskRpc, rotatingTransport, rotatingHttp, type RotateStats } from './rotate.js';
 export { readTydro } from './tydro.js';
@@ -15,7 +15,7 @@ export {
   type SymbolMap,
 } from './nado.js';
 export { readBook, type BookRead, type SensorsConfig } from './book.js';
-export { readNadoChain, chainInfoToGatewayShape } from './nado-chain.js';
+export { readNadoChain, chainInfoToGatewayShape, RECENT_SUB_SCAN_MAX_BLOCKS, type NadoDiscovery } from './nado-chain.js';
 export { NADO_CONTRACTS, NADO_PRODUCTS, NADO_SDK_COMMIT, NADO_PRODUCTS_FETCHED, NLP_PRODUCT_ID } from './nado-registry.js';
 export { multicallAdaptive, type Call, type CallResult } from './batch.js';
 export {

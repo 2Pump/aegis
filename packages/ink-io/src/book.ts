@@ -1,13 +1,15 @@
 import type { Book, NadoBook, Sensor, TydroBook } from '@aegis/pose';
 import type { Address, PublicClient } from 'viem';
 import { readNado, type NadoConfig } from './nado.js';
-import { readNadoChain } from './nado-chain.js';
+import { readNadoChain, type NadoDiscovery } from './nado-chain.js';
 import type { InkError } from './result.js';
 import { readTydro } from './tydro.js';
 
 export interface SensorsConfig {
   client: PublicClient;
   nado: NadoConfig;
+  /** what AEGIS already knows about an owner's Nado subaccounts (the census); null/absent = default only, PARTIAL */
+  nadoDiscovery?: (address: string) => Promise<NadoDiscovery | null>;
 }
 
 export interface BookRead {
@@ -23,7 +25,9 @@ const dark = <T>(e: InkError, at: number): Sensor<T> => ({ status: 'DARK', code:
 export async function readBook(address: `0x${string}`, cfg: SensorsConfig): Promise<BookRead> {
   const nadoRead =
     (cfg.nado.mode ?? 'chain') === 'chain'
-      ? readNadoChain(cfg.client, address).then((r) => (r.ok ? { ok: true as const, value: r.value.book } : r))
+      ? (cfg.nadoDiscovery ? cfg.nadoDiscovery(address).catch(() => null) : Promise.resolve(null)).then((d) =>
+          readNadoChain(cfg.client, address, undefined, d).then((r) => (r.ok ? { ok: true as const, value: r.value.book } : r)),
+        )
       : readNado(address, cfg.nado);
   const [t, n] = await Promise.all([readTydro(cfg.client, address as Address), nadoRead]);
   const at = Date.now();

@@ -84,9 +84,17 @@ The level is deterministic and versioned (`STRESS` in `packages/census/src/press
 - Moves beyond 50%.
 - Coverage: the map counts only wallets AEGIS can see. The Scan page has the coverage numbers.
 
+## Freshness (`fresh-1.0.0`)
+
+The map is rebuilt only by full scans (every 3 h; every wallet at one block), the well every hour — so they differ, and the page says so.
+- **CURRENT** ≤ 4 h · **DELAYED** ≤ 12 h · **STALE** beyond (`FRESHNESS` in `pressure.ts`, unit-tested).
+- The freshness panel shows the map's block and age beside the well's, and why they differ.
+- STALE greys the stress level and labels it "as of X ago, not now"; the share text carries the same warning.
+- "Check for a newer map" is throttled to once a minute; a failed refresh keeps the last good map and says it failed — never zeroes.
+
 ## Alerts
 
-Not built, and not wired to the Pressure Map. AEGIS has no Telegram (a standing rule), so the Alerts page keeps its "not built" state. Scenario-based alerts would need that rule changed first.
+Built, not live — see [ALERTS.md](ALERTS.md). Scenario alerts use this engine.
 
 ## Checks
 
@@ -95,4 +103,4 @@ The Checks page now:
 - shows each stored check under the rules version it ran under, flagged when that version is older (never relabelled)
 - marks a check STALE after 30 days
 
-`pnpm prove 0xADDRESS` is the repeatable re-check. It records the time, block, rules version, source and fields, and a source it can't reach is never recorded as a pass.
+`pnpm prove 0xADDRESS` is the repeatable re-check by hand; its record now also carries the structured `verify-1.0.0` form. The automatic daily checks are described in [VERIFICATION.md](VERIFICATION.md#automatic-checks-verify-100).

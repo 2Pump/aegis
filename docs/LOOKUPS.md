@@ -66,7 +66,7 @@ So AEGIS reads Nado from the **Ink chain** with a `view` call to Nado's own `FQu
 | Deployer | 0xC1cC56caB60e832665E6c3780BfEBe3C1C971603 | created both proxies |
 
 ABI copied verbatim from SDK `packages/shared/src/abis/Querier.ts` @7a326cb; unit test round-trips it through viem's encoder/decoder.
-Price label: **NADO ON-CHAIN**, the last oracle price settled on Ink. Caveats: settled state can trail app.nado.xyz by seconds; only the `default` subaccount is read (isolated discovery needs the blocked archive API); product ids → symbols from the 2026-09-28 snapshot in `nado-registry.ts`.
+Price label: **NADO ON-CHAIN**, the last oracle price settled on Ink. Caveats: settled state can trail app.nado.xyz by seconds. Since 2026-10-04, wallet pages read **every** subaccount the census has found from the chain (default, isolated and any other), plus any new one named by a trade since the census block (up to ~6 h back), and label the Nado report COMPLETE or PARTIAL. Product ids → symbols from the 2026-09-28 snapshot in `nado-registry.ts`.
 
 ### C.0b Discovery events + start blocks (census)
 
@@ -98,7 +98,7 @@ Docs: https://docs.nado.xyz (index: `/llms.txt`). **Queries need no signature** 
 
 **Queries used:**
 1. `GET /query?type=symbols` → `data.symbols` is an **object keyed by symbol** `{type, product_id, symbol, …}`. PROVEN (live response).
-2. `POST archive {"subaccounts": {"address": "0x…"}}` → list of subaccounts incl. isolated. **Request shape GUESSED** from the docs description (“Query all subaccounts associated to an address”). On any failure AEGIS reads `default` only and **says so on the plate**.
+2. (Gateway mode only — not used since 2026-09-28; wallet pages read the chain.) `POST archive {"subaccounts": {"address": "0x…"}}` → list of subaccounts incl. isolated. **Request shape GUESSED** from the docs description (“Query all subaccounts associated to an address”). On any failure AEGIS reads `default` only and **says so on the plate**.
 3. `GET /query?type=subaccount_info&subaccount=0x…` → balances, healths, product oracle prices. PROVEN (docs example payload; parser unit-tested on it).
 
 **Units:** every amount/price is x18 (“amounts come back normalized to 18 decimal places”). Spot `amount` < 0 = borrow. Perp `amount` = signed base size; `v_quote_balance` = quote leg in USD.

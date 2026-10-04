@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classify, familyOf, type Book } from '@aegis/pose';
-import { PressureAcc, STRESS, clampQuery, pressureCurve, queryPressure, shareText, stressLevel, type PressureSnapshot } from '../src/index.js';
+import { PressureAcc, STRESS, clampQuery, materialCounts, meetsMaterial, pressureCurve, pressureFreshness, queryPressure, shareText, stressLevel, type PressureSnapshot } from '../src/index.js';
 import { fileStore, runCensus } from '../src/node/index.js';
 import { fakeChain } from './fakeChain.js';
 
@@ -143,5 +143,47 @@ describe('census full sweep writes pressure.json', () => {
     expect(p!.population.drawn).toBeGreaterThan(0);
     expect(JSON.stringify(p)).not.toMatch(/0x[0-9a-f]{40}/i);
     expect(logs.some((l) => l.startsWith('pressure map: '))).toBe(true);
+  });
+});
+
+describe('Pressure freshness', () => {
+  const at = '2026-10-04T12:00:00.000Z';
+  const base = { at, pricesAt: at };
+  const h = (n: number) => Date.parse(at) + n * 3_600_000;
+  it('CURRENT within one full-scan interval plus its run time', () => expect(pressureFreshness(base, h(3.5)).status).toBe('CURRENT'));
+  it('DELAYED when a scan or two was missed', () => expect(pressureFreshness(base, h(6)).status).toBe('DELAYED'));
+  it('STALE after 12 hours', () => expect(pressureFreshness(base, h(13)).status).toBe('STALE'));
+  it('STALE when the reading time is missing — never assumed current', () => {
+    const f = pressureFreshness({ at: 'not a time' }, h(1));
+    expect(f.status).toBe('STALE');
+    expect(f.ageH).toBeNull();
+  });
+  it('the map and the well can differ: the map is judged by its own time, not the well’s', () => {
+    // well refreshed 4 minutes ago, map built 29 minutes ago → still CURRENT, and its own age is what's reported
+    expect(pressureFreshness(base, h(29 / 60)).why).toMatch(/0\.5 h ago/);
+  });
+  it('the share text says STALE, and that the stress level is as of then', () => {
+    const books: Array<[Book, '1–10k']> = Array.from({ length: 6 }, (_, i) => [borrower(10_000, 6_154, 'LIVE', i), '1–10k']);
+    const s = { ...snap(books), at, pricesAt: at };
+    const q = { dir: 'ETH', sign: 'down' as const, pct: 10, material: '0' as const, dim: '*' };
+    const t = shareText(s, q, stressLevel(s, { nowMs: h(20), oiCoverage: 0.94 }), 'u', h(20));
+    expect(t).toMatch(/STALE: this map is 20 h old/);
+    expect(t).toMatch(/as of then, not now/);
+    expect(shareText(s, q, stressLevel(s, { nowMs: h(1), oiCoverage: 0.94 }), 'u', h(1))).not.toMatch(/STALE|DELAYED/);
+  });
+});
+
+describe('material floors (one definition for the well, Scan and Pressure)', () => {
+  it('boundaries: <1k and dust are below $1,000; 1–10k meets $1,000; 100k+ meets every floor', () => {
+    expect(meetsMaterial('<1k', '1k')).toBe(false);
+    expect(meetsMaterial('dust', '0')).toBe(true);
+    expect(meetsMaterial('1–10k', '1k')).toBe(true);
+    expect(meetsMaterial('1–10k', '10k')).toBe(false);
+    expect(meetsMaterial('10–100k', '10k')).toBe(true);
+    expect(meetsMaterial('100k+', '100k')).toBe(true);
+  });
+  it('counts per floor; empty list is all zeros', () => {
+    expect(materialCounts(['dust', '<1k', '1–10k', '10–100k', '100k+'])).toEqual({ '0': 5, '1k': 3, '10k': 2, '100k': 1 });
+    expect(materialCounts([])).toEqual({ '0': 0, '1k': 0, '10k': 0, '100k': 0 });
   });
 });

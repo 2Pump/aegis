@@ -10,8 +10,8 @@ import { dirname, join } from 'node:path';
  */
 export interface CensusStore {
   describe: string;
-  get(name: 'census.json' | 'known.json' | 'pressure.json'): Promise<unknown | null>;
-  put(name: 'census.json' | 'known.json' | 'pressure.json', body: unknown): Promise<string>;
+  get(name: 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json'): Promise<unknown | null>;
+  put(name: 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json', body: unknown): Promise<string>;
 }
 
 export function fileStore(dir: string): CensusStore {

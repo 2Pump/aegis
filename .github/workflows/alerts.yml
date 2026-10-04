@@ -1,0 +1,48 @@
+# AEGIS Telegram alerts — OFF until the owner turns it on.
+# Every job is skipped unless the repository VARIABLE ALERTS_ENABLED is 'true' (Settings → Secrets and variables →
+# Actions → Variables). Secrets it needs (Settings → Secrets → Actions):
+#   TELEGRAM_BOT_TOKEN  from @BotFather
+#   ALERTS_STORE_KEY    32 random bytes, base64 (encrypts the alerts db: chat ids never sit in the clear)
+#   BLOB_READ_WRITE_TOKEN, INK_RPC (optional) — the same ones the census uses
+# Each run: answers new bot commands, reads every watched wallet once (read-only view calls), sends alerts on changes.
+# GitHub's own schedule can lag; cron-job.org can dispatch this workflow like it does the census.
+
+name: alerts
+run-name: alerts · ${{ github.event_name }}
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: alerts
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  alerts:
+    if: ${{ vars.ALERTS_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - run: pnpm install --frozen-lockfile
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - name: Alerts
+        run: pnpm alerts --store blob
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALERTS_STORE_KEY: ${{ secrets.ALERTS_STORE_KEY }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          INK_RPC: ${{ secrets.INK_RPC }}

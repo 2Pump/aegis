@@ -183,6 +183,7 @@ export function confidenceOf(book: Book): { confidence: Confidence; why: string[
   }
   const n = book.nado.data;
   if ((n.spots.length || n.perps.length) && [...n.spots, ...n.perps].some((x) => x.maintWeight === undefined)) why.push("Nado's maintenance weights weren't in this reading (weight 1 assumed)");
+  if (n.coverage?.status === 'PARTIAL') why.push('Nado isolated subaccounts may be missing from this reading');
   const t = book.tydro.data;
   if (t.debts.length && new Set(t.supplies.map((l) => l.family)).size > 1) why.push('Tydro collateral spans several assets (one liquidation threshold assumed)');
   return { confidence: why.length ? 'APPROXIMATE' : 'MODELLED', why };

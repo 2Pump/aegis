@@ -95,7 +95,7 @@ WOUNDED is an overlay; it is primary only if nothing else fires. If nothing fire
 
 - NAKED looks at perps only. A $10k spot + $5k short is NAKED (short side), not “half-hedged”. Intentional: the rule is simple and public.
 - CARRY uses the Nado oracle for perp notional and the Tydro oracle for Tydro legs. Two venues, two prices — both labeled on the plate.
-- Isolated Nado subaccounts are read when the indexer lookup works; otherwise only `default` is read and the plate says so.
+- Isolated Nado subaccounts are found from the chain: every deposit and trade since launch, scanned by the census. The census and the live layer read all of them. A wallet page reads all of them too, plus any new one named by a trade since the last census. If that list isn't available, or is too old to bridge, the page reads `default` only and shows a red **PARTIAL** banner at the top. A subaccount that can't be read makes the Nado reading unreadable and names it; it is never silently dropped. Risk uses the worst subaccount's own margin buffer, so an isolated position can be near liquidation while the rest of the wallet is healthy.
 - Funding rates are not wired in V1. The plate shows funding **side** only.
 - A same-family loop is judged by family, not by Tydro's e-mode setting. A USDe → USDT loop counts as a loop even outside e-mode (its HF is simply higher). sUSDe and USDT are both `USD` family, so a sUSDe depeg is exactly the risk the 1.03 line measures.
 - Anything that still fires no rule is below every rule's minimum size (e.g. perps under $200 gross) or mixes stables and non-stables with some debt below the LOCKED/STABLE lines.

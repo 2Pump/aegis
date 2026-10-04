@@ -54,7 +54,7 @@ docs              LOOKUPS · RULES · MATH · THREAT · VERIFICATION · CENSUS
 .github/workflows census.yml — hourly census job
 verification      status.json (the well gate) + proof records written by `pnpm prove`
 fixtures          Six synthetic books (the dossier examples) + empty seeds.json
-scripts           census · prove · make-fixtures · sync-tydro-registry · audit-writes
+scripts           census · prove · verify-auto · alerts · make-fixtures · sync-tydro-registry · audit-writes
 ```
 
 ## Routes
@@ -63,4 +63,4 @@ scripts           census · prove · make-fixtures · sync-tydro-registry · aud
 - `/calibration`: proof status + the six fixture books. `/fixture/carry|naked|equity-margin|wounded|dark|empty`: calibration plates.
 - Rules: one drawer, opened from the header button, the footer, a wallet page, or any link with `?rules=1` (old `/rules` links redirect to it).
 - `/census`: pose mix of every account found, coverage, and snapshot and backfill status.
-- `/watch`: placeholder for Phase 3 (Telegram).
+- `/watch`: Telegram alerts — built and tested, labelled NOT LIVE until switched on (docs/ALERTS.md).

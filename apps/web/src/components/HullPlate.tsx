@@ -42,6 +42,13 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         </div>
       ) : null}
 
+      {!isFixture && book.nado.status === 'OK' && book.nado.data.coverage?.status === 'PARTIAL' ? (
+        <div className="banner red" data-testid="nado-partial" role="status">
+          PARTIAL — this report may be missing Nado isolated positions: {book.nado.data.coverage.why.join('; ')}. The position type, risk and stress
+          test below cover only what was read. Re-read in a minute, or open the Scan page to load AEGIS's subaccount list.
+        </div>
+      ) : null}
+
       {/* the wallet plate: sigil · energy levels (types that fired) · risk rail */}
       <WalletPlate address={book.address} pose={pose}>
         <span className="mono dim" style={{ overflowWrap: 'anywhere' }}>{checksum}</span>
@@ -76,6 +83,14 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
             <dd className="mono">{lastOk.tydro ? `${fmtAge(lastOk.tydro, now)} ago` : 'never'}{book.asOfBlock ? ` · block ${book.asOfBlock.toLocaleString('en-US')}` : ''}</dd>
             <dt>nado last read</dt>
             <dd className="mono">{lastOk.nado ? `${fmtAge(lastOk.nado, now)} ago` : 'never'}</dd>
+            {book.nado.status === 'OK' && book.nado.data.coverage ? (
+              <>
+                <dt>nado report</dt>
+                <dd className="mono" data-testid="nado-coverage">
+                  <b className={book.nado.data.coverage.status === 'COMPLETE' ? 'pos' : 'neg'}>{book.nado.data.coverage.status}</b> · {subCountText(book.nado.data)}
+                </dd>
+              </>
+            ) : null}
             <dt>source</dt>
             <dd className="mono">{book.source === 'FIXTURE' ? 'test wallet' : 'read live from chain'}</dd>
           </dl>
@@ -274,7 +289,16 @@ function NadoTable({ n }: { n: NadoBook }) {
         <dd className="num">{n.maintenance ? `${fmtUsd(n.maintenance.healthUsd)} of ${fmtUsd(n.maintenance.assetsUsd)} weighted assets` : '—'}</dd>
         <dt>subaccounts</dt>
         <dd className="mono" style={{ fontSize: 11 }}>{n.subaccounts.length ? n.subaccounts.map(subName).join(', ') : 'none with balances'}</dd>
+        {n.coverage ? (
+          <>
+            <dt>report</dt>
+            <dd className="mono" style={{ fontSize: 11 }}>
+              <b className={n.coverage.status === 'COMPLETE' ? 'pos' : 'neg'}>{n.coverage.status}</b> — {n.coverage.why.join('; ')}
+            </dd>
+          </>
+        ) : null}
       </dl>
+      <SubaccountTable n={n} />
       {n.spots.length ? (
         <div className="table-wrap">
           <table className="t">
@@ -322,6 +346,45 @@ function NadoTable({ n }: { n: NadoBook }) {
       {n.notes.map((x, i) => (
         <div key={i} className={x.includes('OK') ? 'banner cyan' : 'banner'}>{x}</div>
       ))}
+    </div>
+  );
+}
+
+function subCountText(n: NadoBook): string {
+  const subs = n.coverage?.subs ?? [];
+  const iso = subs.filter((x) => x.kind === 'isolated').length;
+  const other = subs.filter((x) => x.kind === 'other').length;
+  return `${subs.length} subaccount${subs.length === 1 ? '' : 's'} read (default${iso ? ` + ${iso} isolated` : ''}${other ? ` + ${other} other` : ''})`;
+}
+
+/** Each subaccount's own margin: an isolated one can be liquidatable while the wallet as a whole looks healthy. */
+function SubaccountTable({ n }: { n: NadoBook }) {
+  const rows = (n.subHealth ?? []).filter((x) => x.maintenance && (x.maintenance.assetsUsd !== 0 || x.maintenance.healthUsd !== 0));
+  if (rows.length < 2) return null;
+  const buf = (m: { healthUsd: number; assetsUsd: number }) => (m.assetsUsd > 0 ? m.healthUsd / m.assetsUsd : m.healthUsd < 0 ? -1 : Infinity);
+  const worst = rows.reduce((a, b) => (buf(b.maintenance!) < buf(a.maintenance!) ? b : a), rows[0]!);
+  const kindOf = (sub: string) => n.coverage?.subs.find((x) => x.subaccount === sub)?.kind ?? (subName(sub) === 'default' ? 'default' : subName(sub).startsWith('iso') || sub.includes('69736f') ? 'isolated' : 'other');
+  return (
+    <div className="table-wrap">
+      <table className="t" data-testid="subaccount-table">
+        <thead>
+          <tr><th>Subaccount</th><th>Kind</th><th className="r">Margin buffer</th><th className="r">Positions</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((x) => {
+            const b = buf(x.maintenance!);
+            const npos = n.spots.filter((s) => s.subaccount === x.subaccount).length + n.perps.filter((p) => p.subaccount === x.subaccount).length;
+            return (
+              <tr key={x.subaccount} className={x === worst ? 'worst' : undefined}>
+                <td className="mono">{subName(x.subaccount)}{x === worst ? <span className="src">MOST AT RISK</span> : null}</td>
+                <td className="mono">{kindOf(x.subaccount)}</td>
+                <td className="r num">{Number.isFinite(b) ? fmtPct(b) : '—'}</td>
+                <td className="r num">{npos}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

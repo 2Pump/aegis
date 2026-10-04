@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats } from '@aegis/census';
+import { MATERIAL, MATERIAL_LABEL, materialCounts, meetsMaterial, sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats, type Material } from '@aegis/census';
 import { COPY, NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL, tagColor } from '@aegis/glyphs';
 import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
@@ -145,24 +145,42 @@ export function woundText(s: CensusShip): string {
   return 'venue shown after the next hourly scan';
 }
 
+const FLOOR_SHORT: Record<Material, string> = { '0': 'All', '1k': '≥ $1k', '10k': '≥ $10k', '100k': '≥ $100k' };
+
 export function WoundedTape({ ships, head }: { ships: readonly CensusShip[]; head: number | null }) {
   // ordered by when they were first seen wounded — never by how close to liquidation
   const all = useMemo(
     () => ships.filter((s) => s.woundedSince !== null && s.primary !== 'EMPTY').sort((a, b) => (b.woundedSince ?? 0) - (a.woundedSince ?? 0)),
     [ships],
   );
-  const asMain = useMemo(() => all.filter((s) => s.primary === 'WOUNDED').length, [all]);
-  const wounded = all.slice(0, 8);
+  // size floor: small wallets are never hidden — "All" is always one click away and its total always shown.
+  // Default ≥ $1,000 so dust accounts don't make the danger look bigger than it is.
+  const [floor, setFloor] = useState<Material>('1k');
+  const counts = useMemo(() => materialCounts(all.map((s) => s.band)), [all]);
+  const list = useMemo(() => all.filter((s) => meetsMaterial(s.band, floor)), [all, floor]);
+  const asMain = useMemo(() => list.filter((s) => s.primary === 'WOUNDED').length, [list]);
+  const wounded = list.slice(0, 8);
   return (
-    <div data-testid="wounded-tape">
+    <div data-testid="wounded-tape" data-floor={floor}>
       <div className="panel-title" style={{ marginBottom: 6 }}>{COPY.woundedTape}</div>
+      <div className="tape-floor" role="group" aria-label="Wallet size floor">
+        {MATERIAL.map((m) => (
+          <button key={m} type="button" className={`sq-btn${floor === m ? ' on' : ''}`} aria-pressed={floor === m} onClick={() => setFloor(m)} data-testid={`tape-floor-${m}`}>
+            {FLOOR_SHORT[m]} <span className="num">{counts[m].toLocaleString('en-US')}</span>
+          </button>
+        ))}
+      </div>
+      <div className="faint tape-floor-note" data-testid="tape-floor-note">
+        {all.length.toLocaleString('en-US')} near liquidation in all · showing <b>{MATERIAL_LABEL[floor].toLowerCase()}</b> ({list.length.toLocaleString('en-US')}). Size is a range from the wallet's
+        positions, never its exact balance.
+      </div>
       {wounded.length === 0 ? (
-        <div className="dim">No wallets near liquidation right now.</div>
+        <div className="dim">{all.length === 0 ? 'No wallets near liquidation right now.' : `None ${MATERIAL_LABEL[floor].toLowerCase()} near liquidation right now — ${all.length.toLocaleString('en-US')} smaller ones are, under "All".`}</div>
       ) : (
         <>
           <div className="faint" style={{ fontSize: 12, marginBottom: 8 }} data-testid="wounded-explain">
-            {all.length} {all.length === 1 ? 'wallet is' : 'wallets are'} near liquidation · for {asMain} it's the only type that applies (the mix bar counts only those). The badge is each wallet's position type. Newest first
-            {all.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
+            {list.length} {list.length === 1 ? 'wallet is' : 'wallets are'} near liquidation at this size · for {asMain} it's the only type that applies (the mix bar counts only those). The badge is each wallet's position type. Newest first
+            {list.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
           </div>
           <ul className="tape">
             {wounded.map((s) => (

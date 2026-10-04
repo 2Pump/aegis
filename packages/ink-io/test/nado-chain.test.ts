@@ -80,10 +80,12 @@ describe('Nado on-chain sensor (FQuerier)', () => {
     expect(b.notes.some((n) => n.includes('FQuerier'))).toBe(true);
   });
 
-  it('non-existent account → OK with empty book and a note (not DARK, not invented)', async () => {
+  it('exists=false but holding balances → OK, counted, and NOT called "no account" (not DARK, not invented)', async () => {
     const res = await readNadoChain(client(false), ADDR);
     expect(res.ok).toBe(true);
-    if (res.ok) expect(res.value.book.notes).toContain('No Nado account for this address');
+    if (!res.ok) return;
+    expect(res.value.book.notes).not.toContain('No Nado account for this address');
+    expect(res.value.book.notes.join(' ')).toMatch(/exists=false on-chain but hold balances — counted/);
   });
 
   it('wrong chain → WRONG_CHAIN', async () => {

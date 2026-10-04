@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
-import { RULES, classify } from '@aegis/pose';
+import { RULES, SCENARIO_ENGINE_VERSION, classify } from '@aegis/pose';
+import { VERIFY, latestChecks, type CheckDisplay } from '@aegis/census';
+import { useVerificationLog } from '../lib/verificationLog';
+import { fmtAge } from '../lib/fmt';
+import { useNow } from '../lib/hulls';
 import { RISK_LABEL } from '@aegis/glyphs';
 import { Panel, TagChip } from '../components/bits';
 import { FIXTURES } from '../lib/fixtures';
@@ -10,8 +14,14 @@ export function CalibrationPage() {
   return (
     <div className="stack">
       <h2 className="page">Checks</h2>
+      <div className="mono dim" style={{ fontSize: 12 }} data-testid="versions-now">
+        Now running: rules <b>{RULES.RULES_VERSION}</b> · scenario engine <b>{SCENARIO_ENGINE_VERSION}</b> · checks {VERIFY.VERSION}. Every check below keeps the versions it ran
+        under.
+      </div>
 
-      <Panel title="Are the readings right?" rail={VERIFIED ? 'var(--cyan)' : VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? 'var(--amber)' : 'var(--red)'} testId="proof-panel">
+      <AutoChecks />
+
+      <Panel title="Matched against the official apps — by hand" rail={VERIFIED ? 'var(--cyan)' : VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? 'var(--amber)' : 'var(--red)'} testId="proof-panel">
         {VERIFIED || VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? (
           <div className="stack" style={{ gap: 8 }}>
             <div className={`banner${VERIFIED ? ' cyan' : ''}`}>{VERIFIED ? 'CHECKED' : 'PARTLY CHECKED'} — {verificationText()}.</div>
@@ -72,5 +82,78 @@ export function CalibrationPage() {
         </div>
       </Panel>
     </div>
+  );
+}
+
+const DISPLAY_TONE: Record<CheckDisplay, string> = { CURRENT: 'var(--cyan)', STALE: 'var(--amber)', FAILED: 'var(--red)', 'SOURCE UNAVAILABLE': 'var(--slate)' };
+const SOURCE_TYPE: Record<string, string> = { 'on-chain': 'on-chain contract', 'official-api': 'official API', 'official-app': 'official app' };
+
+/** The daily automatic cross-checks (verify.yml). Real wallets, compared with authoritative sources AEGIS doesn't read from. */
+function AutoChecks() {
+  const log = useVerificationLog();
+  const now = useNow(60_000);
+  return (
+    <Panel title="Automatic checks — daily" rail="var(--cyan)" testId="auto-checks" right={<span className="mono">stale after {VERIFY.STALE_HOURS} h</span>}>
+      {log.status === 'loading' ? <div className="dim">Loading…</div> : null}
+      {log.status === 'missing' ? (
+        <div className="banner" data-testid="auto-checks-missing">
+          No automatic check has run yet. The <code>verify</code> workflow runs daily (or by hand: Actions → verify → Run workflow); results appear here.
+        </div>
+      ) : null}
+      {log.status === 'error' ? <div className="banner red">Couldn't load the check log ({log.message}). Nothing is shown rather than a guess.</div> : null}
+      {log.status === 'ok' ? (
+        <>
+          <div className="dim" style={{ fontSize: 12, marginBottom: 8 }}>
+            Real wallets read with this site's own readers, then compared with sources AEGIS does not read from: Tydro's AaveProtocolDataProvider (balances and a recomputed
+            health factor, same block) and Nado's Clearinghouse (every subaccount's maintenance health). Nado's official API is tried too; it only answers Nado's own website, so
+            it shows SOURCE UNAVAILABLE — that is never counted as a pass. These are not the by-hand matches against the official apps further down.
+          </div>
+          <div className="table-wrap">
+            <table className="t" data-testid="auto-checks-latest">
+              <thead>
+                <tr><th>Status</th><th>Case</th><th>Compared with</th><th>Latest</th><th>Fields</th><th>Versions</th></tr>
+              </thead>
+              <tbody>
+                {latestChecks(log.records, now).map((g) => {
+                  const r = g.latest;
+                  const passed = r.fields.filter((f) => f.pass === true).length;
+                  return (
+                    <tr key={`${g.venue}${g.sourceType}${g.case}`} data-testid="auto-check-row" data-display={g.display}>
+                      <td className="mono"><b style={{ color: DISPLAY_TONE[g.display] }}>{g.display}</b></td>
+                      <td>{r.case}<div className="faint mono" style={{ fontSize: 11 }}>{r.wallet}</div></td>
+                      <td className="mono" style={{ fontSize: 11 }}>{SOURCE_TYPE[r.sourceType] ?? r.sourceType}<div className="faint">{r.source}</div></td>
+                      <td className="mono" style={{ fontSize: 11 }}>
+                        {fmtAge(Date.parse(r.at), now)} ago · block {r.block?.toLocaleString('en-US') ?? '—'}
+                        {r.failureReason ? <div className="neg">{r.failureReason}</div> : null}
+                        {g.display !== 'CURRENT' && g.lastSuccess && g.lastSuccess !== r ? (
+                          <div className="faint">last success {fmtAge(Date.parse(g.lastSuccess.at), now)} ago ({g.lastSuccessDisplay})</div>
+                        ) : null}
+                      </td>
+                      <td className="num">{passed}/{r.fields.length}</td>
+                      <td className="mono" style={{ fontSize: 11 }}>
+                        rules {r.rulesVersion}{r.rulesVersion !== RULES.RULES_VERSION ? <b className="proof-old"> (older)</b> : null}
+                        {r.engineVersion ? ` · ${r.engineVersion}` : ''}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <details style={{ marginTop: 10 }}>
+            <summary className="mono dim" style={{ fontSize: 11, cursor: 'pointer' }}>History ({log.records.length} records, newest first — never deleted)</summary>
+            <ul className="reasons" style={{ marginTop: 8 }}>
+              {[...log.records].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 60).map((r, i) => (
+                <li key={`${r.at}${i}`}>
+                  {r.status.replace('_', ' ')} · {r.venue} · {r.case} · {r.wallet} · {SOURCE_TYPE[r.sourceType] ?? r.sourceType} · {r.at} · block {r.block ?? '—'} · rules {r.rulesVersion}
+                  {r.fields.length ? ` · ${r.fields.map((f) => `${f.label} ${f.pass === null ? 'n/a' : f.pass ? 'ok' : `FAIL (AEGIS ${f.aegis}, source ${f.expected}, ±${f.tolerance})`}`).join('; ')}` : ''}
+                  {r.failureReason ? ` · ${r.failureReason}` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </>
+      ) : null}
+    </Panel>
   );
 }

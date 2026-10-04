@@ -14,3 +14,4 @@ apps/web/public/census/
 
 # Nado API reply saved for `pnpm prove --nado-json` (real account data, keep local)
 nado.json
+.alerts/

@@ -10,6 +10,8 @@ import {
   queryPressure,
   shareText,
   stressLevel,
+  pressureFreshness,
+  FRESHNESS,
   type Material,
   type PressureQuery,
   type PressureSnapshot,
@@ -51,7 +53,7 @@ const LEVEL_TONE: Record<string, string> = { CALM: 'var(--cyan)', ELEVATED: 'var
 
 export function PressurePage() {
   const now = useNow(30_000);
-  const ps = usePressure();
+  const { state: ps, refresh } = usePressure();
   const census = useCensus();
   if (!WELL_ON) {
     return (
@@ -75,14 +77,43 @@ export function PressurePage() {
         </div>
       ) : null}
       {ps.status === 'error' ? <div className="banner red">Couldn't load the pressure map ({ps.message}). Nothing is shown rather than a guess.</div> : null}
-      {ps.status === 'ok' ? <PressureBody s={ps.snap} now={now} oi={cov ? minShare(cov.share.nadoOpenInterestLongs, cov.share.nadoOpenInterestShorts) : null} cov={cov} /> : null}
+      {ps.status === 'ok' ? (
+        <PressureBody
+          s={ps.snap}
+          now={now}
+          oi={cov ? minShare(cov.share.nadoOpenInterestLongs, cov.share.nadoOpenInterestShorts) : null}
+          cov={cov}
+          wellAt={census.status === 'ok' ? census.snap.generatedAt : null}
+          wellBlock={census.status === 'ok' ? census.snap.block : null}
+          refreshError={ps.refreshError ?? null}
+          onRefresh={refresh}
+        />
+      ) : null}
     </div>
   );
 }
 
 const minShare = (a: number | null, b: number | null) => (a === null || b === null ? null : Math.min(a, b));
 
-function PressureBody({ s, now, oi, cov }: { s: PressureSnapshot; now: number; oi: number | null; cov: { share: Record<string, number | null | undefined>; block: number; at: string } | null }) {
+function PressureBody({
+  s,
+  now,
+  oi,
+  cov,
+  wellAt,
+  wellBlock,
+  refreshError,
+  onRefresh,
+}: {
+  s: PressureSnapshot;
+  now: number;
+  oi: number | null;
+  cov: { share: Record<string, number | null | undefined>; block: number; at: string } | null;
+  wellAt: string | null;
+  wellBlock: number | null;
+  refreshError: string | null;
+  onRefresh: () => boolean;
+}) {
   const [params, setParams] = useSearchParams();
   const q = clampQuery(
     { dir: params.get('d') ?? undefined, sign: (params.get('s') as 'down' | 'up') ?? undefined, pct: params.get('p') === null ? undefined : Number(params.get('p')), material: (params.get('m') as Material) ?? undefined, dim: params.get('by') ?? undefined },
@@ -97,21 +128,46 @@ function PressureBody({ s, now, oi, cov }: { s: PressureSnapshot; now: number; o
   const r = useMemo(() => queryPressure(s, q), [s, q.dir, q.sign, q.pct, q.material, q.dim]);
   const all = useMemo(() => queryPressure(s, { ...q, material: '0' }), [s, q.dir, q.sign, q.pct, q.dim]);
   const stress = useMemo(() => stressLevel(s, { nowMs: now, oiCoverage: oi }), [s, now, oi]);
-  const ageMs = now - Date.parse(s.at);
-  const stale = ageMs > STRESS.STALE_HOURS * 3_600_000;
+  const fresh = pressureFreshness(s, now);
+  const stale = fresh.status === 'STALE';
+  const [tried, setTried] = useState<string | null>(null);
   const signLabel = q.sign === 'down' ? '−' : '+';
   const scenarioLabel = `${dir.label} ${signLabel}${q.pct}%`;
 
   return (
     <>
-      <div className="mono faint pm-stamp" data-testid="pressure-stamp">
-        Based on wallets currently visible to AEGIS · block {s.block.toLocaleString('en-US')} · read {fmtAge(Date.parse(s.at), now)} ago (venue oracle prices at that block) · rules {s.rulesVersion}
-        {s.rulesVersion !== RULES.RULES_VERSION ? ` (site now on ${RULES.RULES_VERSION})` : ''} · engine {s.engine}
-        {s.engine !== SCENARIO_ENGINE_VERSION ? ` (site on ${SCENARIO_ENGINE_VERSION})` : ''} · {STRESS.VERSION}
-      </div>
-      {stale ? <div className="banner">STALE — this map is {fmtAge(Date.parse(s.at), now)} old. The full scan rebuilds it every 3 hours; prices have moved since.</div> : null}
+      <section className={`panel pm-fresh ${fresh.status}`} style={{ ['--rail' as string]: fresh.status === 'CURRENT' ? 'var(--cyan)' : fresh.status === 'DELAYED' ? 'var(--amber)' : 'var(--red)' }} data-testid="pressure-freshness" data-status={fresh.status}>
+        <div className="rail" aria-hidden />
+        <div className="body">
+          <div className="pm-fresh-row">
+            <b className="pm-fresh-status">{fresh.status}</b>
+            <span>
+              This map: block {s.block.toLocaleString('en-US')}, read {fmtAge(Date.parse(s.pricesAt ?? s.at), now)} ago — {fresh.why}.
+              {wellAt ? ` The well: block ${wellBlock?.toLocaleString('en-US') ?? '—'}, ${fmtAge(Date.parse(wellAt), now)} ago.` : ''}
+            </span>
+            <button
+              type="button"
+              className="sq-btn"
+              onClick={() => setTried(onRefresh() ? 'checking…' : 'checked less than a minute ago')}
+              title="Looks for a newer map file. It never re-reads the chain."
+            >
+              Check for a newer map
+            </button>
+            {tried ? <span className="faint">{tried}</span> : null}
+          </div>
+          <div className="faint pm-fresh-why">
+            Why they differ: the well is refreshed every hour, but the Pressure Map needs every wallet read at the same block, which only the full scan does (every 3 hours, about 45 minutes per run). Prices are the venues' own oracle prices at the map's block.
+          </div>
+          {refreshError ? <div className="banner" data-testid="pressure-refresh-failed">The last refresh failed ({refreshError}). Showing the last good map, with its own age above — nothing was replaced by a guess.</div> : null}
+          <div className="mono faint pm-stamp" data-testid="pressure-stamp">
+            Based on wallets currently visible to AEGIS · rules {s.rulesVersion}
+            {s.rulesVersion !== RULES.RULES_VERSION ? ` (site now on ${RULES.RULES_VERSION})` : ''} · engine {s.engine}
+            {s.engine !== SCENARIO_ENGINE_VERSION ? ` (site on ${SCENARIO_ENGINE_VERSION})` : ''} · {STRESS.VERSION} · {FRESHNESS.VERSION}
+          </div>
+        </div>
+      </section>
 
-      <StressPanel stress={stress} />
+      <StressPanel stress={stress} stale={stale} asOf={fmtAge(Date.parse(s.pricesAt ?? s.at), now)} />
 
       <Panel title="Scenario" rail="var(--slate)" testId="pressure-controls">
         <div className="pm-presets" role="group" aria-label="Preset scenarios">
@@ -237,8 +293,8 @@ function PressureBody({ s, now, oi, cov }: { s: PressureSnapshot; now: number; o
 
 const pctOf = (x: number | null | undefined) => (x === null || x === undefined ? '—' : `${(x * 100).toFixed(1)}%`);
 
-function StressPanel({ stress }: { stress: StressReading }) {
-  const tone = LEVEL_TONE[stress.level]!;
+function StressPanel({ stress, stale, asOf }: { stress: StressReading; stale: boolean; asOf: string }) {
+  const tone = stale ? 'var(--ink-faint)' : LEVEL_TONE[stress.level]!;
   return (
     <section className="panel pm-stress" style={{ ['--rail' as string]: tone }} data-testid="stress-level" data-level={stress.level}>
       <div className="rail" aria-hidden />
@@ -248,7 +304,10 @@ function StressPanel({ stress }: { stress: StressReading }) {
           <span className="right">{stress.version} · a reading of today's positions, not a forecast</span>
         </h3>
         <div className="pm-stress-row">
-          <div className="pm-level" style={{ color: tone }}>{stress.level}</div>
+          <div className="pm-level" style={{ color: tone }}>
+            {stress.level}
+            {stale ? <div className="pm-asof" data-testid="stress-stale">STALE · as of {asOf} ago, not now</div> : null}
+          </div>
           <ul className="pm-why">
             {stress.why.map((w) => (
               <li key={w}>{w}</li>
@@ -407,7 +466,7 @@ function Breakdown({ s, q, rows }: { s: PressureSnapshot; q: PressureQuery; rows
 function ShareBox({ s, q, stress }: { s: PressureSnapshot; q: PressureQuery; stress: StressReading }) {
   const [copied, setCopied] = useState(false);
   const url = typeof window === 'undefined' ? '' : `${window.location.origin}/pressure?d=${q.dir}&s=${q.sign}&p=${q.pct}&m=${q.material}&by=${encodeURIComponent(q.dim)}`;
-  const text = shareText(s, q, stress, url);
+  const text = shareText(s, q, stress, url, Date.now());
   return (
     <Panel title="Share this scenario" rail="var(--amber)" testId="pressure-share">
       <pre className="pm-share mono" data-testid="pressure-share-text">{text}</pre>

@@ -1,0 +1,43 @@
+# AEGIS automatic verification — daily.
+# Reads a few real wallets from the latest census with the site's own readers and compares them with authoritative
+# on-chain sources AEGIS's path doesn't use (Tydro's AaveProtocolDataProvider; Nado's Clearinghouse.getHealth for
+# every subaccount), and tries Nado's official API (expected SOURCE UNAVAILABLE from here: Cloudflare; never worked
+# around). Appends records to verification-log.json on Vercel Blob; the Checks page shows them.
+# Read-only. Same secrets as the census (BLOB_READ_WRITE_TOKEN, optional INK_RPC). Nothing here can move funds.
+
+name: verify
+run-name: verify · ${{ github.event_name }}
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: verify
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - run: pnpm install --frozen-lockfile
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - name: Verify
+        run: pnpm verify:auto --store blob
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          INK_RPC: ${{ secrets.INK_RPC }}

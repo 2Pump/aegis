@@ -32,7 +32,8 @@ import {
   parseAddress,
   readBook,
 } from '@aegis/ink-io';
-import { classify, type Book } from '@aegis/pose';
+import { SCENARIO_ENGINE_VERSION, classify, type Book } from '@aegis/pose';
+import { compareField, finalize, shortWallet, type VerificationRecord } from '@aegis/census';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -280,6 +281,42 @@ async function main() {
   const fails = checks.filter((c) => c.verdict === 'FAIL');
   const uiPass = checks.filter((c) => c.id.startsWith('ui.') && c.verdict === 'PASS');
 
+  function structuredRecords(): VerificationRecord[] {
+    const num = (x: string) => {
+      const v = Number(String(x).replace(/[$,\s]/g, ''));
+      return x === '—' || x === '' || !Number.isFinite(v) ? null : v;
+    };
+    const out: VerificationRecord[] = [];
+    for (const v of ['tydro', 'nado'] as const) {
+      const fs = ui.filter((f) => f.venue === v);
+      if (!fs.length) continue;
+      const fields = fs.map((f) => {
+        const c = checks.find((x) => x.id === f.id);
+        return compareField({ id: f.id, label: f.label, expected: c ? num(c.other) : null, aegis: f.aegis, tolerance: f.tol, unit: f.unit });
+      });
+      const api = v === 'nado' && nadoSource === 'api';
+      out.push(
+        finalize({
+          v: 1,
+          kind: 'manual',
+          venue: v,
+          wallet: shortWallet(user),
+          case: 'Hand check against the official app',
+          source: api ? 'Nado official API (saved by hand from a browser)' : v === 'tydro' ? 'Tydro app (typed in by hand)' : 'app.nado.xyz (typed in by hand)',
+          sourceType: api ? 'official-api' : 'official-app',
+          at: new Date().toISOString(),
+          block: book.asOfBlock,
+          rulesVersion: pose.rulesVersion,
+          engineVersion: SCENARIO_ENGINE_VERSION,
+          fields,
+          sourceUnavailable: false,
+          failureReason: checks.some((c) => venueOf(c.id) === v && c.verdict === 'FAIL' && !c.id.startsWith('ui.')) ? 'a machine check for this venue failed' : null,
+        }),
+      );
+    }
+    return out;
+  }
+
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dir = join(root, 'verification');
   mkdirSync(dir, { recursive: true });
@@ -293,6 +330,8 @@ async function main() {
     pose: { tags: pose.tags, hullTemp: pose.hullTemp, reasons: pose.reasons },
     checks,
     provenVenues: venues,
+    /** the same structured format as the automatic checks (verify-1.0.0): per-field expected / AEGIS / tolerance / pass */
+    structured: structuredRecords(),
     nadoReference: nadoSource === 'api' ? `Nado official API (${nadoUrl})` : 'app.nado.xyz',
   };
   const file = join(dir, `${user}-${stamp}.json`);

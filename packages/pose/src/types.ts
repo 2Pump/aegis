@@ -130,6 +130,22 @@ export interface NadoBook {
   notes: string[];
   /** every live subaccount's own maintenance triple (isolated positions are liquidated on their own). Used only by the scenario engine. */
   subHealth?: Array<{ subaccount: string; maintenance: HealthTriple | null }>;
+  /**
+   * Which subaccounts this book covers, and whether that is every one AEGIS knows of. Set by the wallet-page reader;
+   * absent in the census (whose discovery IS the list). PARTIAL = isolated positions may be missing.
+   */
+  coverage?: NadoCoverage;
+}
+
+export type SubaccountKind = 'default' | 'isolated' | 'other';
+
+export interface NadoCoverage {
+  status: 'COMPLETE' | 'PARTIAL';
+  /** plain-language reasons (PARTIAL), or how completeness was established (COMPLETE) */
+  why: string[];
+  /** AEGIS discovery is complete through this block (null = no discovery available) */
+  throughBlock: number | null;
+  subs: Array<{ subaccount: string; kind: SubaccountKind; readAt: number }>;
 }
 
 export type Sensor<T> =

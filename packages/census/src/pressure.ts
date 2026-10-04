@@ -42,6 +42,18 @@ export type Material = (typeof MATERIAL)[number];
 export const MATERIAL_LABEL: Record<Material, string> = { '0': 'All wallets', '1k': 'At least $1,000', '10k': 'At least $10,000', '100k': 'At least $100,000' };
 const BAND_FLOOR: Record<SizeBand, number> = { dust: 0, '<1k': 0, '1–10k': 1, '10–100k': 2, '100k+': 3 };
 
+/** Does a wallet of this size band meet the floor? The ONE definition of "material" (well, Scan, Pressure). */
+export function meetsMaterial(band: SizeBand, m: Material): boolean {
+  return BAND_FLOOR[band] >= MATERIAL.indexOf(m);
+}
+
+/** How many of these wallets meet each floor — e.g. for the near-liquidation list's summary. */
+export function materialCounts(bands: readonly SizeBand[]): Record<Material, number> {
+  const out = { '0': 0, '1k': 0, '10k': 0, '100k': 0 } as Record<Material, number>;
+  for (const b of bands) for (const m of MATERIAL) if (meetsMaterial(b, m)) out[m]++;
+  return out;
+}
+
 export type Venue = 'tydro' | 'nado' | 'both';
 
 export interface PressureSnapshot {
@@ -51,6 +63,8 @@ export interface PressureSnapshot {
   block: number;
   /** when the sweep read the chain (prices are the venues' oracle prices at that block) */
   at: string;
+  /** when the prices were read: the venues' oracle prices at `block`, read at this time (same sweep) */
+  pricesAt?: string;
   maxPct: number;
   privacyMinCell: number;
   /** wallets in the sweep, by what could be simulated */
@@ -98,7 +112,7 @@ export class PressureAcc {
     if (conf.confidence === 'APPROXIMATE') this.pop.approximate++;
     const venue = venueOf(book);
     const dims = ['*', ...(venue ? [`v:${venue}`] : []), `t:${pose.primary ?? 'NONE'}`];
-    const floors = MATERIAL.slice(0, BAND_FLOOR[band] + 1);
+    const floors = MATERIAL.filter((m) => meetsMaterial(band, m));
     const cur = curOf(pose.hullTemp, liquidatable(book));
     for (const m of floors) for (const d of dims) this.bump(this.now, `${cur}|${m}|${d}`);
     for (const dir of this.dirs) {
@@ -147,6 +161,7 @@ export class PressureAcc {
       rulesVersion: meta.rulesVersion,
       block: meta.block,
       at: meta.at,
+      pricesAt: meta.at,
       maxPct: MAX_PCT,
       privacyMinCell: PRIVACY_MIN_CELL,
       population: { ...this.pop },
@@ -309,16 +324,40 @@ export function stressLevel(s: PressureSnapshot, ctx: { nowMs: number; oiCoverag
 }
 
 /** The share text: counts and labels only — never balances, never addresses. */
-export function shareText(s: PressureSnapshot, q: PressureQuery, stress: StressReading, url: string): string {
+export function shareText(s: PressureSnapshot, q: PressureQuery, stress: StressReading, url: string, nowMs: number = Date.now()): string {
   const d = DIRECTIONS.find((x) => x.id === q.dir)!;
   const r = queryPressure(s, q);
   const all = queryPressure(s, { ...q, material: '0' });
+  const f = pressureFreshness(s, nowMs);
   return [
     `AEGIS Pressure Map — ${d.label} ${q.sign === 'down' ? '−' : '+'}${q.pct}% (a simulation, not a prediction)`,
-    `Ink Stress Level: ${stress.level}${stress.confidence === 'REDUCED' ? ' (reduced confidence)' : ''}`,
+    ...(f.status === 'CURRENT' ? [] : [`${f.status}: this map is ${f.why}`]),
+    `Ink Stress Level: ${stress.level}${f.status === 'STALE' ? ' (as of then, not now)' : ''}${stress.confidence === 'REDUCED' ? ' (reduced confidence)' : ''}`,
     `Wallets pushed toward liquidation: ${all.affected} of ${all.population} visible to AEGIS · ${r.affected} of ${r.population} ${MATERIAL_LABEL[q.material].toLowerCase()}`,
     `Block ${s.block.toLocaleString('en-US')} · ${s.at}`,
     'Based on wallets currently visible to AEGIS. AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
     url,
   ].join('\n');
+}
+
+/* ───────────────────────── freshness ───────────────────────── */
+
+/**
+ * The Pressure Map is rebuilt by each one-block full sweep (every 3 hours, ~45 min to run); the well is refreshed by
+ * every hourly run. So Pressure is normally older than the well. Versioned thresholds:
+ *   CURRENT  ≤ CURRENT_H   (one full-sweep interval plus its run time)
+ *   DELAYED  ≤ STALE_H     (a sweep or two missed)
+ *   STALE    > STALE_H, or no readable time
+ */
+export const FRESHNESS = { VERSION: 'fresh-1.0.0', CURRENT_H: 4, STALE_H: 12 } as const;
+
+export type Freshness = 'CURRENT' | 'DELAYED' | 'STALE';
+
+export function pressureFreshness(s: Pick<PressureSnapshot, 'at' | 'pricesAt'>, nowMs: number): { status: Freshness; ageH: number | null; why: string } {
+  const t = Date.parse(s.pricesAt ?? s.at);
+  if (!Number.isFinite(t)) return { status: 'STALE', ageH: null, why: 'its reading time is missing, so its age is unknown' };
+  const ageH = Math.max(0, (nowMs - t) / 3_600_000);
+  if (ageH <= FRESHNESS.CURRENT_H) return { status: 'CURRENT', ageH, why: `built by the last full scan, ${ageH.toFixed(1)} h ago` };
+  if (ageH <= FRESHNESS.STALE_H) return { status: 'DELAYED', ageH, why: `${ageH.toFixed(1)} h old — at least one full scan was missed` };
+  return { status: 'STALE', ageH, why: `${ageH.toFixed(0)} h old — prices and positions have moved since` };
 }
