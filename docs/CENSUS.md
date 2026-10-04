@@ -30,9 +30,9 @@ On the site this is called **the scan** (nav: Scan). "Hourly update" = an increm
 | Anything that transacted since the last run | every hour |
 | At-risk (HF < 2, Nado buffer < 50%, ELEVATED/CRITICAL) | every hour, and every ~15 s live |
 | Tydro borrowers (ever touched a debt token) | every hour (price alone can move their HF) |
-| Quiet, healthy, active Nado accounts | full sweep every 8 hours (they're expensive: the Querier returns ~100 products per call) |
-| Healthy wallets that never borrowed on Tydro | full sweep every 8 hours (no debt → price can't wound them; any deposit, withdrawal or trade re-reads them at once) |
-| Empty wallets | full sweep every 8 hours (they can only fill up through an event, which re-reads them at once) |
+| Quiet, healthy, active Nado accounts | full sweep every 3 hours (they're expensive: the Querier returns ~100 products per call) |
+| Healthy wallets that never borrowed on Tydro | full sweep every 3 hours (no debt → price can't wound them; any deposit, withdrawal or trade re-reads them at once) |
+| Empty wallets | full sweep every 3 hours (they can only fill up through an event, which re-reads them at once) |
 
 The first hourly run on this rule (2026-09-29, run #13) read 4,609 wallets in about 4 minutes and carried 60,265.
 
@@ -96,7 +96,7 @@ Fix (census v1.1):
 Most wallets the explorer lists hold nothing, or only dust. On the first backfill run, 22,991 of 32,499 were empty. So:
 - `census.json` carries only wallets worth drawing. It stays small enough for phones.
 - The empty ones are remembered in `known.json` as address → the block they were read at.
-- Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The full sweep every 8 hours re-reads them anyway.
+- Hourly runs don't re-read them. A wallet can only fill up through a deposit or transfer event, and the event scan marks it for re-reading at once. The full sweep every 3 hours re-reads them anyway.
 
 ## Reads once history is complete
 
@@ -146,7 +146,7 @@ Since 2026-10-03 the page opens on a living colony (`apps/web/src/components/Col
 
 ## Coverage check (is anyone missing?)
 
-On every **full** sweep (every 8 hours, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:
+On every **full** sweep (every 3 hours, or Actions → census → Run workflow with **full** ticked), the job compares what the known wallets add up to against each protocol's own on-chain totals at the same block:
 
 - **Tydro:** Σ wallet aToken / debt-token balances vs `aToken.totalSupply()` / `variableDebtToken.totalSupply()`, per reserve.
 - **Nado:** Σ wallet spot deposits vs each spot product's `totalDepositsNormalized × cumulativeDepositsMultiplierX18`, and Σ wallet longs and shorts vs each perp product's `openInterest`. Both come from the same FQuerier call the hull page uses.
@@ -218,7 +218,7 @@ The job log shows the coverage line only on full sweeps; the other runs republis
 
 **Coverage measures itself (since 2026-10-03).** Every run now has a 115-minute budget and a 130-minute job limit.
 - **Hourly runs** still finish in about 5 minutes.
-- **The automatic full sweep, every 8 hours** (weekly before 2026-10-03) reads all ~65,000 wallets in one run, about 45 minutes. That's enough to measure coverage, run the NLP and protocol-account lines and the discovery check, and publish the shares. No hand-started runs are needed. Timer runs that arrive during it wait, then skip because the census is fresh.
+- **The automatic full sweep, every 3 hours** (weekly before 2026-10-03, then every 8 hours) reads all ~65,000 wallets in one run, about 45 minutes. That's enough to measure coverage, run the NLP and protocol-account lines and the discovery check, and publish the shares. No hand-started runs are needed. Timer runs that arrive during it wait, then skip because the census is fresh.
 - **A hand-started full run** (Run workflow, **full** ticked) still works if you want a measurement sooner. It restarts any paused sweep.
 
 ## The lock

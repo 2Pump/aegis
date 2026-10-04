@@ -71,7 +71,7 @@ export function PressurePage() {
       {ps.status === 'loading' ? <div className="dim">Loading the latest pressure map…</div> : null}
       {ps.status === 'missing' ? (
         <div className="banner" data-testid="pressure-missing">
-          No pressure map yet. It's built by the full scan (every 8 hours, every wallet read at one block) and appears after the next one.
+          No pressure map yet. It's built by the full scan (every 3 hours, every wallet read at one block) and appears after the next one.
         </div>
       ) : null}
       {ps.status === 'error' ? <div className="banner red">Couldn't load the pressure map ({ps.message}). Nothing is shown rather than a guess.</div> : null}
@@ -109,7 +109,7 @@ function PressureBody({ s, now, oi, cov }: { s: PressureSnapshot; now: number; o
         {s.rulesVersion !== RULES.RULES_VERSION ? ` (site now on ${RULES.RULES_VERSION})` : ''} · engine {s.engine}
         {s.engine !== SCENARIO_ENGINE_VERSION ? ` (site on ${SCENARIO_ENGINE_VERSION})` : ''} · {STRESS.VERSION}
       </div>
-      {stale ? <div className="banner">STALE — this map is {fmtAge(Date.parse(s.at), now)} old. The full scan rebuilds it every 8 hours; prices have moved since.</div> : null}
+      {stale ? <div className="banner">STALE — this map is {fmtAge(Date.parse(s.at), now)} old. The full scan rebuilds it every 3 hours; prices have moved since.</div> : null}
 
       <StressPanel stress={stress} />
 

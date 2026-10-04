@@ -8,7 +8,7 @@ const read = (k: string): string | undefined => {
   return v && v.trim() ? v.trim() : undefined;
 };
 
-/** Written next to census.json by every one-block full sweep (every 8 hours). */
+/** Written next to census.json by every one-block full sweep (every 3 hours). */
 export const PRESSURE_URL = read('VITE_PRESSURE_URL') ?? CENSUS_URL.replace(/census\.json(\?.*)?$/, 'pressure.json');
 
 export type PressureState =

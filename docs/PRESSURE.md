@@ -27,7 +27,7 @@ What happens to the wallets AEGIS can see if prices move. It's a simulation from
 - Same-family positions move together. For example, kBTC, SolvBTC and BTC-PERP move as one, as do weETH and WETH. So a same-family loop doesn't get closer to liquidation when its family moves; only a depeg of one coin against another does.
 
 **3. Aggregates** (`packages/census/src/pressure.ts`).
-- **When they're built.** Every full sweep that reads every wallet at one block (every 8 hours) runs the engine on each wallet with debt or perps. It writes `pressure.json` next to `census.json`.
+- **When they're built.** Every full sweep that reads every wallet at one block (every 3 hours) runs the engine on each wallet with debt or perps. It writes `pressure.json` next to `census.json`.
 - **Cost.** About 7 s for 18,500 wallets, giving a file of about 260 KB.
 - **What's in the file:**
   - **counts only:** wallets that first reach Watch, Near liquidation or Liquidatable at each whole-% move, per direction × up/down × current state × size floor × one breakdown (venue or position type)
