@@ -1,5 +1,5 @@
 /**
- * AUTOMATIC VERIFICATION (`pnpm verify:auto`, scheduled every 4 hours by .github/workflows/verify.yml).
+ * AUTOMATIC VERIFICATION (`pnpm verify:auto`, run every ~4 hours by the hourly census (census.yml → "Checks (when due)"); by hand via verify.yml).
  *
  * Picks representative real wallets from the latest census (a Tydro borrower, a Nado default-only wallet, a Nado
  * wallet with an isolated subaccount), reads each with the exact readers the site uses, and compares them with

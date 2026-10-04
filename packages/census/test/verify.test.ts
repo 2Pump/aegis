@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXPECTED_CHECKS, appendRecords, checkDisplay, compareField, finalize, latestChecks, notChecked, type VerificationRecord } from '../src/index.js';
+import { EXPECTED_CHECKS, appendRecords, checkDisplay, compareField, finalize, latestChecks, notChecked, verifyDue, type VerificationRecord } from '../src/index.js';
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
 const field = (expected: number | null, aegis: number | null, tolerance = 0.001) => compareField({ id: 'x', label: 'x', expected, aegis, tolerance, unit: 'rel' });
@@ -86,5 +86,13 @@ describe('verification records', () => {
     const rows = latestChecks([a, b], NOW).filter((x) => x.venue === 'nado' && x.sourceType === 'on-chain' && x.case.startsWith('Nado isolated'));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.latest).toBe(b);
+  });
+
+  it('due logic for the hourly census: due with no record, not due inside the window, due after it; manual records don\'t count', () => {
+    expect(verifyDue(null, NOW, 3.75).due).toBe(true);
+    expect(verifyDue([rec({ at: '2026-10-04T10:00:00Z' })], NOW, 3.75).due).toBe(false); // 2 h old
+    expect(verifyDue([rec({ at: '2026-10-04T08:00:00Z' })], NOW, 3.75).due).toBe(true); // 4 h old
+    expect(verifyDue([rec({ kind: 'manual', at: '2026-10-04T11:00:00Z' })], NOW, 3.75).due).toBe(true);
+    expect(verifyDue('junk', NOW, 3.75).due).toBe(true);
   });
 });

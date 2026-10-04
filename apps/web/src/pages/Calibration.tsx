@@ -97,7 +97,7 @@ function AutoChecks() {
       {log.status === 'loading' ? <div className="dim">Loading…</div> : null}
       {log.status === 'missing' ? (
         <div className="banner" data-testid="auto-checks-missing">
-          No automatic check has run yet. The <code>verify</code> workflow runs every {VERIFY.EVERY_HOURS} hours (or by hand: Actions → verify → Run workflow); results appear here.
+          No automatic check has run yet. Checks run every {VERIFY.EVERY_HOURS} hours as part of the hourly census (or by hand: Actions → verify → Run workflow); results appear here.
         </div>
       ) : null}
       {log.status === 'error' ? <div className="banner red">Couldn't load the check log ({log.message}). Nothing is shown rather than a guess.</div> : null}

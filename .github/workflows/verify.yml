@@ -1,16 +1,15 @@
-# AEGIS automatic verification — every 4 hours.
-# Reads a few real wallets from the latest census with the site's own readers and compares them with authoritative
-# on-chain sources AEGIS's path doesn't use (Tydro's AaveProtocolDataProvider; Nado's Clearinghouse.getHealth for
-# every subaccount), and tries Nado's official API (expected SOURCE UNAVAILABLE from here: Cloudflare; never worked
-# around). Appends records to verification-log.json on Vercel Blob; the Checks page shows them.
-# Read-only. Same secrets as the census (BLOB_READ_WRITE_TOKEN, optional INK_RPC). Nothing here can move funds.
+# AEGIS automatic verification — BY HAND only. The every-4-hours runs happen inside the hourly census
+# (census.yml → "Checks (when due)"), which cron-job.org keeps on time; GitHub's own schedule was unreliable, and two
+# timers could both append to the log at once. Use this to run the checks right now: Actions → verify → Run workflow.
+# Reads a few real wallets from the latest census with the site's own readers and compares them with sources AEGIS's
+# own path doesn't use (Tydro's AaveProtocolDataProvider; Nado's Clearinghouse.getHealth for every subaccount; Nado's
+# official API, which may refuse — then SOURCE UNAVAILABLE, never worked around). Appends to verification-log.json on
+# Vercel Blob; the Checks page shows it. Read-only. Same secrets as the census. Nothing here can move funds.
 
 name: verify
 run-name: verify · ${{ github.event_name }}
 
 on:
-  schedule:
-    - cron: '23 */4 * * *'
   workflow_dispatch:
 
 concurrency:

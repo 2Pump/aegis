@@ -105,3 +105,16 @@ jobs:
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           INK_RPC: ${{ secrets.INK_RPC }}
+
+      # The Checks page (docs/VERIFICATION.md): runs only when the last automatic check is ~4 h old, so the hourly
+      # timer keeps the checks current with no timer of their own (a few minutes when due, seconds when not).
+      # Runs even if the census step failed. A failed CHECK shows on the Checks page as FAILED; it doesn't turn the
+      # census run red (continue-on-error) — the census itself is judged by its own step above.
+      - name: Checks (when due)
+        if: ${{ !cancelled() && steps.fresh.outputs.skip != 'true' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: pnpm verify:auto --store blob --if-due
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          INK_RPC: ${{ secrets.INK_RPC }}

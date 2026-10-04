@@ -212,6 +212,7 @@ export {
   EXPECTED_CHECKS,
   caseName,
   notChecked,
+  verifyDue,
   type CheckGroup,
   type VerificationRecord,
   type FieldCheck,

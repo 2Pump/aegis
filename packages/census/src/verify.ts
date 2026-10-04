@@ -133,6 +133,18 @@ export function latestChecks(records: readonly VerificationRecord[], nowMs: numb
     .sort((a, b) => (order(a) < order(b) ? -1 : 1));
 }
 
+/**
+ * Is an automatic run due? Due when the newest automatic record is at least `hours` old (or there is none).
+ * The hourly census calls this, so checks run about every VERIFY.EVERY_HOURS without a separate timer.
+ */
+export function verifyDue(log: unknown, nowMs: number, hours: number): { due: boolean; why: string } {
+  const recs = appendRecords(log, []).filter((r) => r.kind === 'auto');
+  const last = recs.reduce((m, r) => Math.max(m, Date.parse(r.at) || 0), 0);
+  if (!last) return { due: true, why: 'no automatic check on record yet' };
+  const ageH = (nowMs - last) / 3_600_000;
+  return ageH >= hours ? { due: true, why: `last automatic check ${ageH.toFixed(1)} h ago (≥ ${hours} h)` } : { due: false, why: `last automatic check ${ageH.toFixed(1)} h ago (< ${hours} h) — not due` };
+}
+
 /** Append without ever deleting history; refuses anything that isn't a record. */
 export function appendRecords(log: unknown, add: readonly VerificationRecord[]): VerificationRecord[] {
   const prev = Array.isArray(log) ? (log as unknown[]).filter((x): x is VerificationRecord => !!x && (x as VerificationRecord).v === 1 && typeof (x as VerificationRecord).at === 'string') : [];

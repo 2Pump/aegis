@@ -111,7 +111,7 @@ This vector cannot pass the human step unless you control that wallet. It proves
 
 ## Automatic checks (`verify-1.0.0`)
 
-`pnpm verify:auto` — run every 4 hours by `.github/workflows/verify.yml` (:23 past 00, 04, 08, 12, 16, 20 UTC, or Actions → verify → Run workflow), same secrets as the census.
+`pnpm verify:auto` — run about every 4 hours by the hourly census itself (census.yml → "Checks (when due)": it runs when the last automatic check is ≥ 3¾ h old, so cron-job.org's hourly timer keeps the checks on time with no timer of their own). By hand: Actions → verify → Run workflow, same secrets as the census.
 - Picks real wallets from the latest census (a different set each run): a Tydro borrower, a Nado default-only wallet, a Nado wallet with an isolated subaccount.
 - Reads each with the site's own readers and compares with sources AEGIS does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
 - Compares Nado's official API too, with a plain request (it answered from GitHub's runners on 2026-10-04). When Cloudflare refuses it, the row is SOURCE UNAVAILABLE — never a pass, never worked around.
