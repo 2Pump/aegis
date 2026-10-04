@@ -167,8 +167,22 @@ function AssetRowView({ r }: { r: AssetRow }) {
                   <ExplorerAddr a={r.tydro?.source ?? null} />
                   {r.tydro?.sourceDescription ? <span className="faint"> · {r.tydro.sourceDescription}</span> : null}
                   {r.tydro?.sourceAnswer !== null && r.tydro?.sourceAnswer !== undefined ? <span className="faint"> · answers {price(r.tydro.sourceAnswer)}</span> : null}
-                  {r.tydro?.sourceUpdatedAt ? <span className="faint"> · updated {when(r.tydro.sourceUpdatedAt)}</span> : null}
+                  {r.tydro?.sourceKind === 'adapter' ? <span className="faint"> · an adapter</span> : null}
+                  {r.tydro?.capped ? <span style={{ color: 'var(--amber)' }}> · price cap ACTIVE</span> : null}
+                  {r.tydro?.sourceUpdatedAt && r.tydro.sourceKind !== 'adapter' ? <span className="faint"> · updated {when(r.tydro.sourceUpdatedAt)}</span> : null}
                 </dd>
+                {r.tydro?.via?.length ? (
+                  <>
+                    <dt>Feeds under it</dt>
+                    <dd>
+                      {r.tydro.via.map((v) => (
+                        <div key={v.role + v.address}>
+                          <ExplorerAddr a={v.address} /> <span className="faint">{v.description ?? ''} · {v.role} · {v.updatedAt ? `updated ${when(v.updatedAt)}` : 'update time not exposed'}</span>
+                        </div>
+                      ))}
+                    </dd>
+                  </>
+                ) : null}
                 <dt>Nado</dt><dd>{r.nado ? <span className="mono">product {r.nado.productId} · update time not exposed on-chain</span> : <span className="faint">not listed on Nado (by token address)</span>}</dd>
                 {r.perp ? (<><dt>Nado perp</dt><dd className="mono">{r.perp.symbol} {price(r.perp.price)} <span className="faint">— basis vs spot, information only (not an oracle error)</span></dd></>) : null}
                 {r.external ? (

@@ -40,9 +40,19 @@ const aaveOracleAbi = [
 ] as const;
 const aggregatorAbi = [
   { type: 'function', name: 'latestRoundData', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint80' }, { type: 'int256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint80' }] },
+  { type: 'function', name: 'latestAnswer', stateMutability: 'view', inputs: [], outputs: [{ type: 'int256' }] },
+  { type: 'function', name: 'latestTimestamp', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
   { type: 'function', name: 'description', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+  { type: 'function', name: 'isCapped', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
 ] as const;
+/**
+ * Getters of Aave's price adapters that point at the feed(s) underneath. Each is tried on every source; a
+ * contract that doesn't have it simply fails that call. Names from aave-capo (PriceCapAdapterBase /
+ * PriceCapAdapterStable) and CLSynchronicityPriceAdapter (peg-to-base).
+ */
+export const ADAPTER_FEED_GETTERS = ['BASE_TO_USD_AGGREGATOR', 'ASSET_TO_USD_AGGREGATOR', 'ASSET_TO_PEG', 'PEG_TO_BASE', 'aggregator'] as const;
+const adapterAbi = ADAPTER_FEED_GETTERS.map((name) => ({ type: 'function', name, stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }) as const);
 const pythAbi = [
   {
     type: 'function',
@@ -55,12 +65,24 @@ const pythAbi = [
 
 export interface AggregatorRead {
   address: string;
-  /** null = the source doesn't answer the Chainlink interface */
+  /**
+   * chainlink   — answers latestRoundData itself (a feed or a feed proxy)
+   * adapter     — answers latestAnswer and points at feed(s) underneath (Aave price-cap / peg adapters); its age
+   *               is the OLDEST of those feeds
+   * answer-only — answers a price but exposes no update time and no feed AEGIS recognises
+   * none        — doesn't answer a price at all
+   */
+  kind?: 'chainlink' | 'adapter' | 'answer-only' | 'none';
+  /** the source's own answer (USD) */
   answer: number | null;
   decimals: number | null;
   description: string | null;
-  /** unix ms of the source's last update; null = not exposed */
+  /** unix ms of the last update (for an adapter: of its oldest underlying feed); null = not exposed */
   updatedAt: number | null;
+  /** adapter only: the feeds underneath */
+  via?: Array<{ role: string; address: string; description: string | null; answer: number | null; updatedAt: number | null }>;
+  /** the adapter reports its price cap as active (the protocol values the asset below its feed); null = not exposed */
+  capped?: boolean | null;
   error: string | null;
 }
 
@@ -77,6 +99,66 @@ export interface OracleSnapshot {
 }
 
 const ok = <T>(r: { ok: boolean; value?: unknown; error?: string } | undefined): T | null => (r && r.ok ? (r.value as T) : null);
+
+const ZERO = '0x0000000000000000000000000000000000000000';
+const PER_SOURCE = ['latestRoundData', 'latestAnswer', 'latestTimestamp', 'decimals', 'description', 'isCapped'] as const;
+
+/** Read price sources; follow adapters (two levels at most) to the feeds underneath. */
+async function readSources(client: PublicClient, addrs: string[], blockNumber: bigint, depth = 0): Promise<Map<string, AggregatorRead>> {
+  const out = new Map<string, AggregatorRead>();
+  if (!addrs.length) return out;
+  const W = PER_SOURCE.length + ADAPTER_FEED_GETTERS.length;
+  const calls: Call[] = addrs.flatMap((a) => [
+    ...PER_SOURCE.map((fn) => ({ address: a as `0x${string}`, abi: aggregatorAbi, functionName: fn }) as Call),
+    ...ADAPTER_FEED_GETTERS.map((fn) => ({ address: a as `0x${string}`, abi: adapterAbi, functionName: fn }) as Call),
+  ]);
+  const r = await multicallAdaptive(client, calls, { blockNumber, chunk: 60 });
+  const found: Array<{ src: string; role: string; feed: string }> = [];
+  addrs.forEach((a, i) => {
+    const at = (k: number) => r[i * W + k];
+    const round = ok<readonly [bigint, bigint, bigint, bigint, bigint]>(at(0));
+    const ans = ok<bigint>(at(1));
+    const ts = ok<bigint>(at(2));
+    const dec = ok<number>(at(3));
+    const desc = ok<string>(at(4));
+    const capped = ok<boolean>(at(5));
+    const feeds = ADAPTER_FEED_GETTERS.map((g, k) => ({ role: g, feed: ok<string>(at(PER_SOURCE.length + k))?.toLowerCase() ?? null })).filter(
+      (x): x is { role: (typeof ADAPTER_FEED_GETTERS)[number]; feed: string } => !!x.feed && x.feed !== ZERO && x.feed !== a,
+    );
+    const raw = round ? round[1] : ans;
+    const answer = raw !== null && dec !== null ? Number(raw) / 10 ** Number(dec) : null;
+    const own = round && round[3] > 0n ? Number(round[3]) * 1000 : ts && ts > 0n ? Number(ts) * 1000 : null;
+    // a Chainlink proxy also answers aggregator(): it is a feed, not an adapter
+    const isAdapter = !round && feeds.length > 0;
+    out.set(a, {
+      address: a,
+      kind: round ? 'chainlink' : isAdapter ? 'adapter' : raw !== null ? 'answer-only' : 'none',
+      answer,
+      decimals: dec !== null ? Number(dec) : null,
+      description: desc,
+      updatedAt: own,
+      via: [],
+      capped: capped,
+      error: raw === null ? `answers neither latestRoundData nor latestAnswer (${(at(0) as { error?: string })?.error?.slice(0, 80) ?? 'failed'})` : null,
+    });
+    if (isAdapter && depth < 2) for (const f of feeds) found.push({ src: a, role: f.role, feed: f.feed });
+  });
+  if (found.length) {
+    const under = await readSources(client, [...new Set(found.map((f) => f.feed))], blockNumber, depth + 1);
+    for (const f of found) {
+      const u = under.get(f.feed);
+      const s = out.get(f.src)!;
+      (s.via ??= []).push({ role: f.role, address: f.feed, description: u?.description ?? null, answer: u?.answer ?? null, updatedAt: u?.updatedAt ?? null });
+    }
+    for (const s of out.values()) {
+      if (s.kind !== 'adapter' || s.updatedAt !== null) continue;
+      const times = (s.via ?? []).map((v) => v.updatedAt);
+      // the oldest underlying feed decides the age; if any feed's time is unknown, the age is unknown
+      s.updatedAt = times.length && times.every((t): t is number => t !== null) ? Math.min(...times) : null;
+    }
+  }
+  return out;
+}
 
 export async function readOracleSnapshot(client: PublicClient, blockNumber: bigint): Promise<Result<OracleSnapshot>> {
   const errors: string[] = [];
@@ -98,28 +180,9 @@ export async function readOracleSnapshot(client: PublicClient, blockNumber: bigi
     const sources = assets.map((_, i) => ok<string>(r1[3 + i])?.toLowerCase() ?? null);
     const pythStart = 3 + assets.length;
 
-    // each distinct source through the Chainlink interface
-    const uniq = [...new Set(sources.filter((s): s is string => !!s && s !== '0x0000000000000000000000000000000000000000'))];
-    const srcCalls: Call[] = uniq.flatMap((a) => [
-      { address: a as `0x${string}`, abi: aggregatorAbi, functionName: 'latestRoundData' },
-      { address: a as `0x${string}`, abi: aggregatorAbi, functionName: 'decimals' },
-      { address: a as `0x${string}`, abi: aggregatorAbi, functionName: 'description' },
-    ]);
-    const r2 = srcCalls.length ? await multicallAdaptive(client, srcCalls, { blockNumber, chunk: 60 }) : [];
-    const agg = new Map<string, AggregatorRead>();
-    uniq.forEach((a, i) => {
-      const round = ok<readonly [bigint, bigint, bigint, bigint, bigint]>(r2[i * 3]);
-      const dec = ok<number>(r2[i * 3 + 1]);
-      const desc = ok<string>(r2[i * 3 + 2]);
-      agg.set(a, {
-        address: a,
-        answer: round && dec !== null ? Number(round[1]) / 10 ** Number(dec) : null,
-        decimals: dec !== null ? Number(dec) : null,
-        description: desc,
-        updatedAt: round ? Number(round[3]) * 1000 : null,
-        error: round ? null : `no Chainlink-style answer (${(r2[i * 3] as { error?: string })?.error?.slice(0, 80) ?? 'failed'})`,
-      });
-    });
+    // each distinct source: the Chainlink interface, the plain answer, and the adapter getters
+    const uniq = [...new Set(sources.filter((s): s is string => !!s && s !== ZERO))];
+    const agg = await readSources(client, uniq, blockNumber);
 
     const tydro = TYDRO_RESERVES.map((r, i) => ({
       symbol: r.symbol,

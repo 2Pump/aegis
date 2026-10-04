@@ -53,7 +53,7 @@ export type OracleStatus = 'OK' | 'WARN' | 'STALE' | 'DIVERGENT' | 'DEPEG' | 'JU
 const SEVERITY: Record<OracleStatus, number> = { OK: 0, UNAVAILABLE: 1, WARN: 2, JUMP: 3, STALE: 3, DIVERGENT: 4, DEPEG: 4, INVALID: 5 };
 
 export interface Check {
-  kind: 'source-age' | 'source-decimals' | 'protocol-vs-source' | 'cross-venue' | 'external' | 'peg' | 'jump' | 'validity';
+  kind: 'source-age' | 'source-decimals' | 'source-cap' | 'protocol-vs-source' | 'cross-venue' | 'external' | 'peg' | 'jump' | 'validity';
   status: OracleStatus;
   text: string;
   /** signed % where it applies */
@@ -65,7 +65,7 @@ export interface AssetRow {
   asset: string;
   symbol: string;
   usedBy: Array<'tydro' | 'nado'>;
-  tydro: { price: number | null; source: string | null; sourceDescription: string | null; sourceDecimals: number | null; sourceAnswer: number | null; sourceUpdatedAt: number | null } | null;
+  tydro: { price: number | null; source: string | null; sourceDescription: string | null; sourceDecimals: number | null; sourceAnswer: number | null; sourceUpdatedAt: number | null; sourceKind?: string | null; via?: Array<{ role: string; address: string; description: string | null; updatedAt: number | null }>; capped?: boolean | null } | null;
   nado: { productId: number; price: number | null } | null;
   /** Nado perp on the same underlying — basis vs spot, information only (not an oracle error) */
   perp: { productId: number; symbol: string; price: number | null } | null;
@@ -139,17 +139,31 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
     // validity
     if (t.priceUsd === null) checks.push({ kind: 'validity', status: 'INVALID', text: "Tydro's protocol price couldn't be read", pct: null });
     else if (!(t.priceUsd > 0) || !Number.isFinite(t.priceUsd)) checks.push({ kind: 'validity', status: 'INVALID', text: `Tydro's protocol price is not a positive number (${t.priceUsd})`, pct: null });
-    // the source behind Tydro's price
-    if (!t.source) checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: "Tydro's source for this asset couldn't be read", pct: null });
-    else if (t.source.updatedAt === null) checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: `source ${t.source.address.slice(0, 10)}… doesn't answer the Chainlink interface — its update time isn't exposed`, pct: null });
+    // the source behind Tydro's price (a feed, or an adapter over feeds)
+    const src = t.source ? { ...t.source, kind: t.source.kind ?? (t.source.updatedAt !== null ? 'chainlink' : t.source.answer !== null ? 'answer-only' : 'none') } : null;
+    const viaText = src?.via?.length ? ` over ${src.via.map((v) => v.description ?? `${v.address.slice(0, 10)}…`).join(' + ')}` : '';
+    if (!src) checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: "Tydro's source for this asset couldn't be read", pct: null });
+    else if (src.kind === 'none') checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: `source ${src.address.slice(0, 10)}… answers no price AEGIS can read`, pct: null });
+    else if (src.updatedAt === null)
+      checks.push({
+        kind: 'source-age',
+        status: 'UNAVAILABLE',
+        text:
+          src.kind === 'adapter'
+            ? `source is an adapter${viaText}; a feed underneath doesn't expose its update time`
+            : `source ${src.address.slice(0, 10)}… answers a price but exposes no update time and no feed AEGIS recognises`,
+        pct: null,
+      });
     else {
-      const ageH = (now - t.source.updatedAt) / 3_600_000;
-      checks.push(ageH > ORACLE.STALE_H ? { kind: 'source-age', status: 'STALE', text: `source last updated ${ageH.toFixed(1)} h ago (over ${ORACLE.STALE_H} h)`, pct: null } : { kind: 'source-age', status: 'OK', text: `source updated ${ageH.toFixed(1)} h ago`, pct: null });
-      if (t.source.decimals !== null && t.source.decimals !== 8) checks.push({ kind: 'source-decimals', status: 'WARN', text: `source reports ${t.source.decimals} decimals (USD feeds normally use 8; an adapter may rescale)`, pct: null });
-      if (t.priceUsd && t.source.answer && t.source.decimals === 8) {
-        const d = pctDiff(t.priceUsd, t.source.answer);
-        if (Math.abs(d) > 0.01) checks.push({ kind: 'protocol-vs-source', status: Math.abs(d) >= ORACLE.DIVERGE_PCT ? 'DIVERGENT' : 'WARN', text: `Tydro's price differs from its own source by ${d.toFixed(2)}% (an adapter or cap sits between them)`, pct: d });
-      }
+      const ageH = (now - src.updatedAt) / 3_600_000;
+      const what = src.kind === 'adapter' ? `adapter${viaText}: oldest feed underneath` : 'source';
+      checks.push(ageH > ORACLE.STALE_H ? { kind: 'source-age', status: 'STALE', text: `${what} last updated ${ageH.toFixed(1)} h ago (over ${ORACLE.STALE_H} h)`, pct: null } : { kind: 'source-age', status: 'OK', text: `${what} updated ${ageH.toFixed(1)} h ago`, pct: null });
+    }
+    if (src && src.decimals !== null && src.decimals !== 8) checks.push({ kind: 'source-decimals', status: 'WARN', text: `source reports ${src.decimals} decimals (USD feeds normally use 8; an adapter may rescale)`, pct: null });
+    if (src?.capped) checks.push({ kind: 'source-cap', status: 'WARN', text: "the adapter's price cap is active: Tydro values this asset at the cap, below what its feed says", pct: null });
+    if (t.priceUsd && src?.answer && src.decimals === 8) {
+      const d = pctDiff(t.priceUsd, src.answer);
+      if (Math.abs(d) > 0.01) checks.push({ kind: 'protocol-vs-source', status: Math.abs(d) >= ORACLE.DIVERGE_PCT ? 'DIVERGENT' : 'WARN', text: `Tydro's price differs from its own source by ${d.toFixed(2)}% (something sits between them)`, pct: d });
     }
     // cross-venue on the same token
     if (t.priceUsd && n?.priceUsd) {
@@ -195,7 +209,7 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
       asset: t.asset,
       symbol: t.symbol === 'USDT' ? 'USDT0' : t.symbol,
       usedBy,
-      tydro: { price: t.priceUsd, source: t.source?.address ?? null, sourceDescription: t.source?.description ?? null, sourceDecimals: t.source?.decimals ?? null, sourceAnswer: t.source?.answer ?? null, sourceUpdatedAt: t.source?.updatedAt ?? null },
+      tydro: { price: t.priceUsd, source: t.source?.address ?? null, sourceDescription: t.source?.description ?? null, sourceDecimals: t.source?.decimals ?? null, sourceAnswer: t.source?.answer ?? null, sourceUpdatedAt: t.source?.updatedAt ?? null, sourceKind: t.source?.kind ?? null, via: (t.source?.via ?? []).map((v) => ({ role: v.role, address: v.address, description: v.description, updatedAt: v.updatedAt })), capped: t.source?.capped ?? null },
       nado: n ? { productId: n.productId, price: n.priceUsd } : null,
       perp: perpRaw ? { productId: perpRaw.productId, symbol: perpRaw.symbol ?? '', price: perpRaw.priceUsd } : null,
       external,

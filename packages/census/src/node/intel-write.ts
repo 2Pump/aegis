@@ -49,6 +49,13 @@ export async function recordOracles(o: IntelOpts): Promise<OracleWatch | null> {
   const pf = await o.store.get(pricePath(m)).catch(() => null);
   await o.store.put(pricePath(m), appendPrices(pf, m, pricePoint(snap.value)));
   const fresh = watch.events.filter((e) => e.block === watch.block);
+  // why each asset isn't OK, in the log itself (the run log is where problems are first seen)
+  for (const r of watch.rows.filter((x) => x.status !== 'OK')) {
+    const bad = r.checks.filter((c) => c.status === r.status).map((c) => `${c.kind}: ${c.text}`);
+    log(`  oracle ${r.symbol} ${r.status} — ${bad.join(' | ').slice(0, 220)}`);
+  }
+  const kinds = watch.rows.reduce<Record<string, number>>((m, r) => ((m[r.tydro?.sourceKind ?? 'unread'] = (m[r.tydro?.sourceKind ?? 'unread'] ?? 0) + 1), m), {});
+  log(`oracles: Tydro sources — ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(' · ')}`);
   log(`oracles: ${watch.rows.length} assets · ${Object.entries(watch.summary).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(' · ')}${fresh.length ? ` · ${fresh.length} new event(s): ${fresh.map((e) => `${e.symbol} ${e.status}`).join(', ')}` : ''}${watch.errors.length ? ` · errors: ${watch.errors.join('; ').slice(0, 160)}` : ''}`);
   return watch;
 }
@@ -133,5 +140,6 @@ export async function rescoreForecasts(store: CensusStore, nowMs: number, log: (
   const liquidations: LedgerRecord[] = liqs.filter(isLedgerFile).flatMap((f) => f.records);
   const s = scoreForecasts({ forecasts, prices, agg, liquidations, nowMs });
   await store.put(FORECAST_SCORE_PATH, s);
-  log(`forecasts: ${s.forecasts} recorded · ${s.scenarios.reduce((a, x) => a + x.judged, 0)} scenario checks judged · ${s.scenarios.reduce((a, x) => a + x.reached, 0)} reached · ${s.unjudgeable} before prices were recorded · ${s.pending} pending`);
+  const per = months.map((m, i) => `${m} ${(ff[i] as ForecastFile)?.kind === 'aegis-forecasts' ? (ff[i] as ForecastFile).records.length : 'none'}`).join(', ');
+  log(`forecasts: ${s.forecasts} recorded · ${s.scenarios.reduce((a, x) => a + x.judged, 0)} scenario checks judged · ${s.scenarios.reduce((a, x) => a + x.reached, 0)} reached · ${s.unjudgeable} before prices were recorded · ${s.pending} pending · files: ${per || 'no months yet'} (one forecast is added on each full scan)`);
 }

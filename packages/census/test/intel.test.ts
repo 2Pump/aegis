@@ -97,7 +97,7 @@ describe('Oracle Watch · checks', () => {
     });
     expect(kinds(w, 'WETH')['source-age']).toBe('STALE');
     expect(kinds(w, 'kBTC')['source-age']).toBe('UNAVAILABLE');
-    expect(row(w, 'USDG').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/update time isn't exposed/);
+    expect(row(w, 'USDG').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/no price AEGIS can read|no update time/);
   });
 
   it('decimals other than 8 are flagged; a protocol price that differs from its own source is shown', () => {
@@ -318,6 +318,50 @@ describe('Protocol Change Monitor · writer (fake chain)', () => {
 /* ───────────────────────── oracle reads (fake chain) ───────────────────────── */
 
 describe('Oracle reads (fake chain)', () => {
+  it('an Aave-style adapter (latestAnswer only) is followed to the feed underneath for its age; an active price cap is flagged', async () => {
+    const FEED = '0x00000000000000000000000000000000000000f4';
+    const ADAPTER = '0x00000000000000000000000000000000000000a3';
+    const client = {
+      getBlock: async () => ({ timestamp: BigInt(T0 / 1000) }),
+      multicall: async ({ contracts }: { contracts: Array<{ functionName: string; address: string; args?: unknown[] }> }) =>
+        contracts.map((c) => {
+          const a = c.address.toLowerCase();
+          if (c.functionName === 'BASE_CURRENCY_UNIT') return { status: 'success', result: 100_000_000n };
+          if (c.functionName === 'getAssetsPrices') return { status: 'success', result: TYDRO_RESERVES.map(() => 105_000_000n) };
+          if (c.functionName === 'getSourceOfAsset') return { status: 'success', result: ADAPTER };
+          if (a === ADAPTER) {
+            if (c.functionName === 'latestAnswer') return { status: 'success', result: 105_000_000n };
+            if (c.functionName === 'decimals') return { status: 'success', result: 8 };
+            if (c.functionName === 'description') return { status: 'success', result: 'Capped weETH / ETH / USD' };
+            if (c.functionName === 'isCapped') return { status: 'success', result: true };
+            if (c.functionName === 'BASE_TO_USD_AGGREGATOR') return { status: 'success', result: FEED };
+          }
+          if (a === FEED) {
+            if (c.functionName === 'latestRoundData') return { status: 'success', result: [1n, 200_000_000_000n, 0n, BigInt(T0 / 1000 - 7200), 1n] };
+            if (c.functionName === 'decimals') return { status: 'success', result: 8 };
+            if (c.functionName === 'description') return { status: 'success', result: 'ETH / USD' };
+            if (c.functionName === 'aggregator') return { status: 'success', result: '0x00000000000000000000000000000000000000f5' }; // a proxy is a feed, not an adapter
+          }
+          return { status: 'failure', error: new Error('execution reverted') };
+        }),
+      readContract: async () => ({ spotProducts: [], perpProducts: [] }),
+    } as unknown as PublicClient;
+    const r = await readOracleSnapshot(client, 1000n);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const src = r.value.tydro[0]!.source!;
+    expect(src.kind).toBe('adapter');
+    expect(src.answer).toBe(1.05);
+    expect(src.updatedAt).toBe(T0 - 7_200_000);
+    expect(src.via).toEqual([{ role: 'BASE_TO_USD_AGGREGATOR', address: FEED, description: 'ETH / USD', answer: 2000, updatedAt: T0 - 7_200_000 }]);
+    expect(src.capped).toBe(true);
+    const w = buildOracleWatch({ snap: r.value });
+    const row0 = w.rows[0]!;
+    expect(row0.checks.find((c) => c.kind === 'source-age')).toMatchObject({ status: 'OK', text: expect.stringMatching(/adapter over ETH \/ USD.*2\.0 h/) });
+    expect(row0.checks.find((c) => c.kind === 'source-cap')?.status).toBe('WARN');
+    expect(row0.tydro?.sourceKind).toBe('adapter');
+  });
+
   it('decimals normalised from each source; a source without the Chainlink interface is reported, not guessed', async () => {
     const client = {
       getBlock: async () => ({ timestamp: BigInt(T0 / 1000) }),

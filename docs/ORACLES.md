@@ -11,7 +11,7 @@ Every feed is an observation, not the truth. When two feeds disagree, one of the
 | Source | What is read | Where the address comes from |
 |---|---|---|
 | Tydro protocol price | `AaveOracle.getAssetsPrices` at `0x4758213271BFdC72224A7a8742dC865fC97756e1` | Tydro deployment |
-| Tydro's source per asset | `AaveOracle.getSourceOfAsset(asset)`, then the Chainlink interface (`latestRoundData`, `decimals`, `description`) on that contract | discovered on-chain each run |
+| Tydro's source per asset | `AaveOracle.getSourceOfAsset(asset)`, then `latestRoundData` / `latestAnswer` / `decimals` / `description` / `isCapped` on that contract. If it's an Aave-style adapter (price cap or peg-to-base), it's followed through `BASE_TO_USD_AGGREGATOR`, `ASSET_TO_USD_AGGREGATOR`, `ASSET_TO_PEG` or `PEG_TO_BASE` to the feeds underneath (at most two levels). The adapter's age is the age of its **oldest** underlying feed. | discovered on-chain each run |
 | Nado oracle prices | `FQuerier.getSubaccountInfo` for the zero subaccount, which returns every product with its oracle price, spot token and risk weights | Nado contracts |
 | Pyth (external reference) | `getPriceUnsafe(id)` at `0x2880aB155794e7179c9eE2e38200202908C17B43`: ETH/USD, BTC/USD, USDC/USD | Pyth's published Ink address and feed IDs. USDT is left out because its feed ID wasn't verified. |
 
@@ -26,6 +26,7 @@ Every feed is an observation, not the truth. When two feeds disagree, one of the
 |---|---|
 | Source age | STALE if over 26 h; UNAVAILABLE if the source doesn't answer the Chainlink interface |
 | Source decimals | WARN if not 8 (an adapter may rescale) |
+| Price cap | WARN if the adapter reports its cap as active (`isCapped()`): Tydro values the asset at the cap, below its feed |
 | Protocol vs its own source | WARN if more than 0.01% apart, DIVERGENT at 1% or more |
 | Tydro vs Nado (same token) | WARN at 0.3%, DIVERGENT at 1% |
 | External (Pyth) | WARN at 0.3%, DIVERGENT at 1%. OK when inside Pyth's own confidence band |
@@ -98,9 +99,11 @@ A divergence is modelled with the Pressure engine as the protocol price convergi
 ## What to look for in the census log
 
 ```
+  oracle kBTC UNAVAILABLE — external: Pyth last published 9.0 h ago …   ← one line per asset that isn't OK, with the reason
+oracles: Tydro sources — chainlink 3 · adapter 11
 oracles: 14 assets · OK 11 · UNAVAILABLE 2 · …
 changes: monitoring N parameters from now on (…)   ← first run only
-forecasts: N recorded · … judged · … reached · … before prices were recorded · … pending
+forecasts: N recorded · … judged · … reached · … before prices were recorded · … pending · files: 2026-09 none, 2026-10 12
 ```
 
 ## Privacy
