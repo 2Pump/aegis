@@ -3,7 +3,8 @@
  * (`pnpm verify:auto`, scheduled). A record keeps the rules and engine versions it ran under forever; it is never
  * relabelled, and an unreachable source is never a pass.
  */
-export const VERIFY = { VERSION: 'verify-1.0.0', STALE_HOURS: 24 } as const;
+/** Runs every 4 h; a result is STALE once it is older than 6 h (one missed run plus slack for GitHub's scheduler). */
+export const VERIFY = { VERSION: 'verify-1.0.0', EVERY_HOURS: 4, STALE_HOURS: 6 } as const;
 
 export type VVenue = 'tydro' | 'nado';
 export type SourceType = 'official-app' | 'official-api' | 'on-chain';

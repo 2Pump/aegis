@@ -2,7 +2,7 @@
  * Automatic verification — see packages/census/src/node/verify-run.ts.
  *
  *   pnpm verify:auto                 # local: reads apps/web/public/census/census.json, writes verification-log.json next to it
- *   pnpm verify:auto --store blob    # GitHub Action (daily): Vercel Blob (needs BLOB_READ_WRITE_TOKEN)
+ *   pnpm verify:auto --store blob    # GitHub Action (every 4 h): Vercel Blob (needs BLOB_READ_WRITE_TOKEN)
  *   pnpm verify:auto --rpc https://… # custom Ink RPC (or env INK_RPC); several = comma-separated, rotated
  *
  * Read-only: view calls and one GET to Nado's public API. Exits 1 when a check FAILED (the record is still written),

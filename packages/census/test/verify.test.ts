@@ -23,7 +23,10 @@ const rec = (over: Partial<VerificationRecord> & { fields?: VerificationRecord['
 
 describe('verification records', () => {
   it('a current successful check is CURRENT', () => expect(checkDisplay(rec({}), NOW)).toBe('CURRENT'));
-  it('a successful check older than 24 h is STALE', () => expect(checkDisplay(rec({ at: '2026-10-02T10:00:00Z' }), NOW)).toBe('STALE'));
+  it('a successful check older than 6 h is STALE; 2 h old is CURRENT', () => {
+    expect(checkDisplay(rec({ at: '2026-10-04T05:00:00Z' }), NOW)).toBe('STALE');
+    expect(checkDisplay(rec({ at: '2026-10-04T10:00:00Z' }), NOW)).toBe('CURRENT');
+  });
   it('a field outside tolerance fails the record and names the field', () => {
     const r = rec({ fields: [compareField({ id: 'hf', label: 'Tydro HF', expected: 1.5, aegis: 1.6, tolerance: 0.005, unit: 'rel' })] });
     expect(r.status).toBe('FAIL');

@@ -88,16 +88,16 @@ export function CalibrationPage() {
 const DISPLAY_TONE: Record<CheckDisplay, string> = { CURRENT: 'var(--cyan)', STALE: 'var(--amber)', FAILED: 'var(--red)', 'SOURCE UNAVAILABLE': 'var(--slate)' };
 const SOURCE_TYPE: Record<string, string> = { 'on-chain': 'on-chain contract', 'official-api': 'official API', 'official-app': 'official app' };
 
-/** The daily automatic cross-checks (verify.yml). Real wallets, compared with authoritative sources AEGIS doesn't read from. */
+/** The automatic cross-checks every 4 h (verify.yml). Real wallets, compared with authoritative sources AEGIS doesn't read from. */
 function AutoChecks() {
   const log = useVerificationLog();
   const now = useNow(60_000);
   return (
-    <Panel title="Automatic checks — daily" rail="var(--cyan)" testId="auto-checks" right={<span className="mono">stale after {VERIFY.STALE_HOURS} h</span>}>
+    <Panel title={`Automatic checks — every ${VERIFY.EVERY_HOURS} h`} rail="var(--cyan)" testId="auto-checks" right={<span className="mono">stale after {VERIFY.STALE_HOURS} h</span>}>
       {log.status === 'loading' ? <div className="dim">Loading…</div> : null}
       {log.status === 'missing' ? (
         <div className="banner" data-testid="auto-checks-missing">
-          No automatic check has run yet. The <code>verify</code> workflow runs daily (or by hand: Actions → verify → Run workflow); results appear here.
+          No automatic check has run yet. The <code>verify</code> workflow runs every {VERIFY.EVERY_HOURS} hours (or by hand: Actions → verify → Run workflow); results appear here.
         </div>
       ) : null}
       {log.status === 'error' ? <div className="banner red">Couldn't load the check log ({log.message}). Nothing is shown rather than a guess.</div> : null}

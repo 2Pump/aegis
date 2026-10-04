@@ -581,7 +581,9 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         if (!pools.ok) throw new Error(pools.error.message);
         for (const p of pools.value) nlpSubs.add(p.subaccount);
         const knownSubs = new Set(Object.values(state.nado.subs).flat().map((x) => x.toLowerCase()));
-        const fresh = pools.value.filter((p) => !knownSubs.has(p.subaccount));
+        // a pool that is also one of Nado's protocol accounts is counted with those, not twice
+        const protoSet = new Set([...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])].map((x) => x.toLowerCase()));
+        const fresh = pools.value.filter((p) => !knownSubs.has(p.subaccount) && !protoSet.has(p.subaccount.toLowerCase()));
         const parsed = fresh.length ? await readNadoSubsMany(client, fresh.map((p) => p.subaccount), readBlock) : new Map();
         const nAcc = new CoverageAcc();
         let holding = 0;
@@ -597,16 +599,16 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         }
         const nc = buildCoverage(nAcc, totals.value).totals;
         const protoAcc = new CoverageAcc();
-        const protoParsed = await readNadoSubsMany(client, [...new Set([...VERTEX_PROTOCOL_SUBS, ...(state.nado.protocolSubs ?? [])])] as `0x${string}`[], readBlock);
+        const protoParsed = await readNadoSubsMany(client, [...protoSet] as `0x${string}`[], readBlock);
         for (const r of protoParsed.values()) if (r.ok && (r.value.spots.length || r.value.perps.length)) protoAcc.addNado(r.value.spots, r.value.perps);
         const all = buildCoverage(mergeAcc(mergeAcc(cov, protoAcc), nAcc), totals.value).totals;
         // public: the share of Nado deposits that sits with Nado's own vault and accounts (shares only, no dollars)
         const own = buildCoverage(mergeAcc(protoAcc, nAcc), totals.value).totals.nadoDeposits;
         if (state.coverage) state.coverage.share.nadoDepositsNadoOwn = own.totalUsd > 0 ? Math.round((own.oursUsd / own.totalUsd) * 1000) / 1000 : null;
         log(
-          `  NLP pools (${pools.value.length} on-chain, ${pools.value.length - fresh.length} already among known wallets, ${holding} more holding balances${unread ? `, ${unread} unreadable` : ''}; not drawn): Nado deposits ${coveragePct(nc.nadoDeposits.oursUsd, nc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(nc.nadoOpenInterest.oursLongUsd, nc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(nc.nadoOpenInterest.oursShortUsd, nc.nadoOpenInterest.totalUsd)}`,
+          `  NLP pools (${pools.value.length} on-chain, ${pools.value.filter((p) => knownSubs.has(p.subaccount)).length} already among known wallets, ${pools.value.filter((p) => !knownSubs.has(p.subaccount) && protoSet.has(p.subaccount.toLowerCase())).length} already among protocol accounts, ${holding} more holding balances${unread ? `, ${unread} unreadable` : ''}; not drawn): Nado deposits ${coveragePct(nc.nadoDeposits.oursUsd, nc.nadoDeposits.totalUsd)} · OI longs ${coveragePct(nc.nadoOpenInterest.oursLongUsd, nc.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(nc.nadoOpenInterest.oursShortUsd, nc.nadoOpenInterest.totalUsd)}`,
         );
-        for (const p of pools.value) log(`    pool ${p.poolId}: owner ${p.owner.slice(0, 10)}… weight ${p.weight.toFixed(2)}${knownSubs.has(p.subaccount) ? ' (already a known wallet)' : ''}`);
+        for (const p of pools.value) log(`    pool ${p.poolId}: owner ${p.owner.slice(0, 10)}… weight ${p.weight.toFixed(2)}${knownSubs.has(p.subaccount) ? ' (already a known wallet)' : protoSet.has(p.subaccount.toLowerCase()) ? ' (already a protocol account)' : ''}`);
         log(
           `  wallets + protocol accounts + NLP pools: Nado deposits ${coveragePct(all.nadoDeposits.oursUsd, all.nadoDeposits.totalUsd)} · OI longs ${coveragePct(all.nadoOpenInterest.oursLongUsd, all.nadoOpenInterest.totalUsd)} / shorts ${coveragePct(all.nadoOpenInterest.oursShortUsd, all.nadoOpenInterest.totalUsd)}`,
         );

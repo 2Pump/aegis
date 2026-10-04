@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { VerificationRecord } from '@aegis/census';
 import { CENSUS_URL } from './census';
 
-/** Written by the daily `verify` workflow next to census.json. Only records of the published shape are kept. */
+/** Written by the `verify` workflow (every 4 h) next to census.json. Only records of the published shape are kept. */
 export const VERIFY_LOG_URL = CENSUS_URL.replace(/census\.json(\?.*)?$/, 'verification-log.json');
 
 export type VerifyLogState = { status: 'loading' } | { status: 'missing' } | { status: 'error'; message: string } | { status: 'ok'; records: VerificationRecord[] };

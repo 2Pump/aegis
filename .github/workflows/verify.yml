@@ -1,4 +1,4 @@
-# AEGIS automatic verification — daily.
+# AEGIS automatic verification — every 4 hours.
 # Reads a few real wallets from the latest census with the site's own readers and compares them with authoritative
 # on-chain sources AEGIS's path doesn't use (Tydro's AaveProtocolDataProvider; Nado's Clearinghouse.getHealth for
 # every subaccount), and tries Nado's official API (expected SOURCE UNAVAILABLE from here: Cloudflare; never worked
@@ -10,7 +10,7 @@ run-name: verify · ${{ github.event_name }}
 
 on:
   schedule:
-    - cron: '23 6 * * *'
+    - cron: '23 */4 * * *'
   workflow_dispatch:
 
 concurrency:

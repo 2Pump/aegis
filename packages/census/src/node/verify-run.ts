@@ -1,5 +1,5 @@
 /**
- * AUTOMATIC VERIFICATION (`pnpm verify:auto`, scheduled daily by .github/workflows/verify.yml).
+ * AUTOMATIC VERIFICATION (`pnpm verify:auto`, scheduled every 4 hours by .github/workflows/verify.yml).
  *
  * Picks representative real wallets from the latest census (a Tydro borrower, a Nado default-only wallet, a Nado
  * wallet with an isolated subaccount), reads each with the exact readers the site uses, and compares them with
@@ -31,7 +31,7 @@ import {
 } from '@aegis/ink-io';
 import { RULES, SCENARIO_ENGINE_VERSION, type Book } from '@aegis/pose';
 import { decodeSnapshot, type CensusShip } from '../index.js';
-import { appendRecords, compareField, finalize, shortWallet, type FieldCheck, type VerificationRecord } from '../verify.js';
+import { VERIFY, appendRecords, compareField, finalize, shortWallet, type FieldCheck, type VerificationRecord } from '../verify.js';
 import type { CensusStore } from './store.js';
 
 const dataProviderAbi = parseAbi([
@@ -76,12 +76,13 @@ export async function runVerification(o: VerifyOpts): Promise<VerificationRecord
   const { snap, ships } = decodeSnapshot(raw);
   const discovery = (addr: string): Promise<NadoDiscovery | null> =>
     Promise.resolve(snap.discovery.backfillComplete ? { subs: ships.find((s) => s.address === addr.toLowerCase())?.extraSubs ?? [], throughBlock: snap.block } : null);
-  const day = Math.floor(now() / 86_400_000);
+  // a different set of wallets every run (one slot per VERIFY.EVERY_HOURS), so over a day many wallets get checked
+  const slot = Math.floor(now() / (VERIFY.EVERY_HOURS * 3_600_000));
   const records: VerificationRecord[] = [];
   const base = { v: 1 as const, kind: 'auto' as const, rulesVersion: RULES.RULES_VERSION, engineVersion: SCENARIO_ENGINE_VERSION };
 
   for (const c of CASES) {
-    const candidates = rotate(ships.filter((s) => s.primary !== 'DARK' && c.pick(s)).sort((a, b) => (a.address < b.address ? -1 : 1)), day).slice(0, o.tries ?? 5);
+    const candidates = rotate(ships.filter((s) => s.primary !== 'DARK' && c.pick(s)).sort((a, b) => (a.address < b.address ? -1 : 1)), slot).slice(0, o.tries ?? 5);
     let done = false;
     for (const s of candidates) {
       const { book } = await readBook(s.address as `0x${string}`, { client: o.client, nado: { mode: 'chain', gatewayBase: NADO_DIRECT.gateway, archiveBase: NADO_DIRECT.archive }, nadoDiscovery: discovery });

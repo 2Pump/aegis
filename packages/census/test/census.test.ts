@@ -457,7 +457,7 @@ describe('isolated-margin subaccounts (the ~46% Nado open-interest coverage foun
     expect(logs3.some((l) => l.includes('report exists=false on-chain (counted since census v1.2)'))).toBe(true);
     expect(logs3.some((l) => l.includes('protocol accounts ('))).toBe(true);
     // the NLP vault's pool (listed on-chain) holds the other 0.05 BTC long: measured in the log, never drawn or published
-    expect(logs3.some((l) => l.includes('NLP pools (1 on-chain, 0 already among known wallets, 1 more holding balances'))).toBe(true);
+    expect(logs3.some((l) => l.includes('NLP pools (1 on-chain, 0 already among known wallets, 0 already among protocol accounts, 1 more holding balances'))).toBe(true);
     expect(logs3.some((l) => /wallets \+ protocol accounts \+ NLP pools: .*OI longs 100/.test(l))).toBe(true);
     expect(snap.coverage!.share.nadoOpenInterestLongs).toBe(0.5); // the public share is still wallets only
     expect(snap.coverage!.share.nadoDepositsNadoOwn).toBe(0); // published separately: the pool holds no deposits here
