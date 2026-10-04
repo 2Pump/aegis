@@ -540,3 +540,14 @@ button.pm-bar:hover { border-color: var(--hair); }
 @media (max-width: 400px) {
   h2.page, .banner, .faint, .dim, .pm-intro, .hist-notyet li { overflow-wrap: anywhere; }
 }
+
+/* Liquidation ledger */
+.liq-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 8px; }
+.liq-tile { border: 1px solid var(--hair-2); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.replay { margin: 6px 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.replay li { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 10px; }
+.replay b { font: 500 11px var(--mono); letter-spacing: 0.06em; color: var(--ink-dim); }
+@media (max-width: 560px) { .replay li { grid-template-columns: 1fr; gap: 2px; } }
+.wrap-text { white-space: normal; overflow-wrap: anywhere; }
+.liq-tile .panel-title { overflow-wrap: anywhere; }
+.stack { grid-template-columns: minmax(0, 1fr); } /* single column that may shrink below its widest child (tables scroll inside .table-wrap instead) */

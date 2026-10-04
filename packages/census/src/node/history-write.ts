@@ -12,7 +12,8 @@
 import type { PublicClient } from 'viem';
 import { PRICE_SOURCE_VERSION, READER_VERSION } from '@aegis/ink-io';
 import { RULES, SCENARIO_ENGINE_VERSION } from '@aegis/pose';
-import type { CensusShip } from '../index.js';
+import { encodeShip, type CensusShip } from '../index.js';
+import { appendWarnings, isWarnFile, warnPath } from '../ledger.js';
 import {
   HISTORY,
   INDEX_PATH,
@@ -54,6 +55,8 @@ export interface HistoryWriteOpts {
 }
 
 export interface HistoryWriteResult {
+  /** new NEAR LIQUIDATION warnings recorded this run */
+  warnings: number;
   point: boolean;
   reorgMarked: boolean;
   baseline: boolean;
@@ -83,7 +86,7 @@ async function pool<T>(items: readonly T[], n: number, fn: (x: T) => Promise<voi
 export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteResult> {
   const log = o.log ?? (() => {});
   const exclude = o.exclude ?? new Set<string>();
-  const res: HistoryWriteResult = { point: false, reorgMarked: false, baseline: false, rows: 0, shards: 0, skipped: [] };
+  const res: HistoryWriteResult = { warnings: 0, point: false, reorgMarked: false, baseline: false, rows: 0, shards: 0, skipped: [] };
   const month = monthOf(Date.parse(o.at));
   const atSec = Math.floor(Date.parse(o.at) / 1000);
   const ships = o.ships.filter((s) => !exclude.has(s.address));
@@ -192,6 +195,34 @@ export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteRe
     }
   });
   if (needBaseline && failed === 0) index.baselined = [...index.baselined, month].sort();
+
+  /* ── AEGIS's own warnings (for the track record): wallets entering NEAR LIQUIDATION ── */
+  try {
+    // the first run that records warnings marks every wallet already NEAR as a starting warning ('B')
+    const firstRun = !index.warningsSince;
+    const warns: Array<{ ship: CensusShip; kind: 'T' | 'B' }> = [];
+    for (const s of ships) {
+      if (s.primary === 'EMPTY' || s.hullTemp !== 'CRITICAL') continue;
+      const p = o.prev.get(s.address);
+      if (firstRun) warns.push({ ship: s, kind: 'B' }); // already near when recording began
+      else if (o.prev.size > 0 && (!p || p.hullTemp !== 'CRITICAL' || p.primary === 'EMPTY')) warns.push({ ship: s, kind: 'T' });
+    }
+    if (warns.length) {
+      const raw = await o.store.get(warnPath(month));
+      if (raw !== null && !isWarnFile(raw)) throw new Error(`${warnPath(month)} exists but isn't a warnings file — left untouched`);
+      const e = (s: CensusShip) => encodeShip(s);
+      const next = appendWarnings(
+        raw,
+        month,
+        warns.map(({ ship, kind }) => ({ wallet: ship.address, block: o.block, at: Date.parse(o.at), kind, primary: e(ship)[1], band: e(ship)[4], venues: ship.venues, rulesVersion: RULES.RULES_VERSION })),
+      );
+      if (!raw || next.rows.length !== raw.rows.length) await o.store.put(warnPath(month), next);
+      res.warnings = next.rows.length - (raw ? raw.rows.length : 0);
+    }
+    if (firstRun) index.warningsSince = o.at;
+  } catch (e) {
+    res.skipped.push(`warnings: ${String(e).slice(0, 120)}`);
+  }
   if (failed) log(`history: ${failed} wallet shard(s) not written this run (retried next run): ${res.skipped.slice(-1)[0]}`);
 
   if (JSON.stringify(index) !== indexBefore) {
@@ -201,6 +232,6 @@ export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteRe
       res.skipped.push(`index: ${String(e).slice(0, 120)}`);
     }
   }
-  log(`history: ${res.point ? 'point recorded' : 'NO point'}${res.baseline ? ` · month ${month} baseline` : ''} · ${res.rows} wallet row(s) in ${res.shards} shard(s)${res.reorgMarked ? ' · reorg marked' : ''}`);
+  log(`history: ${res.point ? 'point recorded' : 'NO point'}${res.baseline ? ` · month ${month} baseline` : ''} · ${res.rows} wallet row(s) in ${res.shards} shard(s) · ${res.warnings} new near-liquidation warning(s)${res.reorgMarked ? ' · reorg marked' : ''}`);
   return res;
 }

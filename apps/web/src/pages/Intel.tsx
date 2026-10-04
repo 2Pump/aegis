@@ -9,6 +9,7 @@ import { MATERIAL, MATERIAL_LABEL, type AggPoint, type Material } from '@aegis/c
 import { NO_TYPE_LABEL, TAG_LABEL } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { Panel } from '../components/bits';
+import { LiquidationsPanel } from '../components/Liquidations';
 import { CountChart, RangePicker, RiskStrip, when } from '../components/HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useAggHistory, useHistoryIndex, type Range } from '../lib/history';
@@ -45,13 +46,7 @@ export function IntelPage() {
         ))}
       </div>
       {tab === 'history' ? (WELL_ON ? <EcosystemHistory /> : <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>) : null}
-      {tab === 'liquidations' ? (
-        <NotBuilt
-          title="Liquidation Ledger"
-          release="Release 2"
-          what="Every Tydro and Nado liquidation on Ink from on-chain events — venue, asset, size range, and whether AEGIS had warned before it, with the lead time. Grouped into cascades with a published, versioned method. Historical only: never a list of wallets that could be liquidated next."
-        />
-      ) : null}
+      {tab === 'liquidations' ? (WELL_ON ? <LiquidationsPanel /> : <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>) : null}
       {tab === 'oracles' ? (
         <NotBuilt
           title="Oracle Watch"
@@ -130,7 +125,7 @@ function EcosystemHistory() {
             <details className="hist-notyet">
               <summary className="mono dim">Not in this history yet</summary>
               <ul className="dim">
-                <li>Actual liquidations, oracle divergence and per-scenario Pressure results over time — with the Liquidation Ledger, Oracle Watch and forecast records (next releases).</li>
+                <li>Actual liquidations: see the LIQUIDATIONS tab. Oracle divergence over time arrives with Oracle Watch; Pressure forecasts are recorded and scored once prices are recorded.</li>
                 <li>Anything before recording began. AEGIS doesn't backfill risk it didn't observe.</li>
               </ul>
             </details>

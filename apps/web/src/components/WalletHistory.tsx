@@ -15,7 +15,10 @@ import { NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL } from '@aegis/glyphs'
 import type { WalletState } from '@aegis/census';
 import { Panel, TagChip } from './bits';
 import { RangePicker, RiskLegend, RiskStrip, when } from './HistoryBits';
-import { recordedStateAt, useHistoryIndex, useWalletHistory, type Range } from '../lib/history';
+import { recordedStateAt, useHistoryIndex, useLedger, useWalletHistory, type Range } from '../lib/history';
+import { aegisBefore } from './Liquidations';
+import { INK_EXPLORER } from '@aegis/ink-io';
+import type { HistoryIndex } from '@aegis/census';
 import { blockAtTime, blockTime, loadBookAt } from '../lib/sensors';
 
 const typeText = (s: { primary: WalletState['primary'] }) => (s.primary ? TAG_LABEL[s.primary] : NO_TYPE_LABEL);
@@ -46,6 +49,7 @@ export function WalletHistory({ address }: { address: string }) {
             {h.status === 'loading' ? <div className="dim" role="status">Loading…</div> : null}
             {h.status === 'error' ? <div className="banner red" role="alert">History couldn't be loaded ({h.message}).</div> : null}
             {h.status === 'ok' ? <Recorded h={h} /> : null}
+            <WalletLiquidations address={address} range={range} index={index} />
           </>
         ) : null}
 
@@ -59,8 +63,8 @@ export function WalletHistory({ address }: { address: string }) {
               any past block below (computed from the chain in your browser).
             </li>
             <li>
-              <b>Deposits, withdrawals, borrows, repayments, perp entries and exits, funding, liquidations</b> — the event ledger arrives with the Liquidation Ledger
-              (next release). Not shown rather than partial.
+              <b>Deposits, withdrawals, borrows, repayments, perp entries and exits, funding</b> — not recorded. This wallet's <b>liquidations</b> are, above (from the
+              Liquidation Ledger).
             </li>
           </ul>
         </details>
@@ -268,3 +272,38 @@ function PastResult({ r }: { r: Extract<PastState, { s: 'ok' }> }) {
   );
 }
 
+
+/** This wallet's actual liquidations in the range (historical, from the ledger). */
+function WalletLiquidations({ address, range, index }: { address: string; range: Range; index: HistoryIndex }) {
+  const led = useLedger(range, index);
+  if (!index.ledger) return <div className="faint" style={{ fontSize: 12 }} data-testid="wallet-liq">Liquidations: the ledger starts with the next hourly scan.</div>;
+  if (led.status !== 'ok') return null;
+  const mine = led.records.filter((r) => r.wallet === address.toLowerCase()).sort((a, b) => b.at - a.at);
+  return (
+    <div data-testid="wallet-liq">
+      <div className="panel-title" style={{ marginBottom: 6 }}>Liquidations of this wallet in this range</div>
+      {mine.length ? (
+        <div className="table-wrap">
+          <table className="t">
+            <thead><tr><th>When (UTC)</th><th>Venue</th><th>What</th><th>Size</th><th>AEGIS before</th></tr></thead>
+            <tbody>
+              {mine.map((r) => (
+                <tr key={r.id}>
+                  <td className="mono"><a href={`${INK_EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer">{when(r.at)}</a></td>
+                  <td className="mono">{r.venue}{r.subaccountKind === 'isolated' ? ' · isolated' : ''}</td>
+                  <td className="mono">{r.venue === 'tydro' ? `${r.collateral} seized · ${r.debt} repaid` : r.product}</td>
+                  <td className="mono">{r.sizeBand ? SIZE_LABEL[r.sizeBand] : 'unavailable'}</td>
+                  <td className="mono">{aegisBefore(r).text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="dim" style={{ fontSize: 12 }}>
+          None recorded in this range{index.ledger.done ? '' : ' (older liquidations are still being added by the history scan)'}.
+        </div>
+      )}
+    </div>
+  );
+}

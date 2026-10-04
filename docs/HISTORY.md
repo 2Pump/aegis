@@ -63,6 +63,6 @@ Per hourly run: about 4–6 extra operations (read the index, read and write the
 ## Not in Release 1 (labelled on the pages)
 
 - Health factor, margin buffer, leverage and exposure over time (never in public files; use "read at a past block").
-- Deposits, borrows, repayments, perp entries and exits, funding and liquidation events: these come with the Liquidation Ledger (Release 2).
-- Oracle divergence and per-scenario Pressure results over time (Releases 2–3).
+- Deposits, borrows, repayments, perp entries and exits, and funding events. Liquidations are recorded since Release 2 (see [LEDGER.md](LEDGER.md)).
+- Oracle divergence over time (Release 3). Pressure scenario results are recorded since Release 2 but not scored yet.
 - Anything before recording began.

@@ -40,11 +40,14 @@ import {
   type CensusShip,
   type CensusSnapshot,
   stressLevel,
+  queryPressure,
   type PressureSnapshot,
   type AggPoint,
 } from '../index.js';
 import type { CensusStore } from './store.js';
 import { recordHistory } from './history-write.js';
+import { recordLiquidations, rescoreAccountability } from './ledger-write.js';
+import { appendForecast, forecastPath, type ForecastRecord } from '../ledger.js';
 
 /** Job state (known.json). Addresses only — public chain facts, no balances. */
 /**
@@ -115,6 +118,10 @@ export interface RunOpts {
   history?: boolean;
   /** addresses never recorded (AEGIS's synthetic test wallets) */
   exclude?: ReadonlySet<string>;
+  /** Liquidation Ledger (ledger.ts): scan liquidations and score the track record. Default true (needs history). */
+  ledger?: boolean;
+  /** time the ledger backfill may use per run. Default 8 minutes. */
+  ledgerBudgetMs?: number;
 }
 
 /** Logs a progress line only when the percentage crosses a new 10% step. */
@@ -728,6 +735,50 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       });
     } catch (e) {
       log(`history: not recorded this run: ${String(e).slice(0, 200)}`);
+    }
+
+    /* ── 6. Liquidation Ledger + track record + forecast records (Release 2) ── */
+    if (o.ledger !== false) {
+      try {
+        const left = deadline - Date.now();
+        await recordLiquidations({
+          store: o.store,
+          client,
+          head,
+          budgetMs: Math.max(0, Math.min(o.ledgerBudgetMs ?? 8 * 60_000, left)),
+          exclude: o.exclude,
+          log,
+          scan: { paceMs: o.scanPaceMs, backoffBaseMs: o.scanBackoffMs },
+        });
+      } catch (e) {
+        log(`ledger: not updated this run: ${String(e).slice(0, 200)}`);
+      }
+      try {
+        await rescoreAccountability(o.store, Date.now(), log);
+      } catch (e) {
+        log(`accountability: not updated this run: ${String(e).slice(0, 200)}`);
+      }
+    }
+    if (pressureSnap) {
+      try {
+        const L = state.coverage?.share.nadoOpenInterestLongs ?? null;
+        const S = state.coverage?.share.nadoOpenInterestShorts ?? null;
+        const oi = L === null || S === null ? null : Math.min(L, S);
+        const sr = stressLevel(pressureSnap, { nowMs: Date.now(), oiCoverage: oi });
+        const scenarios: ForecastRecord['scenarios'] = [];
+        for (const dir of ['CRYPTO', 'ETH', 'BTC', 'USD'])
+          for (const pct of [10, 20])
+            for (const material of ['0', '1k'] as const) {
+              const q = queryPressure(pressureSnap, { dir, sign: 'down', pct, material, dim: '*' });
+              scenarios.push({ dir, sign: 'down', pct, material, population: q.population, near: q.nearUnder, liquidatable: q.liquidatableUnder, affected: q.affected });
+            }
+        const rec: ForecastRecord = { at: snap.generatedAt, block: head, v: { rules: RULES.RULES_VERSION, engine: pressureSnap.engine, stress: sr.version }, coverage: oi, population: pressureSnap.population.exposed, confidence: sr.confidence, scenarios };
+        const m = snap.generatedAt.slice(0, 7);
+        await o.store.put(forecastPath(m), appendForecast(await o.store.get(forecastPath(m)), m, rec));
+        log(`forecast: recorded ${scenarios.length} scenario results at block ${head} (scored once prices are recorded)`);
+      } catch (e) {
+        log(`forecast: not recorded this run: ${String(e).slice(0, 200)}`);
+      }
     }
   }
   return snap;

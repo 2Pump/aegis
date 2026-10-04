@@ -284,3 +284,7 @@ It went live on 2026-09-29. Run #12 failed on a bug in this check (`node -e` doe
 ## Flight Recorder (since 2026-10-04)
 
 After publishing, every run records history: one aggregate point (block hash, versions, risk counts per size floor, type mix, stress level on full scans) and a wallet row for every wallet whose type, risk, size range or venues changed. Wallets are split into 64 shards, with a baseline row for each wallet once a month. If history fails, the scan still publishes. Details, retention and rollback are in [HISTORY.md](HISTORY.md).
+
+## Liquidation Ledger (since Release 2)
+
+After the Flight Recorder, every run scans for new liquidations (forward) and spends up to 8 minutes on the history scan back to launch, which finishes in roughly 10–15 hourly runs. It then re-scores the track record, and on full scans records the Pressure Map's scenario forecasts. Details: [LEDGER.md](LEDGER.md).

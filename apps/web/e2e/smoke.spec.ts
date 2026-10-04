@@ -181,10 +181,14 @@ test('INTEL: in the nav between Pressure and Scan; later sections say NOT BUILT,
   expect(links.map((s) => s.trim().toUpperCase())).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
   await page.goto('/intel');
   await expect(page.getByTestId('intel-tabs')).toBeVisible();
-  for (const t of ['liquidations', 'oracles', 'changes', 'carry']) {
+  for (const t of ['oracles', 'changes', 'carry']) {
     await page.getByTestId(`intel-tab-${t}`).click();
     await expect(page.getByTestId('intel-not-built')).toContainText('NOT BUILT YET');
   }
+  // the Liquidation Ledger is built; in a locked build it is locked with the well (no numbers)
+  await page.getByTestId('intel-tab-liquidations').click();
+  await expect(page.getByText(/Locked with the well|NOT RECORDING YET|Liquidation ledger/).first()).toBeVisible();
+  await expect(page.getByTestId('intel-not-built')).toHaveCount(0);
 });
 
 test('wallet page: a HISTORY section that never invents history (no recording → says so)', async ({ page }) => {
@@ -199,4 +203,12 @@ test('wallet page: a HISTORY section that never invents history (no recording �
 test('test wallets never get a history section', async ({ page }) => {
   await page.goto('/fixture/carry');
   await expect(page.getByTestId('wallet-history')).toHaveCount(0);
+});
+
+test('Checks: the track record never shows a rate it cannot back (not scored yet → says so)', async ({ page }) => {
+  await page.goto('/calibration');
+  const t = page.getByTestId('track-record');
+  await expect(t).toBeVisible();
+  await expect(t.getByText(/NOT SCORED YET|Couldn't load|Liquidations it could judge/).first()).toBeVisible();
+  await expect(t.getByText(/AI|guaranteed/i)).toHaveCount(0);
 });

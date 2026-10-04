@@ -107,6 +107,12 @@ export function CountChart({
         {series.map((s) => (
           <path key={s.name} d={path(s.points)} fill="none" stroke={s.color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
         ))}
+        {/* with only one or two recorded points a line says nothing: show the points themselves */}
+        {series.map((s) =>
+          s.points.length <= 2
+            ? s.points.map((p) => <rect key={`${s.name}${p.t}`} x={Math.min(W - 8, Math.max(0, x(p.t) - 4))} y={y(p.v) - 4} width="8" height="8" fill={s.color} />)
+            : null,
+        )}
         <text x="4" y="12" fill="#7d8b9b" fontSize="11" fontFamily="IBM Plex Mono, monospace">{max.toLocaleString('en-US')}</text>
       </svg>
       <div className="hist-legend">

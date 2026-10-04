@@ -62,6 +62,6 @@ scripts           census · prove · verify-auto · alerts · make-fixtures · s
 - `/hull/:address`: the ship plate. It re-reads every 15 s, backs off on 429, and pauses while the tab is hidden. It has sections REGISTRY, HULL TEMP, POSE, LOCKER, BOOK, VECTOR and SHARE, plus an on-page **sensor log**, so a screenshot shows exactly what each sensor returned.
 - `/calibration`: proof status + the six fixture books. `/fixture/carry|naked|equity-margin|wounded|dark|empty`: calibration plates.
 - Rules: one drawer, opened from the header button, the footer, a wallet page, or any link with `?rules=1` (old `/rules` links redirect to it).
-- `/intel`: INTEL. HISTORY (ecosystem risk over time, from the Flight Recorder) is built; LIQUIDATIONS, ORACLES, CHANGES and CARRY say NOT BUILT until their releases (docs/HISTORY.md).
+- `/intel`: INTEL. HISTORY (ecosystem risk over time, from the Flight Recorder) and LIQUIDATIONS (ledger, cascades, replay) are built; ORACLES, CHANGES and CARRY say NOT BUILT until their releases (docs/HISTORY.md, docs/LEDGER.md). The Checks page carries the track record.
 - `/census`: pose mix of every account found, coverage, and snapshot and backfill status.
 - `/watch`: Telegram alerts — built and tested, labelled NOT LIVE until switched on (docs/ALERTS.md).

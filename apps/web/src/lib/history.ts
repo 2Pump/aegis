@@ -5,6 +5,11 @@
  */
 import { useEffect, useState } from 'react';
 import {
+  ACCOUNT_PATH,
+  isLedgerFile,
+  ledgerPath,
+  type Accountability,
+  type LedgerRecord,
   HISTORY,
   INDEX_PATH,
   aggPath,
@@ -148,4 +153,59 @@ export async function recordedStateAt(address: string, atMs: number, block: numb
   let hit: WalletState | null = null;
   for (const s of tl) if (s.block <= block) hit = s;
   return hit;
+}
+
+/* ───────────────────────── Release 2: ledger + track record ───────────────────────── */
+
+
+/** Liquidations in the range (ledger months only as far as needed; at most 24 months for ALL). */
+export function useLedger(range: Range, index: HistoryIndex | null): Loaded<{ records: LedgerRecord[]; from: number; to: number }> {
+  type S = Loaded<{ records: LedgerRecord[]; from: number; to: number }>;
+  const [s, set] = useState<S>({ status: 'loading' });
+  useEffect(() => {
+    if (!index) return;
+    let alive = true;
+    const to = Date.now();
+    const months = index.ledgerMonths ?? [];
+    if (!months.length) {
+      set({ status: 'none' });
+      return;
+    }
+    // the ledger reaches back before recording began (it's backfilled from the chain), so ALL = every ledger month
+    const from = range === 'all' ? Date.parse(`${months[0]}-01T00:00:00Z`) : to - ({ '24h': 1, '7d': 7, '30d': 30 } as const)[range] * 86_400_000;
+    const need = months.filter((m) => m >= new Date(from).toISOString().slice(0, 7)).slice(-24);
+    set({ status: 'loading' });
+    Promise.all(need.map((m) => getJson(ledgerPath(m), m === thisMonth())))
+      .then((files) => {
+        if (!alive) return;
+        const records = files.flatMap((f) => (isLedgerFile(f) ? f.records : [])).filter((r) => r.at >= from && r.at <= to);
+        set({ status: 'ok', records, from, to });
+      })
+      .catch((e: unknown) => alive && set({ status: 'error', message: String(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [range, index]);
+  return s;
+}
+
+export function useAccountability(): Loaded<{ a: Accountability }> {
+  const [s, set] = useState<Loaded<{ a: Accountability }>>({ status: 'loading' });
+  useEffect(() => {
+    let alive = true;
+    getJson(ACCOUNT_PATH, true)
+      .then((j) => alive && set((j as Accountability)?.kind === 'aegis-accountability' ? { status: 'ok', a: j as Accountability } : { status: 'none' }))
+      .catch((e: unknown) => alive && set({ status: 'error', message: String(e) }));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return s;
+}
+
+/** Points of the aggregate history around a time window (for cascade replay). */
+export async function aggAround(fromMs: number, toMs: number, index: HistoryIndex): Promise<AggPoint[]> {
+  const months = monthsBetween(fromMs, toMs).filter((m) => index.months.includes(m));
+  const files = await Promise.all(months.map((m) => getJson(aggPath(m), m === thisMonth()).catch(() => null)));
+  return files.flatMap((f) => (isAggFile(f) ? f.points : [])).filter((p) => Date.parse(p.at) >= fromMs && Date.parse(p.at) <= toMs);
 }

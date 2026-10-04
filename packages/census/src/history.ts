@@ -330,6 +330,24 @@ export interface HistoryIndex {
   firstBlock: number | null;
   /** finished months already thinned to one point per COMPACT_EVERY_H (plus every risk change) */
   compacted?: string[];
+  /** Liquidation Ledger (ledger.ts): months with a ledger file, and how far the scans have got */
+  ledgerMonths?: string[];
+  ledger?: LedgerCursor;
+  /** when AEGIS began recording its own NEAR LIQUIDATION warnings (the track record starts here) */
+  warningsSince?: string;
+}
+
+/** Where the liquidation scans have got (kept in the index so any run can resume). */
+export interface LedgerCursor {
+  startedAt: string;
+  /** forward scanning began after this block; the backfill runs up to it */
+  forwardFrom: number;
+  forwardTo: number;
+  backfillFrom: number;
+  backfillNext: number;
+  done: boolean;
+  events: number;
+  skipped: number;
 }
 
 export function isHistoryIndex(x: unknown): x is HistoryIndex {

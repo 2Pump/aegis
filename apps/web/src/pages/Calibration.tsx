@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { RULES, SCENARIO_ENGINE_VERSION, classify } from '@aegis/pose';
 import { VERIFY, caseName, latestChecks, type CheckDisplay } from '@aegis/census';
 import { useVerificationLog } from '../lib/verificationLog';
+import { TrackRecord } from '../components/TrackRecord';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { RISK_LABEL } from '@aegis/glyphs';
@@ -20,6 +21,8 @@ export function CalibrationPage() {
       </div>
 
       <AutoChecks />
+
+      <TrackRecord />
 
       <Panel title="Matched against the official apps — by hand" rail={VERIFIED ? 'var(--cyan)' : VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? 'var(--amber)' : 'var(--red)'} testId="proof-panel">
         {VERIFIED || VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? (
