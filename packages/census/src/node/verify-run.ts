@@ -31,7 +31,7 @@ import {
 } from '@aegis/ink-io';
 import { RULES, SCENARIO_ENGINE_VERSION, type Book } from '@aegis/pose';
 import { decodeSnapshot, type CensusShip } from '../index.js';
-import { VERIFY, appendRecords, compareField, finalize, shortWallet, type FieldCheck, type VerificationRecord } from '../verify.js';
+import { VERIFY, appendRecords, compareField, notChecked, finalize, shortWallet, type FieldCheck, type VerificationRecord } from '../verify.js';
 import type { CensusStore } from './store.js';
 
 const dataProviderAbi = parseAbi([
@@ -48,16 +48,33 @@ export interface VerifyOpts {
   /** injectable for tests; defaults to global fetch */
   fetch?: (url: string) => Promise<{ status: number; ok: boolean; headers: { get(k: string): string | null }; json(): Promise<unknown> }>;
   now?: () => number;
-  /** how many candidates to try per case before giving up (bounded RPC use) */
+  /** how many candidates to try per case before giving up (bounded RPC use); default per case */
   tries?: number;
 }
 
-type Case = { name: string; venue: 'tydro' | 'nado'; pick: (s: CensusShip) => boolean; need: (b: Book) => boolean };
+type Case = {
+  name: string;
+  venue: 'tydro' | 'nado';
+  pick: (s: CensusShip) => boolean;
+  /** lower = tried first: wallets the census already knows have what this case needs */
+  tier?: (s: CensusShip) => number;
+  tries: number;
+  need: (b: Book) => boolean;
+};
 
 const CASES: Case[] = [
-  { name: 'Tydro borrower', venue: 'tydro', pick: (s) => s.venues.tydro, need: (b) => b.tydro.status === 'OK' && b.tydro.data.debts.length > 0 },
-  { name: 'Nado default subaccount', venue: 'nado', pick: (s) => s.venues.nado && s.extraSubs.length === 0, need: (b) => b.nado.status === 'OK' && (b.nado.data.spots.length > 0 || b.nado.data.perps.length > 0) },
-  { name: 'Nado isolated subaccount', venue: 'nado', pick: (s) => s.venues.nado && s.extraSubs.some((x) => subaccountKind(x) === 'isolated'), need: (b) => b.nado.status === 'OK' && (b.nado.data.coverage?.subs.some((x) => x.kind === 'isolated') ?? false) },
+  {
+    // most Tydro wallets only deposit; the census flags tell which ones borrow (a Tydro wound, a same-family loop,
+    // an at-risk watch), so those are tried first, then everyone else
+    name: 'Tydro borrower',
+    venue: 'tydro',
+    pick: (s) => s.venues.tydro && s.primary !== 'EMPTY',
+    tier: (s) => (s.wound.tydro || s.correlatedLoop ? 0 : s.watch || s.hullTemp === 'ELEVATED' || s.hullTemp === 'CRITICAL' ? 1 : 2),
+    tries: 40,
+    need: (b) => b.tydro.status === 'OK' && b.tydro.data.debts.length > 0,
+  },
+  { name: 'Nado default subaccount', venue: 'nado', tries: 5, pick: (s) => s.venues.nado && s.extraSubs.length === 0, need: (b) => b.nado.status === 'OK' && (b.nado.data.spots.length > 0 || b.nado.data.perps.length > 0) },
+  { name: 'Nado isolated subaccount', venue: 'nado', tries: 10, pick: (s) => s.venues.nado && s.extraSubs.some((x) => subaccountKind(x) === 'isolated'), need: (b) => b.nado.status === 'OK' && (b.nado.data.coverage?.subs.some((x) => x.kind === 'isolated') ?? false) },
 ];
 
 /** a different wallet each day, deterministically (no randomness to argue about) */
@@ -82,7 +99,17 @@ export async function runVerification(o: VerifyOpts): Promise<VerificationRecord
   const base = { v: 1 as const, kind: 'auto' as const, rulesVersion: RULES.RULES_VERSION, engineVersion: SCENARIO_ENGINE_VERSION };
 
   for (const c of CASES) {
-    const candidates = rotate(ships.filter((s) => s.primary !== 'DARK' && c.pick(s)).sort((a, b) => (a.address < b.address ? -1 : 1)), slot).slice(0, o.tries ?? 5);
+    const pool = ships.filter((s) => s.primary !== 'DARK' && c.pick(s)).sort((a, b) => (a.address < b.address ? -1 : 1));
+    // rotate within each tier, best tier first
+    const tiers = new Map<number, CensusShip[]>();
+    for (const s of pool) {
+      const t = c.tier ? c.tier(s) : 0;
+      tiers.set(t, [...(tiers.get(t) ?? []), s]);
+    }
+    const candidates = [...tiers.keys()]
+      .sort((a, b) => a - b)
+      .flatMap((t) => rotate(tiers.get(t)!, slot))
+      .slice(0, o.tries ?? c.tries);
     let done = false;
     for (const s of candidates) {
       const { book } = await readBook(s.address as `0x${string}`, { client: o.client, nado: { mode: 'chain', gatewayBase: NADO_DIRECT.gateway, archiveBase: NADO_DIRECT.archive }, nadoDiscovery: discovery });
@@ -97,7 +124,14 @@ export async function runVerification(o: VerifyOpts): Promise<VerificationRecord
       done = true;
       break;
     }
-    if (!done) log(`verify · ${c.name} · no suitable wallet found in ${candidates.length} tries — no record (nothing to check is not a pass)`);
+    if (!done) {
+      // recorded as NOT CHECKED (shown on the page), never left out and never a pass
+      const why = `no suitable wallet found in ${candidates.length} tries this run`;
+      const at = new Date(now()).toISOString();
+      const types = c.venue === 'tydro' ? (['on-chain'] as const) : (['on-chain', 'official-api'] as const);
+      for (const t of types) records.push(notChecked({ ...base, venue: c.venue, wallet: '—', case: c.name, source: '—', sourceType: t, at, failureReason: why }));
+      log(`verify · ${c.name} · ${why} — recorded as NOT CHECKED (nothing to check is not a pass)`);
+    }
   }
 
   const prev = await o.store.get('verification-log.json');
@@ -158,7 +192,7 @@ async function verifyNadoChain(client: PublicClient, book: Book, name: string, a
     }
     const iso = n.coverage?.subs.filter((s) => s.kind === 'isolated').length ?? 0;
     fields.push(compareField({ id: 'coverage', label: 'Nado report complete', expected: 1, aegis: n.coverage?.status === 'COMPLETE' ? 1 : 0, tolerance: 0, unit: 'abs' }));
-    return finalize({ ...rec, case: iso ? `${name} (${iso} isolated)` : name, fields, sourceUnavailable: false });
+    return finalize({ ...rec, source: iso ? `${rec.source} · ${iso} isolated subaccount${iso === 1 ? '' : 's'}` : rec.source, fields, sourceUnavailable: false });
   } catch (e) {
     return finalize({ ...rec, fields: [], sourceUnavailable: true, failureReason: `on-chain source unreachable: ${String(e).slice(0, 160)}` });
   }

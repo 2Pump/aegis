@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendRecords, checkDisplay, compareField, finalize, latestChecks, type VerificationRecord } from '../src/index.js';
+import { EXPECTED_CHECKS, appendRecords, checkDisplay, compareField, finalize, latestChecks, notChecked, type VerificationRecord } from '../src/index.js';
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
 const field = (expected: number | null, aegis: number | null, tolerance = 0.001) => compareField({ id: 'x', label: 'x', expected, aegis, tolerance, unit: 'rel' });
@@ -57,7 +57,7 @@ describe('verification records', () => {
   it('a record under old rules keeps its version — never relabelled', () => {
     const old = rec({ rulesVersion: 'v1.1.0', at: '2026-09-29T01:43:02Z' });
     const [g] = latestChecks([old], NOW);
-    expect(g!.latest.rulesVersion).toBe('v1.1.0');
+    expect(g!.latest!.rulesVersion).toBe('v1.1.0');
     expect(g!.display).toBe('STALE');
   });
   it('history is appended, never deleted; junk in the log is refused', () => {
@@ -65,5 +65,26 @@ describe('verification records', () => {
     const b = rec({});
     expect(appendRecords([a, { nope: 1 }, 'x'], [b])).toEqual([a, b]);
     expect(appendRecords(null, [b])).toEqual([b]);
+  });
+
+  it('every expected check gets a row: one never run shows NOT CHECKED, never left out', () => {
+    const g = latestChecks([], NOW);
+    expect(g).toHaveLength(EXPECTED_CHECKS.length);
+    expect(g.every((x) => x.display === 'NOT CHECKED' && x.latest === null)).toBe(true);
+    expect(g[0]!.case).toBe('Tydro borrower'); // Tydro first
+  });
+  it('a run that found no wallet is NOT CHECKED — never a pass — and the last success stays visible', () => {
+    const ok = rec({});
+    const nc = notChecked({ v: 1, kind: 'auto', venue: 'tydro', wallet: '—', case: 'Tydro borrower', source: '—', sourceType: 'on-chain', at: '2026-10-04T11:00:00Z', rulesVersion: 'v1.2.0', engineVersion: null, failureReason: 'no suitable wallet found in 40 tries this run' });
+    const t = latestChecks([ok, nc], NOW).find((x) => x.venue === 'tydro')!;
+    expect(t.display).toBe('NOT CHECKED');
+    expect(t.lastSuccess).toBe(ok);
+  });
+  it('old "(1 isolated)" names land on the same row as the plain case name', () => {
+    const a = rec({ venue: 'nado', case: 'Nado isolated subaccount (1 isolated)', at: '2026-10-04T09:00:00Z' });
+    const b = rec({ venue: 'nado', case: 'Nado isolated subaccount', at: '2026-10-04T10:00:00Z' });
+    const rows = latestChecks([a, b], NOW).filter((x) => x.venue === 'nado' && x.sourceType === 'on-chain' && x.case.startsWith('Nado isolated'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.latest).toBe(b);
   });
 });

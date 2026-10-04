@@ -38,7 +38,8 @@ export interface VerificationRecord {
   rulesVersion: string;
   engineVersion: string | null;
   fields: FieldCheck[];
-  status: 'PASS' | 'FAIL' | 'SOURCE_UNAVAILABLE';
+  /** NOT_CHECKED: no suitable wallet could be found this run — nothing was compared (never a pass, not a failure of AEGIS) */
+  status: 'PASS' | 'FAIL' | 'SOURCE_UNAVAILABLE' | 'NOT_CHECKED';
   failureReason: string | null;
   sourceUnavailable: boolean;
 }
@@ -62,30 +63,74 @@ export function finalize(r: Omit<VerificationRecord, 'status' | 'failureReason'>
   return { ...r, status: 'PASS', failureReason: null };
 }
 
-export type CheckDisplay = 'CURRENT' | 'STALE' | 'FAILED' | 'SOURCE UNAVAILABLE';
+export type CheckDisplay = 'CURRENT' | 'STALE' | 'FAILED' | 'SOURCE UNAVAILABLE' | 'NOT CHECKED';
+
+/** Every check the automatic run is meant to produce. One that has no record yet is shown as NOT CHECKED — never left out. */
+export const EXPECTED_CHECKS: ReadonlyArray<{ venue: VVenue; sourceType: SourceType; case: string }> = [
+  { venue: 'tydro', sourceType: 'on-chain', case: 'Tydro borrower' },
+  { venue: 'nado', sourceType: 'on-chain', case: 'Nado default subaccount' },
+  { venue: 'nado', sourceType: 'official-api', case: 'Nado default subaccount' },
+  { venue: 'nado', sourceType: 'on-chain', case: 'Nado isolated subaccount' },
+  { venue: 'nado', sourceType: 'official-api', case: 'Nado isolated subaccount' },
+];
+
+/** One name per case. (Early records named the isolated case "… (1 isolated)"; they belong to the same row.) */
+export const caseName = (c: string) => c.replace(/\s*\(\d+ isolated\)$/, '');
+
+/** A run that couldn't find a wallet for a case says so — a record with nothing compared, never a pass. */
+export function notChecked(r: Omit<VerificationRecord, 'status' | 'fields' | 'sourceUnavailable' | 'failureReason' | 'block'> & { failureReason: string }): VerificationRecord {
+  return { ...r, block: null, fields: [], sourceUnavailable: false, status: 'NOT_CHECKED' };
+}
 
 export function checkDisplay(r: VerificationRecord, nowMs: number, staleHours: number = VERIFY.STALE_HOURS): CheckDisplay {
+  if (r.status === 'NOT_CHECKED') return 'NOT CHECKED';
   if (r.status === 'SOURCE_UNAVAILABLE') return 'SOURCE UNAVAILABLE';
   if (r.status === 'FAIL') return 'FAILED';
   const t = Date.parse(r.at);
   return Number.isFinite(t) && (nowMs - t) / 3_600_000 <= staleHours ? 'CURRENT' : 'STALE';
 }
 
-/** Per venue × source type × case: the latest attempt, and the last success (kept visible when a newer attempt fails). */
-export function latestChecks(records: readonly VerificationRecord[], nowMs: number, staleHours: number = VERIFY.STALE_HOURS) {
+export interface CheckGroup {
+  venue: VVenue;
+  sourceType: SourceType;
+  case: string;
+  /** null = this expected check has never run */
+  latest: VerificationRecord | null;
+  display: CheckDisplay;
+  lastSuccess: VerificationRecord | null;
+  lastSuccessDisplay: CheckDisplay | null;
+}
+
+/**
+ * Per venue × source type × case: the latest attempt, and the last success (kept visible when a newer attempt fails).
+ * Every EXPECTED check gets a row, even with no record — a missing check is shown, never silently left out.
+ */
+export function latestChecks(records: readonly VerificationRecord[], nowMs: number, staleHours: number = VERIFY.STALE_HOURS): CheckGroup[] {
+  const key = (v: string, t: string, c: string) => `${v}|${t}|${caseName(c)}`;
   const groups = new Map<string, VerificationRecord[]>();
+  for (const e of EXPECTED_CHECKS) groups.set(key(e.venue, e.sourceType, e.case), []);
   for (const r of records) {
-    const k = `${r.venue}|${r.sourceType}|${r.case}`;
+    const k = key(r.venue, r.sourceType, r.case);
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
-  return [...groups.values()]
-    .map((rs) => {
+  const order = (g: CheckGroup) => `${g.venue === 'tydro' ? 0 : 1}${g.case}${g.sourceType}`;
+  return [...groups.entries()]
+    .map(([k, rs]): CheckGroup => {
+      const [venue, sourceType, c] = k.split('|') as [VVenue, SourceType, string];
       const sorted = [...rs].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-      const latest = sorted[0]!;
+      const latest = sorted[0] ?? null;
       const lastSuccess = sorted.find((r) => r.status === 'PASS') ?? null;
-      return { venue: latest.venue, sourceType: latest.sourceType, case: latest.case, latest, display: checkDisplay(latest, nowMs, staleHours), lastSuccess, lastSuccessDisplay: lastSuccess ? checkDisplay(lastSuccess, nowMs, staleHours) : null };
+      return {
+        venue,
+        sourceType,
+        case: c,
+        latest,
+        display: latest ? checkDisplay(latest, nowMs, staleHours) : 'NOT CHECKED',
+        lastSuccess,
+        lastSuccessDisplay: lastSuccess ? checkDisplay(lastSuccess, nowMs, staleHours) : null,
+      };
     })
-    .sort((a, b) => (a.venue + a.case < b.venue + b.case ? -1 : 1));
+    .sort((a, b) => (order(a) < order(b) ? -1 : 1));
 }
 
 /** Append without ever deleting history; refuses anything that isn't a record. */

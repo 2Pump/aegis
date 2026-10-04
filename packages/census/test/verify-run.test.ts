@@ -32,6 +32,11 @@ describe('automatic verification (safe fake chain; nothing real is touched)', ()
     // the fake chain has no AaveProtocolDataProvider: the Tydro check's source is unreachable → never a pass
     const tydro = recs.find((r) => r.venue === 'tydro');
     if (tydro) expect(tydro.status).not.toBe('PASS');
+    // a case with no suitable wallet is RECORDED as NOT CHECKED (shown on the page), never left out and never a pass
+    const iso = recs.filter((r) => r.case === 'Nado isolated subaccount');
+    expect(iso.map((r) => r.sourceType).sort()).toEqual(['official-api', 'on-chain']);
+    expect(iso.every((r) => r.status === 'NOT_CHECKED' && r.fields.length === 0 && /no suitable wallet/.test(r.failureReason ?? ''))).toBe(true);
+    expect(checkDisplay(iso[0]!, Date.now())).toBe('NOT CHECKED');
     expect(logs.some((l) => l.includes('Nado isolated subaccount · no suitable wallet'))).toBe(true);
 
     // a second run appends; the first run's records are still there

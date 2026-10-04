@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { RULES, SCENARIO_ENGINE_VERSION, classify } from '@aegis/pose';
-import { VERIFY, latestChecks, type CheckDisplay } from '@aegis/census';
+import { VERIFY, caseName, latestChecks, type CheckDisplay } from '@aegis/census';
 import { useVerificationLog } from '../lib/verificationLog';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
@@ -85,7 +85,7 @@ export function CalibrationPage() {
   );
 }
 
-const DISPLAY_TONE: Record<CheckDisplay, string> = { CURRENT: 'var(--cyan)', STALE: 'var(--amber)', FAILED: 'var(--red)', 'SOURCE UNAVAILABLE': 'var(--slate)' };
+const DISPLAY_TONE: Record<CheckDisplay, string> = { CURRENT: 'var(--cyan)', STALE: 'var(--amber)', FAILED: 'var(--red)', 'SOURCE UNAVAILABLE': 'var(--slate)', 'NOT CHECKED': 'var(--amber)' };
 const SOURCE_TYPE: Record<string, string> = { 'on-chain': 'on-chain contract', 'official-api': 'official API', 'official-app': 'official app' };
 
 /** The automatic cross-checks every 4 h (verify.yml). Real wallets, compared with authoritative sources AEGIS doesn't read from. */
@@ -105,8 +105,7 @@ function AutoChecks() {
         <>
           <div className="dim" style={{ fontSize: 12, marginBottom: 8 }}>
             Real wallets read with this site's own readers, then compared with sources AEGIS does not read from: Tydro's AaveProtocolDataProvider (balances and a recomputed
-            health factor, same block) and Nado's Clearinghouse (every subaccount's maintenance health). Nado's official API is tried too; it only answers Nado's own website, so
-            it shows SOURCE UNAVAILABLE — that is never counted as a pass. These are not the by-hand matches against the official apps further down.
+            health factor, same block) and Nado's Clearinghouse (every subaccount's maintenance health). Nado's official API is compared too, as a third source; when it refuses (it sits behind a Cloudflare check) the row says SOURCE UNAVAILABLE, which never counts as a pass. A case with no suitable wallet that run says NOT CHECKED. These are not the by-hand matches against the official apps further down.
           </div>
           <div className="table-wrap">
             <table className="t" data-testid="auto-checks-latest">
@@ -116,20 +115,34 @@ function AutoChecks() {
               <tbody>
                 {latestChecks(log.records, now).map((g) => {
                   const r = g.latest;
+                  const key = `${g.venue}${g.sourceType}${g.case}`;
+                  if (!r) {
+                    // an expected check with no record yet: shown, never left out
+                    return (
+                      <tr key={key} data-testid="auto-check-row" data-display={g.display}>
+                        <td className="mono"><b style={{ color: DISPLAY_TONE[g.display] }}>{g.display}</b></td>
+                        <td>{g.case}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{SOURCE_TYPE[g.sourceType] ?? g.sourceType}</td>
+                        <td className="mono" style={{ fontSize: 11 }}><div className="neg">no check has run for this yet</div></td>
+                        <td className="num">—</td>
+                        <td className="mono" style={{ fontSize: 11 }}>—</td>
+                      </tr>
+                    );
+                  }
                   const passed = r.fields.filter((f) => f.pass === true).length;
                   return (
-                    <tr key={`${g.venue}${g.sourceType}${g.case}`} data-testid="auto-check-row" data-display={g.display}>
+                    <tr key={key} data-testid="auto-check-row" data-display={g.display}>
                       <td className="mono"><b style={{ color: DISPLAY_TONE[g.display] }}>{g.display}</b></td>
-                      <td>{r.case}<div className="faint mono" style={{ fontSize: 11 }}>{r.wallet}</div></td>
+                      <td>{g.case}<div className="faint mono" style={{ fontSize: 11 }}>{r.wallet}</div></td>
                       <td className="mono" style={{ fontSize: 11 }}>{SOURCE_TYPE[r.sourceType] ?? r.sourceType}<div className="faint">{r.source}</div></td>
                       <td className="mono" style={{ fontSize: 11 }}>
-                        {fmtAge(Date.parse(r.at), now)} ago · block {r.block?.toLocaleString('en-US') ?? '—'}
+                        {fmtAge(Date.parse(r.at), now)} ago{r.block !== null ? ` · block ${r.block.toLocaleString('en-US')}` : ''}
                         {r.failureReason ? <div className="neg">{r.failureReason}</div> : null}
                         {g.display !== 'CURRENT' && g.lastSuccess && g.lastSuccess !== r ? (
                           <div className="faint">last success {fmtAge(Date.parse(g.lastSuccess.at), now)} ago ({g.lastSuccessDisplay})</div>
                         ) : null}
                       </td>
-                      <td className="num">{passed}/{r.fields.length}</td>
+                      <td className="num">{r.fields.length ? `${passed}/${r.fields.length}` : '—'}</td>
                       <td className="mono" style={{ fontSize: 11 }}>
                         rules {r.rulesVersion}{r.rulesVersion !== RULES.RULES_VERSION ? <b className="proof-old"> (older)</b> : null}
                         {r.engineVersion ? ` · ${r.engineVersion}` : ''}
@@ -145,7 +158,7 @@ function AutoChecks() {
             <ul className="reasons" style={{ marginTop: 8 }}>
               {[...log.records].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 60).map((r, i) => (
                 <li key={`${r.at}${i}`}>
-                  {r.status.replace('_', ' ')} · {r.venue} · {r.case} · {r.wallet} · {SOURCE_TYPE[r.sourceType] ?? r.sourceType} · {r.at} · block {r.block ?? '—'} · rules {r.rulesVersion}
+                  {r.status.replace('_', ' ')} · {r.venue} · {caseName(r.case)} · {r.wallet} · {SOURCE_TYPE[r.sourceType] ?? r.sourceType} · {r.at} · block {r.block ?? '—'} · rules {r.rulesVersion}
                   {r.fields.length ? ` · ${r.fields.map((f) => `${f.label} ${f.pass === null ? 'n/a' : f.pass ? 'ok' : `FAIL (AEGIS ${f.aegis}, source ${f.expected}, ±${f.tolerance})`}`).join('; ')}` : ''}
                   {r.failureReason ? ` · ${r.failureReason}` : ''}
                 </li>

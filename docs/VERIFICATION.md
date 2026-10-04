@@ -114,9 +114,11 @@ This vector cannot pass the human step unless you control that wallet. It proves
 `pnpm verify:auto` — run every 4 hours by `.github/workflows/verify.yml` (:23 past 00, 04, 08, 12, 16, 20 UTC, or Actions → verify → Run workflow), same secrets as the census.
 - Picks real wallets from the latest census (a different set each run): a Tydro borrower, a Nado default-only wallet, a Nado wallet with an isolated subaccount.
 - Reads each with the site's own readers and compares with sources AEGIS does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
-- Tries Nado's official API with a plain request. It sits behind Cloudflare, so it is recorded as SOURCE UNAVAILABLE — never a pass, never worked around.
+- Compares Nado's official API too, with a plain request (it answered from GitHub's runners on 2026-10-04). When Cloudflare refuses it, the row is SOURCE UNAVAILABLE — never a pass, never worked around.
+- Tydro: wallets the census already flags as borrowing (a Tydro wound, a same-family loop, an at-risk watch) are tried first, up to 40.
+- A case with no suitable wallet that run is recorded as NOT CHECKED. Every expected check always has a row on the page, so a missing one is never silently left out.
 - Each record: venue, short wallet, case, source + type, time, block, rules and engine versions, fields (expected / AEGIS / tolerance / pass), status, failure reason.
 - Appended to `verification-log.json` on Blob; history is never deleted.
-- Checks page: per case the latest status — CURRENT, STALE (> 6 h: one missed run plus slack), FAILED, SOURCE UNAVAILABLE — plus the last success, versions (older flagged) and the full history. A FAIL makes the workflow run red.
+- Checks page: per case the latest status — CURRENT, STALE (> 6 h: one missed run plus slack), FAILED, SOURCE UNAVAILABLE, NOT CHECKED — plus the last success, versions (older flagged) and the full history. A FAIL makes the workflow run red.
 
 `pnpm prove` records now also carry the same structured form (`structured`), and a stated failure can never finalize as a pass.
