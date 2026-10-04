@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Book } from '@aegis/pose';
 import {
@@ -403,11 +405,12 @@ describe('alerts · persistence and secrets', () => {
   });
 
   it('a decryptable object that is not an alerts db is refused (never overwritten as empty)', async () => {
-    const dir = await import('node:fs/promises').then((f) => f.mkdtemp('/tmp/aegis-alerts-'));
-    const p = `${dir}/a.json`;
-    await import('node:fs/promises').then((f) => f.writeFile(p, JSON.stringify(seal(key, { hello: 1 }))));
+    // the OS temp folder (C:\Users\…\Temp on Windows, /tmp on Linux) — never a hard-coded path
+    const dir = mkdtempSync(join(tmpdir(), 'aegis-alerts-'));
+    const p = join(dir, 'a.json');
+    writeFileSync(p, JSON.stringify(seal(key, { hello: 1 })));
     await expect(fileAlertsStore(p, key).load()).rejects.toThrow(/not an alerts db/);
-    expect(await fileAlertsStore(`${dir}/none.json`, key).load()).toBeNull();
+    expect(await fileAlertsStore(join(dir, 'none.json'), key).load()).toBeNull();
   });
 
   it('store key must be 32 bytes; chat hash is stable and not the id', () => {
