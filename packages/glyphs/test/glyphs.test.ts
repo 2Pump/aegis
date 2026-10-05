@@ -62,3 +62,16 @@ describe('glyphs', () => {
     expect(Math.hypot(hx - x, hy - y)).toBeLessThan(1);
   });
 });
+
+describe('legacy brand text (display only)', () => {
+  it('translates human-readable values, never keys or lowercase identifiers', async () => {
+    const { brandJson, brandText, hasLegacyBrand } = await import('../src/brand');
+    expect(brandText("on-chain; AEGIS reads FQuerier · Aegis bot · AEGIS's list")).toBe("on-chain; PHROURAX reads FQuerier · Phrourax bot · PHROURAX's list");
+    const raw = { kind: 'aegis-verify-log', aegis: { why: 'before AEGIS began recording' }, AEGIS_KEY: 1, rows: [['0xabc', 'AEGIS couldn\'t read Nado', 3]], schema: 'aegis-api-1' };
+    const out = brandJson(raw);
+    expect(out).toEqual({ kind: 'aegis-verify-log', aegis: { why: 'before PHROURAX began recording' }, AEGIS_KEY: 1, rows: [['0xabc', "PHROURAX couldn't read Nado", 3]], schema: 'aegis-api-1' });
+    expect(raw.aegis.why).toBe('before AEGIS began recording'); // the source object is not mutated
+    expect(hasLegacyBrand(JSON.stringify({ kind: 'aegis-changes', aegis: 1 }))).toBe(false);
+    expect(hasLegacyBrand('"source": "AEGIS reads FQuerier"')).toBe(true);
+  });
+});

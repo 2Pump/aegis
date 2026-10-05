@@ -2,6 +2,7 @@
  * What the well may honestly say about its data right now (pure, unit-tested).
  * Never: zeroes or "no wallets" while the scan is still loading or failed; "PAUSED" when nothing was paused.
  */
+import type { CensusSnapshot } from '@aegis/census';
 import type { CensusState } from './census';
 
 /** An hourly scan older than this is labelled STALE (two missed runs plus slack). */
@@ -33,4 +34,21 @@ export function liveBadge(o: { running: boolean; wantLive: boolean; visible: boo
   if (o.phase === 'loading') return { text: 'WAITING FOR SCAN', on: false };
   if (o.phase === 'unavailable') return { text: 'NO SCAN', on: false };
   return { text: 'STARTING', on: false };
+}
+
+/**
+ * What the published census itself says about a full re-read. Authoritative only: the snapshot's own `sweep` field
+ * (a full sweep that ran out of time and continues on the next hourly run). Never inferred from age or block gap,
+ * and it carries no progress count or finish time — so none is shown.
+ */
+export function fullCensusInProgress(snap: Pick<CensusSnapshot, 'sweep'> | null | undefined): boolean {
+  return !!snap && snap.sweep.kind === 'full' && snap.sweep.complete === false;
+}
+
+/** Blocks between the completed census snapshot and the live monitor's latest block (two different systems). */
+export function snapshotGap(snapBlock: number, liveBlock: number | null): { blocks: number; text: string } | null {
+  if (liveBlock === null || !Number.isFinite(liveBlock)) return null;
+  const blocks = Math.max(0, liveBlock - snapBlock);
+  const h = blocks / 3600;
+  return { blocks, text: `${blocks.toLocaleString('en-US')} BLOCKS${blocks >= 90 ? ` (~${h >= 1.5 ? `${h.toFixed(1)} H` : `${Math.round(blocks / 60)} MIN`})` : ''}` };
 }

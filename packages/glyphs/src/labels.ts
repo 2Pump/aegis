@@ -35,6 +35,23 @@ export const TAG_MEANING: Readonly<Record<Tag, string>> = {
   EMPTY: 'Nothing worth drawing.',
 };
 export const NO_TYPE_LABEL = 'Unclassified';
+
+/*
+ * Two different near-liquidation totals, named so they can't be read as contradicting each other:
+ *  - the RISK STATE: every wallet whose current risk is near liquidation (census counts.wounded, any position type)
+ *  - the SOLE CLASSIFICATION: wallets for which "near liquidation" is the only type that applies (main type WOUNDED)
+ */
+export const NEAR_STATE_LABEL = 'Current risk state — near liquidation';
+export const NEAR_STATE_LONG = 'Wallets currently in the near-liquidation risk state';
+export const NEAR_SOLE_LABEL = 'Near liquidation — sole classification';
+export const NEAR_EXPLAIN =
+  'A wallet can be near liquidation while still being classified as Hedged, Unhedged, Bitcoin-backed, or another position type. The smaller figure counts wallets for which Near Liquidation is the only applicable classification.';
+
+/** A wallet's MAIN position type as a label (mix bars, type filters, charts): WOUNDED there means the sole classification. */
+export function primaryTypeLabel(t: Tag | 'NONE' | null): string {
+  if (t === null || t === 'NONE') return NO_TYPE_LABEL;
+  return t === 'WOUNDED' ? NEAR_SOLE_LABEL : TAG_LABEL[t];
+}
 export const NO_TYPE_MEANING = "Doesn't match any pattern.";
 
 export function tagLabel(tag: Tag | null): string {

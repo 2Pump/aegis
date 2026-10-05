@@ -62,7 +62,7 @@ export function WatchPage() {
         </Panel>
       ) : (
         <div className="banner" data-testid="alerts-unavailable" role="status">
-          NOT LIVE YET — Telegram alerts are built and tested, but not switched on. There is no bot to message and nothing to sign up for.
+          COMING SOON · BUILT AND TESTED — Telegram alerts are not accepting sign-ups yet. No bot is currently available to message.
         </div>
       )}
       <Panel title="What alerts will do" rail="var(--slate)">

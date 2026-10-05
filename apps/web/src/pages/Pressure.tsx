@@ -23,6 +23,7 @@ import { WELL_ON, useCensus } from '../lib/census';
 import { usePressure } from '../lib/pressure';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
+import { fullCensusInProgress } from '../lib/wellState';
 
 /*
  * PRESSURE MAP — what happens to the wallets Phrourax can see if prices move.
@@ -85,6 +86,7 @@ export function PressurePage() {
           cov={cov}
           wellAt={census.status === 'ok' ? census.snap.generatedAt : null}
           wellBlock={census.status === 'ok' ? census.snap.block : null}
+          fullRunning={census.status === 'ok' && fullCensusInProgress(census.snap)}
           refreshError={ps.refreshError ?? null}
           onRefresh={refresh}
         />
@@ -104,6 +106,7 @@ function PressureBody({
   wellBlock,
   refreshError,
   onRefresh,
+  fullRunning = false,
 }: {
   s: PressureSnapshot;
   now: number;
@@ -113,6 +116,8 @@ function PressureBody({
   wellBlock: number | null;
   refreshError: string | null;
   onRefresh: () => boolean;
+  /** the published census says a full re-read is part-way through (authoritative; see fullCensusInProgress) */
+  fullRunning?: boolean;
 }) {
   const [params, setParams] = useSearchParams();
   const q = clampQuery(
@@ -158,6 +163,11 @@ function PressureBody({
           <div className="faint pm-fresh-why">
             Why they differ: the well is refreshed every hour, but the Pressure Map needs every wallet read at the same block, which only the full scan does (every 3 hours, about 45 minutes per run). Prices are the venues' own oracle prices at the map's block.
           </div>
+          {fullRunning && fresh.status !== 'CURRENT' ? (
+            <div className="pm-fresh-why" data-testid="pressure-full-running">
+              <b>FULL CENSUS IN PROGRESS</b> — the latest census snapshot is part-way through a full re-read. This map will refresh after the next completed full census; live monitoring remains active meanwhile.
+            </div>
+          ) : null}
           {refreshError ? <div className="banner" data-testid="pressure-refresh-failed">The last refresh failed ({refreshError}). Showing the last good map, with its own age above — nothing was replaced by a guess.</div> : null}
           <div className="mono faint pm-stamp" data-testid="pressure-stamp">
             Based on wallets currently visible to Phrourax · rules {s.rulesVersion}

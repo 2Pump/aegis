@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sharePct, type CensusSnapshot, type LiveChange } from '@aegis/census';
-import { NO_TYPE_LABEL, TAG_LABEL, tagColor } from '@aegis/glyphs';
+import { NO_TYPE_LABEL, TAG_LABEL, tagColor, primaryTypeLabel, NEAR_EXPLAIN, NEAR_STATE_LABEL } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
 
@@ -18,7 +18,7 @@ import { fmtAge } from '../lib/fmt';
  */
 
 const ORDER: Array<Tag | 'NONE'> = ['CARRY', 'EQUITY-MARGIN', 'NAKED', 'KBTC-CORE', 'LEVERED', 'HOLD', 'LOCKED', 'STABLE-BALLAST', 'WOUNDED', 'DARK', 'NONE'];
-const nameOf = (k: Tag | 'NONE') => (k === 'NONE' ? NO_TYPE_LABEL : k === 'WOUNDED' ? 'Near liquidation (only type)' : TAG_LABEL[k]);
+const nameOf = (k: Tag | 'NONE') => primaryTypeLabel(k);
 const colorOf = (k: Tag | 'NONE') => (k === 'NONE' ? '#6B7280' : k === 'WOUNDED' ? '#9CA3AF' : tagColor(k));
 
 // drawing space (SVG units): dish centre 200,200
@@ -404,7 +404,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
               <dt>empty</dt><dd className="num">{snap.counts.empty.toLocaleString('en-US')}</dd>
               <dt>on tydro</dt><dd className="num">{snap.counts.tydro.toLocaleString('en-US')}</dd>
               <dt>on nado</dt><dd className="num">{snap.counts.nado.toLocaleString('en-US')}</dd>
-              <dt>near liquidation</dt><dd className="num">{snap.counts.wounded.toLocaleString('en-US')}</dd>
+              <dt title={NEAR_EXPLAIN}>{NEAR_STATE_LABEL.toLowerCase()}</dt><dd className="num">{snap.counts.wounded.toLocaleString('en-US')}</dd>
               <dt>couldn't read</dt><dd className="num">{snap.counts.dark.toLocaleString('en-US')}</dd>
             </dl>
 

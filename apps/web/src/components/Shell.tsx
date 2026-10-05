@@ -64,7 +64,9 @@ export function Shell() {
           <NavLink to="/pressure">Pressure</NavLink>
           <NavLink to="/intel">Intel</NavLink>
           <NavLink to="/census">Scan</NavLink>
-          <NavLink to="/watch">Alerts</NavLink>
+          <NavLink to="/watch" aria-label={ENV.alertsBot ? 'Alerts' : 'Alerts, coming soon'} data-testid="nav-alerts">
+            Alerts{ENV.alertsBot ? null : <span className="nav-soon" aria-hidden>SOON</span>}
+          </NavLink>
           <NavLink to="/calibration">Checks</NavLink>
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>
         </nav>

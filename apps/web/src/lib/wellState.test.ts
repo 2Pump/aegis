@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CensusShip, CensusSnapshot } from '@aegis/census';
-import { liveBadge, wellPhase, SCAN_STALE_H } from './wellState';
+import { fullCensusInProgress, liveBadge, snapshotGap, wellPhase, SCAN_STALE_H } from './wellState';
 import type { CensusState } from './census';
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
@@ -28,4 +28,20 @@ describe('live badge — PAUSED only when actually paused', () => {
   it('hidden tab → PAUSED · TAB HIDDEN', () => expect(b({ visible: false })).toBe('PAUSED · TAB HIDDEN'));
   it('running → LIVE', () => expect(b({ running: true })).toBe('LIVE'));
   it('no scan → NO SCAN', () => expect(b({ phase: 'unavailable' })).toBe('NO SCAN'));
+});
+
+describe('census status — only from authoritative snapshot metadata', () => {
+  const sweep = (kind: 'full' | 'incremental', complete?: boolean) => ({ sweep: { kind, complete, reread: 1, carried: 1, ms: 1 } });
+  it('FULL CENSUS IN PROGRESS only when the snapshot itself says a full sweep is part-way', () => {
+    expect(fullCensusInProgress(sweep('full', false))).toBe(true);
+    expect(fullCensusInProgress(sweep('full', true))).toBe(false);
+    expect(fullCensusInProgress(sweep('incremental', true))).toBe(false);
+    expect(fullCensusInProgress(null)).toBe(false);
+  });
+  it('a big snapshot gap alone never means a census is running', () => {
+    expect(fullCensusInProgress(sweep('incremental', true))).toBe(false);
+    expect(snapshotGap(57_728_710, 57_740_274)).toEqual({ blocks: 11_564, text: '11,564 BLOCKS (~3.2 H)' });
+    expect(snapshotGap(100, 130)!.text).toBe('30 BLOCKS');
+    expect(snapshotGap(100, null)).toBeNull();
+  });
 });

@@ -1,6 +1,6 @@
 # Liquidation Ledger, Cascades, Track record (Release 2)
 
-Versions: ledger `ledger-1.0.0` · cascades `cascade-1.0.0` · scoring `acct-1.0.0`.
+Versions: ledger `ledger-1.0.0` · cascades `cascade-1.0.0` · scoring `acct-1.1.0`.
 
 ## Sources (on-chain, read-only `eth_getLogs`)
 
@@ -75,9 +75,10 @@ Cascades without a dominant family, or spanning both venues, are labelled **unce
 
 Where something wasn't recorded, the step says so.
 
-## Track record (`acct-1.0.0`, on the Checks page)
+## Track record (`acct-1.1.0`, on the Checks page)
 
-- **Warnings:** recorded by the hourly census in `history/warn/<YYYY-MM>.json` each time a wallet enters NEAR LIQUIDATION. The first run that records warnings marks wallets already NEAR as starting warnings.
+- **Warnings:** recorded by the hourly census in `history/warn/<YYYY-MM>.json` each time a wallet enters NEAR LIQUIDATION (`T` rows). The first run that records warnings also stores the wallets already NEAR as **baseline risk states** (`B` rows).
+- **Baseline risk states are not warnings** (`acct-1.1.0`, 2026-10-05). They're counted and shown on their own row, but left out of every warning rate: a baseline import is not a prediction Phrourax made. Under `acct-1.0.0` they were in the denominators; the page shows those rates as unavailable until the next hourly run republishes the score under `acct-1.1.0`. The stored warning rows are unchanged.
 - **Scored:** each run, from every warning and liquidation since recording began (at most 13 months), into `history/accountability.json`:
   - Liquidations Phrourax could judge: warned NEAR before, WATCH only, missed, and never seen.
   - For windows of 1 h, 6 h, 24 h and 7 days: warnings followed by that wallet's liquidation within the window (warnings younger than the window count as *pending*, not misses), and liquidations warned at least that long before.

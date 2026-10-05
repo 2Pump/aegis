@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { decodeSnapshot, type CensusShip, type CensusSnapshot } from '@aegis/census';
+import type { CensusShip, CensusSnapshot } from '@aegis/census';
+import { loadCensusOnce } from './censusLoad';
 import { log } from './log';
 import { VERIFIED } from './verification';
 
@@ -31,30 +32,15 @@ export function useCensus(): CensusState {
   const [s, set] = useState<CensusState>({ status: 'loading' });
   useEffect(() => {
     let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch(`${CENSUS_URL}${CENSUS_URL.includes('?') ? '&' : '?'}t=${Math.floor(Date.now() / 60_000)}`, { cache: 'no-cache' });
-        if (res.status === 404) {
-          if (alive) set({ status: 'missing', message: `No census at ${CENSUS_URL} yet — run \`pnpm census\` locally or set up the hourly job (docs/CENSUS.md).` });
-          return;
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status} from ${CENSUS_URL}`);
-        const type = res.headers.get('content-type') ?? '';
-        if (!type.includes('json')) {
-          // SPA fallback returns index.html for missing files in dev/prod
-          if (alive) set({ status: 'missing', message: `No census at ${CENSUS_URL} yet — run \`pnpm census\` locally or set up the hourly job (docs/CENSUS.md).` });
-          return;
-        }
-        const { snap, ships } = decodeSnapshot(await res.json());
-        if (!alive) return;
-        set({ status: 'ok', snap, ships, loadedAt: Date.now() });
-        log('ok', 'live', `scan loaded · ${snap.counts.drawn} wallets · block ${snap.block} · ${snap.sweep.kind === 'full' ? 'full re-read' : 'hourly update'}${snap.sweep.complete === false ? ' (partial — continues next run)' : ''}`);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (alive) set((prev) => (prev.status === 'ok' ? { ...prev, refreshError: msg } : { status: 'error', message: msg }));
-        log('err', 'live', `scan load failed: ${msg}`);
-      }
-    };
+    const load = () =>
+      loadCensusOnce({
+        fetchFn: (u, init) => fetch(u, init),
+        url: CENSUS_URL,
+        nowMs: Date.now(),
+        alive: () => alive,
+        update: set,
+        log,
+      });
     void load();
     const id = setInterval(() => void load(), REFRESH_MS);
     return () => {

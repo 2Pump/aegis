@@ -86,7 +86,7 @@ function Body({ f }: { f: CarryFile }) {
           </div>
         </div>
       ))}
-      <div className="faint" style={{ fontSize: 11.5 }}>{f.equities}</div>
+      <div className="note-text">{f.equities}</div>
     </div>
   );
 }
@@ -122,7 +122,7 @@ function Row({ x }: { x: CarryStructure }) {
 
 function Spark({ d }: { d: CarryStructure['daily'] }) {
   const vals = d.map((p) => p.net).filter((v): v is number => v !== null);
-  if (vals.length < 2) return <div className="faint" style={{ fontSize: 12 }}>Not enough recorded days for a chart yet.</div>;
+  if (vals.length < 2) return <div className="note-text">Not enough recorded days for a chart yet.</div>;
   const W = 300;
   const H = 54;
   const lo = Math.min(0, ...vals);
@@ -155,7 +155,7 @@ function Detail({ x }: { x: CarryStructure }) {
               <tr key={c.label}>
                 <td className="wrap-text">
                   {c.label}
-                  <div className="faint" style={{ fontSize: 11 }}>{c.kind === 'cost' ? 'cost · ' : c.kind === 'funding' ? 'funding · ' : ''}{c.basis}</div>
+                  <div className="note-text">{c.kind === 'cost' ? 'cost · ' : c.kind === 'funding' ? 'funding · ' : ''}{c.basis}</div>
                 </td>
                 <td className="num">{(c.weight * 100).toFixed(0)}%</td>
                 <td className="num">{c.kind === 'cost' ? `−${apr(c.current)}` : apr(c.current)}</td>
@@ -284,9 +284,9 @@ function Markets({ f }: { f: CarryFile }) {
           {f.markets.funding.length > 20 ? (
             <button type="button" className="sq-btn" style={{ marginTop: 8 }} onClick={() => setAll(!all)}>{all ? 'SHOW FEWER' : `SHOW ALL ${f.markets.funding.length}`}</button>
           ) : null}
-          <div className="faint" style={{ fontSize: 11.5, marginTop: 6 }}>Funding = the change in Nado&apos;s cumulative funding for shorts, divided by the oracle price, annualized. A long pays about the same. Sorted by open interest. Past funding says nothing certain about future funding.</div>
+          <div className="note-text" style={{ marginTop: 6 }}>Funding = the change in Nado&apos;s cumulative funding for shorts, divided by the oracle price, annualized. A long pays about the same. Sorted by open interest. Past funding says nothing certain about future funding.</div>
         </div>
-        <div className="faint" style={{ fontSize: 11.5 }}>Gas: {f.gas.perTxUsd !== null ? `≈ $${f.gas.perTxUsd.toFixed(4)} per transaction` : 'not read'} — {f.gas.note}.</div>
+        <div className="note-text">Gas: {f.gas.perTxUsd !== null ? `≈ $${f.gas.perTxUsd.toFixed(4)} per transaction` : 'not read'} — {f.gas.note}.</div>
       </div>
     </Panel>
   );
@@ -305,7 +305,7 @@ function Existing({ f }: { f: CarryFile }) {
           <div style={{ fontSize: 13.5 }}>
             <b>{e.carryWallets.toLocaleString('en-US')}</b> wallets hold a position the rules classify as CARRY · <b>{e.nearOrWorse}</b> near liquidation now · if ETH rose 10%, <b>{e.ifEthUp10}</b> more would be near; if it fell 10%, <b>{e.ifEthDown10}</b>. Ink Stress Level: {e.stress ?? '—'}.
           </div>
-          <div className="faint" style={{ fontSize: 11.5 }}>{e.note} Pressure Map block {e.pressureBlock?.toLocaleString('en-US') ?? '—'}.</div>
+          <div className="note-text">{e.note} Pressure Map block {e.pressureBlock?.toLocaleString('en-US') ?? '—'}.</div>
         </div>
       )}
     </Panel>

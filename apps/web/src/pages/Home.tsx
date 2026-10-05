@@ -1,8 +1,8 @@
 import { Suspense, lazy, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CensusShip } from '@aegis/census';
-import { COPY, RISK_LABEL, shipLiteFromPose } from '@aegis/glyphs';
-import { ActivityTape, CensusStatusLine, LivePanel, MixBar, WoundedTape, blocksAgo, mixOf } from '../components/CensusBits';
+import { COPY, RISK_LABEL, shipLiteFromPose, NEAR_STATE_LABEL } from '@aegis/glyphs';
+import { ActivityTape, CensusStatusLine, LivePanel, MixBar, WoundedTape, blocksAgo, mixOf, CensusExplain } from '../components/CensusBits';
 import { PasteBar } from '../components/PasteBar';
 import { Panel, TagChip } from '../components/bits';
 import { Well, type WellShip } from '../components/Well';
@@ -106,8 +106,8 @@ export function Home() {
       <div className="stack" style={{ gap: 6 }}>
         <h2 className="page">{COPY.oneLiner}</h2>
         <PasteBar autoFocus />
-        <div className="faint mono" style={{ fontSize: 11 }}>
-          Read-only. No connect required. Phrourax reads Tydro and Nado straight from the Ink chain and sorts each wallet into a position type.
+        <div className="home-sub" data-testid="home-sub">
+          Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.
         </div>
       </div>
 
@@ -162,6 +162,7 @@ export function Home() {
           <Panel title="The well" rail="var(--cyan)" right={<span className="mono">every Tydro + Nado wallet found on-chain</span>}>
             <div className="stack" style={{ gap: 12 }}>
               <CensusStatusLine snap={snap} stats={lw.stats} live={lw.live} onToggle={() => lw.setLive(!lw.live)} phase={phase} visible={lw.visible} />
+              <CensusExplain snap={snap} phase={phase} liveBlock={lw.stats.head ?? lw.stats.cursor ?? null} />
               {phase.kind === 'loading' ? (
                 <div className="well-wait" data-testid="well-loading" role="status" aria-live="polite">
                   LOADING LATEST SCAN…
@@ -210,7 +211,7 @@ export function Home() {
           </Panel>
 
           <div className="grid two">
-            <Panel title="Near liquidation" rail="var(--red)">
+            <Panel title={NEAR_STATE_LABEL} rail="var(--red)">
               <WoundedTape ships={lw.ships} head={head} ready={ready} notReady={phase.kind === 'loading' ? 'Loading the latest scan…' : 'Scan unavailable — no counts shown.'} />
             </Panel>
             <Panel title="Activity" rail="var(--cyan)">

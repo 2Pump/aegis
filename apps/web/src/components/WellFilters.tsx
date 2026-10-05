@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TAG_COLORS } from '@aegis/pose';
-import { NO_TYPE_LABEL, NO_TYPE_MEANING, RISK_LABEL, SIZE_LABEL, TAG_LABEL, TAG_MEANING } from '@aegis/glyphs';
+import { NO_TYPE_LABEL, NO_TYPE_MEANING, RISK_LABEL, SIZE_LABEL, TAG_LABEL, TAG_MEANING, primaryTypeLabel, NEAR_STATE_LONG, NEAR_EXPLAIN, NEAR_SOLE_LABEL, NEAR_STATE_LABEL } from '@aegis/glyphs';
 import { POSE_CHIPS, isFilterActive, type MinBand, type PoseKey, type VenueFilter, type WellFilter } from '../lib/wellFilter';
 import { TagChip } from './bits';
 import type { WellShip } from './Well';
@@ -71,7 +71,7 @@ export function WellFilters({
               style={{ ['--chip' as string]: color }}
             >
               <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
-              {p === 'NONE' ? NO_TYPE_LABEL : p === 'WOUNDED' ? `${TAG_LABEL.WOUNDED} (only type)` : TAG_LABEL[p]}
+              {primaryTypeLabel(p)}
               <span className="faint"> {(counts.get(p) ?? 0).toLocaleString('en-US')}</span>
             </button>
           );
@@ -88,9 +88,14 @@ export function WellFilters({
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
-        <label className="toggle">
-          <input type="checkbox" checked={filter.woundedOnly} onChange={(e) => onChange({ ...filter, woundedOnly: e.target.checked })} />
-          near liquidation only <span className="faint">({woundedCount.toLocaleString('en-US')})</span>
+        <label className="toggle" title={`${NEAR_STATE_LONG}, whatever their position type. ${NEAR_EXPLAIN}`}>
+          <input
+            type="checkbox"
+            checked={filter.woundedOnly}
+            onChange={(e) => onChange({ ...filter, woundedOnly: e.target.checked })}
+            aria-label={`Show only ${NEAR_STATE_LONG.toLowerCase()}: ${woundedCount.toLocaleString('en-US')}`}
+          />
+          only current risk state: near liquidation <span className="faint">({woundedCount.toLocaleString('en-US')})</span>
         </label>
         <form className="find" onSubmit={submitFind}>
           <input
@@ -118,6 +123,10 @@ export function WellFilters({
         <span className="mono dim" style={{ fontSize: 12 }} data-testid="well-shown">
           showing {shown.toLocaleString('en-US')} of {all.length.toLocaleString('en-US')} wallets
         </span>
+      </div>
+      <div className="note-text" data-testid="near-explain">
+        Two near-liquidation figures: <b>{NEAR_SOLE_LABEL.toLowerCase()}</b> ({(counts.get('WOUNDED') ?? 0).toLocaleString('en-US')}, a position-type chip above) and{' '}
+        <b>{NEAR_STATE_LABEL.toLowerCase()}</b> ({woundedCount.toLocaleString('en-US')}, the checkbox). {NEAR_EXPLAIN}
       </div>
       {findErr ? <div className="banner" style={{ padding: '6px 10px' }}>{findErr}</div> : null}
       {filter.find && !found ? (

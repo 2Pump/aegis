@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MATERIAL, MATERIAL_LABEL, materialCounts, meetsMaterial, sharePct, type CensusShip, type CensusSnapshot, type LiveChange, type LiveStats, type Material } from '@aegis/census';
-import { COPY, NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL, tagColor } from '@aegis/glyphs';
+import { COPY, NO_TYPE_LABEL, RISK_LABEL, SIZE_LABEL, TAG_LABEL, tagColor, primaryTypeLabel } from '@aegis/glyphs';
 import { RULES, type Tag } from '@aegis/pose';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { TagChip } from './bits';
 import { SensorLog } from './SensorLog';
-import { liveBadge, type WellPhase } from '../lib/wellState';
+import { fullCensusInProgress, liveBadge, snapshotGap, type WellPhase } from '../lib/wellState';
 
 /** Ink makes ~1 block per second; block counts are exact, times derived from them are approximate (~). */
 export function blocksAgo(block: number, head: number | null): string {
@@ -44,7 +44,7 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
   const parts = MIX_ORDER.filter((k) => mix[k]).map((k) => ({ k, n: mix[k]!, color: k === 'NONE' ? '#6B7280' : tagColor(k as Tag) }));
   return (
     <div data-testid="mixbar">
-      <div className="mixbar" role="img" aria-label={`Position types: ${parts.map((p) => `${p.k === 'NONE' ? NO_TYPE_LABEL : TAG_LABEL[p.k as Tag]} ${p.n}`).join(', ')}`}>
+      <div className="mixbar" role="img" aria-label={`Position types: ${parts.map((p) => `${primaryTypeLabel(p.k as Tag | 'NONE')} ${p.n}`).join(', ')}`}>
         {parts.map((p) => (
           <span key={p.k} style={{ width: `${(p.n / Math.max(total, 1)) * 100}%`, background: p.k === 'DARK' ? 'repeating-linear-gradient(45deg,#374151 0 4px,#1f2937 4px 8px)' : p.color }} />
         ))}
@@ -53,7 +53,7 @@ export function MixBar({ mix, label }: { mix: Record<string, number>; label: str
         {parts.map((p) => (
           <span key={p.k}>
             <i style={{ background: p.color }} />
-            {p.k === 'NONE' ? NO_TYPE_LABEL : TAG_LABEL[p.k as Tag]} {p.n.toLocaleString('en-US')} ({((p.n / Math.max(total, 1)) * 100).toFixed(1)}%)
+            {primaryTypeLabel(p.k as Tag | 'NONE')} {p.n.toLocaleString('en-US')} ({((p.n / Math.max(total, 1)) * 100).toFixed(1)}%)
           </span>
         ))}
       </div>
@@ -93,6 +93,15 @@ export function CensusStatusLine({
           {cell('LAST SCAN', snap.block.toLocaleString('en-US'))}
           {cell('AGE', fmtAge(Date.parse(snap.generatedAt), now).toUpperCase())}
           {cell('TYPE', snap.sweep.kind === 'full' ? (snap.sweep.complete === false ? 'FULL · PARTIAL' : 'FULL') : 'HOURLY')}
+          {(() => {
+            const g = snapshotGap(snap.block, stats.head ?? stats.cursor ?? null);
+            return g ? (
+              <div className="tele-cell" data-testid="snapshot-gap" title="Blocks between the completed census snapshot and the live monitor's latest block. They are separate systems: the gap grows until the next census publishes.">
+                SNAPSHOT GAP <b>{g.text}</b>
+              </div>
+            ) : null;
+          })()}
+          {fullCensusInProgress(snap) ? <div className="tele-cell amber" data-testid="full-census-running">FULL CENSUS IN PROGRESS</div> : null}
           {cell('WALLETS', snap.counts.drawn.toLocaleString('en-US'))}
           {cell('FOUND', snap.counts.known.toLocaleString('en-US'))}
           {cell('RULES', snap.rulesVersion.toUpperCase())}
@@ -110,7 +119,7 @@ export function CensusStatusLine({
         <span>
           {badge.text}
           {stats.cursor ? <> <b>{stats.cursor.toLocaleString('en-US')}</b></> : null}
-          {stats.lagBlocks !== null ? <> · LAG <b>{stats.lagBlocks}</b></> : null}
+          {stats.lagBlocks !== null ? <> · <span title="How many blocks the live monitor is behind the chain head.">HEAD LAG</span> <b>{stats.lagBlocks}</b></> : null}
         </span>
         <button className="sq-btn" onClick={onToggle} data-testid="live-toggle" aria-pressed={!live} disabled={phase.kind === 'loading' || phase.kind === 'unavailable'}>
           {live ? 'PAUSE' : 'RESUME'}
@@ -121,13 +130,40 @@ export function CensusStatusLine({
 }
 
 /**
+ * One plain sentence under the status strip when the snapshot needs explaining. Only from authoritative facts:
+ * the snapshot's own sweep field (full census in progress) and its age (stale). Nothing when it's fresh.
+ */
+export function CensusExplain({ snap, phase, liveBlock }: { snap: CensusSnapshot | null; phase: WellPhase; liveBlock: number | null }) {
+  const now = useNow(30_000);
+  if (!snap || phase.kind !== 'ok') return null;
+  const ago = fmtAge(Date.parse(snap.generatedAt), now);
+  const last = `block ${snap.block.toLocaleString('en-US')}, ${ago} ago`;
+  const live = liveBlock !== null ? ` Live chain block ${liveBlock.toLocaleString('en-US')}.` : '';
+  if (fullCensusInProgress(snap)) {
+    return (
+      <div className="census-explain amber" data-testid="census-explain" data-kind="full-running" role="status">
+        <b>FULL CENSUS IN PROGRESS</b> · Last published snapshot: {last} — part-way through a full re-read of every wallet, which continues on the next hourly run.{live} Live monitoring remains active. The Well and Pressure Map will refresh when the full census completes.
+      </div>
+    );
+  }
+  if (phase.stale) {
+    return (
+      <div className="census-explain amber" data-testid="census-explain" data-kind="stale" role="status">
+        <b>STALE SCAN</b> · Last completed census snapshot: {last}; the hourly census hasn&apos;t published since.{live} Live monitoring and the census snapshot are different systems: while this page is open, live monitoring watches every new block and re-reads wallets that act, but the counts, the Well and the Pressure Map come from the last completed snapshot.
+      </div>
+    );
+  }
+  return null;
+}
+
+/**
  * How much of each protocol the known wallets add up to, measured against the protocols' own on-chain totals
  * on the last full sweep. Shares only — the snapshot carries no dollar figures.
  */
 export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: number }) {
   const c = snap.coverage;
   if (!c) {
-    return <div className="faint" style={{ fontSize: 12, marginTop: 10 }} data-testid="coverage-shares">How much of each protocol the found wallets cover: measured on the next full scan (every 3 hours).</div>;
+    return <div className="note-text" style={{ marginTop: 10 }} data-testid="coverage-shares">How much of each protocol the found wallets cover: measured on the next full scan (every 3 hours).</div>;
   }
   const row = (label: string, x: number | null) => (
     <>
@@ -137,7 +173,7 @@ export function CoverageShares({ snap, now }: { snap: CensusSnapshot; now: numbe
   );
   return (
     <div style={{ marginTop: 10 }} data-testid="coverage-shares">
-      <div className="faint" style={{ fontSize: 12, marginBottom: 4 }}>
+      <div className="note-text" style={{ marginBottom: 4 }}>
         How much of each protocol's own on-chain totals the found wallets add up to · full scan at block {c.block.toLocaleString('en-US')} ({fmtAge(Date.parse(c.at), now)} ago)
         {c.darkWallets ? ` · ${c.darkWallets} unreadable` : ''}
       </div>
@@ -203,8 +239,8 @@ export function WoundedTape({ ships, head, ready = true, notReady }: { ships: re
         <div className="dim">{all.length === 0 ? 'No wallets near liquidation right now.' : `None ${MATERIAL_LABEL[floor].toLowerCase()} near liquidation right now — ${all.length.toLocaleString('en-US')} smaller ones are, under "All".`}</div>
       ) : (
         <>
-          <div className="faint" style={{ fontSize: 12, marginBottom: 8 }} data-testid="wounded-explain">
-            {list.length} {list.length === 1 ? 'wallet is' : 'wallets are'} near liquidation at this size · for {asMain} it's the only type that applies (the mix bar counts only those). The badge is each wallet's position type. Newest first
+          <div className="note-text" style={{ marginBottom: 8 }} data-testid="wounded-explain">
+            {list.length.toLocaleString('en-US')} {list.length === 1 ? 'wallet is' : 'wallets are'} in the near-liquidation risk state at this size · for {asMain} it's the sole classification (the mix bar counts only those). The badge is each wallet's position type. Newest first
             {list.length > wounded.length ? ` · showing ${wounded.length}` : ''}.
           </div>
           <ul className="tape">

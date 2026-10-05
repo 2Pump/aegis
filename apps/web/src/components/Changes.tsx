@@ -127,10 +127,10 @@ function ChangeList({ records }: { records: ChangeRecord[] }) {
                   <Impact label="PHROURAX COUNTS JUST BEFORE" s={r.impact.before} />
                   <Impact label="JUST AFTER" s={r.impact.after} />
                 </div>
-                <div className="faint" style={{ fontSize: 11.5 }}>{brandText(r.impact.note)}</div>
+                <div className="note-text">{brandText(r.impact.note)}</div>
               </>
             ) : (
-              <div className="faint" style={{ fontSize: 11.5 }}>Before/after wallet counts are locked with the well until the readings are verified.</div>
+              <div className="note-text">Before/after wallet counts are locked with the well until the readings are verified.</div>
             )}
             <div className="faint mono" style={{ fontSize: 10.5 }}>{r.verification} · {r.reader}</div>
           </li>
@@ -178,14 +178,14 @@ function Browser({ p }: { p: ParamsLatest }) {
             </tbody>
           </table>
         </div>
-        <div className="faint" style={{ fontSize: 11.5 }}>{rows.length > CAP ? `Showing ${CAP} of ${rows.length} — narrow the filter. ` : `${rows.length} shown. `}Values are as the contracts return them (basis points where labelled).</div>
+        <div className="note-text">{rows.length > CAP ? `Showing ${CAP} of ${rows.length} — narrow the filter. ` : `${rows.length} shown. `}Values are as the contracts return them (basis points where labelled).</div>
         {p.unsupported.length ? (
           <details>
             <summary className="mono dim" style={{ fontSize: 11, cursor: 'pointer' }}>Not monitored — couldn&apos;t be read ({p.unsupported.length})</summary>
             <ul className="dim" style={{ fontSize: 12.5, lineHeight: 1.55 }}>
               {p.unsupported.map((u) => <li key={u} className="wrap-text">{u}</li>)}
             </ul>
-            <div className="faint" style={{ fontSize: 11.5 }}>A parameter Phrourax can&apos;t read is listed here rather than claimed as watched.</div>
+            <div className="note-text">A parameter Phrourax can&apos;t read is listed here rather than claimed as watched.</div>
           </details>
         ) : null}
       </div>

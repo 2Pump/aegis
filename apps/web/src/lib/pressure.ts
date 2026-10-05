@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PRESSURE_VERSION, type PressureSnapshot } from '@aegis/census';
 import { CENSUS_URL } from './census';
 import { log } from './log';
+import { readJson } from './brandJson';
 
 const read = (k: string): string | undefined => {
   const v = (import.meta.env as Record<string, string | undefined>)[k];
@@ -53,7 +54,7 @@ export function usePressure(): { state: PressureState; refresh: () => boolean } 
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const j: unknown = await res.json();
+        const j: unknown = await readJson(res);
         if (!valid(j)) throw new Error('unexpected shape (refused)');
         if (alive) set({ status: 'ok', snap: j, loadedAt: Date.now() });
         log('ok', 'live', `pressure map loaded · block ${j.block} · ${j.population.exposed} wallets simulated`);

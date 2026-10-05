@@ -101,14 +101,14 @@ function Recorded({ h }: { h: Ok }) {
       <div className="hist-axis mono faint"><span>{when(from)}</span><span>now</span></div>
       <RiskLegend />
       {before ? (
-        <div className="faint" style={{ fontSize: 12 }}>
+        <div className="note-text">
           At the start of this range: <b>{RISK_LABEL[before.hullTemp]}</b> · {typeText(before)} (recorded {when(before.at)}, block {before.block.toLocaleString('en-US')}).
         </div>
       ) : (
-        <div className="faint" style={{ fontSize: 12 }}>The strip starts at this wallet's first recorded state{shown[0] && shown[0].at > from ? ` (${when(shown[0].at)}) — nothing was recorded for it before that` : ''}.</div>
+        <div className="note-text">The strip starts at this wallet's first recorded state{shown[0] && shown[0].at > from ? ` (${when(shown[0].at)}) — nothing was recorded for it before that` : ''}.</div>
       )}
       {gaps.length ? (
-        <div className="faint" style={{ fontSize: 12 }} data-testid="history-gaps">
+        <div className="note-text" data-testid="history-gaps">
           Data gaps (no hourly scan for over 2 h): {gaps.slice(0, 4).map((g) => `${when(g.from)} → ${when(g.to)}`).join(' · ')}
           {gaps.length > 4 ? ` · +${gaps.length - 4} more` : ''}
         </div>
@@ -233,7 +233,7 @@ function PastResult({ r }: { r: Extract<PastState, { s: 'ok' }> }) {
           {r.recorded ? (
             <>
               <div><b>{r.recorded.primary === 'EMPTY' ? 'No position' : RISK_LABEL[r.recorded.hullTemp]}</b> · {typeText(r.recorded)}</div>
-              <div className="faint" style={{ fontSize: 12 }}>
+              <div className="note-text">
                 Recorded live by the hourly scan at block {r.recorded.block.toLocaleString('en-US')} ({when(r.recorded.at)}) under rules {r.recorded.rulesVersion}. The original result — never re-classified.
               </div>
             </>
@@ -253,7 +253,7 @@ function PastResult({ r }: { r: Extract<PastState, { s: 'ok' }> }) {
                 <dt>Tydro HF</dt><dd className="num">{r.tydro ? 'unreadable' : r.hf === null ? '—' : r.hf.toFixed(3)}</dd>
                 <dt>Nado buffer</dt><dd className="num">{r.nado ? 'unreadable' : pct(r.buffer)}</dd>
               </dl>
-              <div className="faint" style={{ fontSize: 12 }}>
+              <div className="note-text">
                 Reconstructed now, in your browser, from the chain at that block — not observed live then.
                 {r.tydro ? ` Tydro couldn't be read: ${r.tydro}.` : ''}
                 {r.nado ? ` Nado couldn't be read: ${r.nado}.` : ''}
@@ -276,7 +276,7 @@ function PastResult({ r }: { r: Extract<PastState, { s: 'ok' }> }) {
 /** This wallet's actual liquidations in the range (historical, from the ledger). */
 function WalletLiquidations({ address, range, index }: { address: string; range: Range; index: HistoryIndex }) {
   const led = useLedger(range, index);
-  if (!index.ledger) return <div className="faint" style={{ fontSize: 12 }} data-testid="wallet-liq">Liquidations: the ledger starts with the next hourly scan.</div>;
+  if (!index.ledger) return <div className="note-text" data-testid="wallet-liq">Liquidations: the ledger starts with the next hourly scan.</div>;
   if (led.status !== 'ok') return null;
   const mine = led.records.filter((r) => r.wallet === address.toLowerCase()).sort((a, b) => b.at - a.at);
   return (

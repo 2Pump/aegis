@@ -99,7 +99,7 @@ function Watch({ w }: { w: OracleWatch }) {
           </tbody>
         </table>
       </div>
-      <div className="faint" style={{ fontSize: 11.5 }}>Click an asset for every check, its source contract and — where a divergence exists — what it would move.</div>
+      <div className="note-text">Click an asset for every check, its source contract and — where a divergence exists — what it would move.</div>
       {w.nadoOther.length ? (
         <details>
           <summary className="mono dim" style={{ fontSize: 11, cursor: 'pointer' }}>Nado products with no Tydro counterpart ({w.nadoOther.length}) — price only</summary>
@@ -113,7 +113,7 @@ function Watch({ w }: { w: OracleWatch }) {
               </tbody>
             </table>
           </div>
-          <div className="faint" style={{ fontSize: 11.5 }}>Product 0 is Nado&apos;s quote (USDT0) — its unit of account, $1 by definition, so it isn&apos;t peg-checked.</div>
+          <div className="note-text">Product 0 is Nado&apos;s quote (USDT0) — its unit of account, $1 by definition, so it isn&apos;t peg-checked.</div>
         </details>
       ) : null}
       <details>
@@ -211,7 +211,7 @@ function AssetRowView({ r }: { r: AssetRow }) {
                   </>
                 ) : null}
               </dl>
-              {r.impact && !WELL_ON ? <div className="faint" style={{ fontSize: 12 }}>What this divergence would move is locked with the well until the readings are verified (no counts shown).</div> : null}
+              {r.impact && !WELL_ON ? <div className="note-text">What this divergence would move is locked with the well until the readings are verified (no counts shown).</div> : null}
               {r.impact && WELL_ON ? (
                 <div className="oracle-impact" data-testid={`oracle-impact-${r.symbol}`}>
                   <div className="panel-title" style={{ marginBottom: 4 }}>If the protocol price converged — {r.impact.direction} {r.impact.sign === 'down' ? '−' : '+'}{r.impact.pct}%</div>
@@ -219,7 +219,7 @@ function AssetRowView({ r }: { r: AssetRow }) {
                     All sizes: <b>{r.impact.byFloor['0'].newlyNear}</b> wallets newly near liquidation, <b>{r.impact.byFloor['0'].newlyLiquidatable}</b> newly liquidatable (of {r.impact.byFloor['0'].population}).
                     {' '}≥ $1k: <b>{r.impact.byFloor['1k'].newlyNear}</b> / <b>{r.impact.byFloor['1k'].newlyLiquidatable}</b> (of {r.impact.byFloor['1k'].population}).
                   </div>
-                  <div className="faint" style={{ fontSize: 11.5 }}>{r.impact.note} Basis: {r.impact.basis}. Pressure snapshot block {r.impact.pressureBlock.toLocaleString('en-US')}.</div>
+                  <div className="note-text">{r.impact.note} Basis: {r.impact.basis}. Pressure snapshot block {r.impact.pressureBlock.toLocaleString('en-US')}.</div>
                 </div>
               ) : null}
             </div>
@@ -297,7 +297,7 @@ function PriceHistory({ w }: { w: OracleWatch }) {
         {h.status === 'none' ? <div className="dim">No prices recorded in this range yet — recording began with Oracle Watch. Nothing earlier is reconstructed.</div> : null}
         {h.status === 'ok' && series.length ? <PriceChart series={series} from={h.from} to={h.to} label={`${sym} prices over time from ${series.map((s) => s.name).join(', ')}`} /> : null}
         {h.status === 'ok' && !series.length ? <div className="dim">No recorded prices for {sym} in this range.</div> : null}
-        <div className="faint" style={{ fontSize: 11.5 }}>Hourly readings only — anything that happened between two scans isn&apos;t in this chart. Pyth is a pull oracle: its points are whatever was last pushed on Ink.</div>
+        <div className="note-text">Hourly readings only — anything that happened between two scans isn&apos;t in this chart. Pyth is a pull oracle: its points are whatever was last pushed on Ink.</div>
       </div>
     </Panel>
   );

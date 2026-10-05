@@ -1,5 +1,6 @@
 /**
- * CHECKS → Track record: Phrourax's own warnings scored against what actually happened (acct-1.0.0).
+ * CHECKS → Track record: Phrourax's own warnings scored against what actually happened (acct-1.1.0).
+ * Baseline risk states (already NEAR when recording began) are shown on their own row and never scored as warnings.
  * Every rate is shown with its numerator and denominator; small samples say so; versions are never pooled.
  */
 import { FORECAST_SCORE, LEDGER, type Accountability, type Breakdown, type ForecastScore, type Rate } from '@aegis/census';
@@ -9,12 +10,21 @@ import { Panel } from './bits';
 import { when } from './HistoryBits';
 import { useAccountability, useForecastScore } from '../lib/history';
 
+/** A share that never rounds a real non-zero count to "0%". */
+export function pctText(rate: number): string {
+  const p = rate * 100;
+  if (p === 0) return '0%';
+  if (p < 0.1) return '<0.1%';
+  if (p < 10) return `${p.toFixed(1)}%`;
+  return `${p.toFixed(0)}%`;
+}
+
 export function RateCell({ r }: { r: Rate }) {
   if (!r.den) return <span className="faint">— (0 cases)</span>;
   return (
     <span>
-      <b>{r.num}</b> of {r.den}
-      {r.rate !== null ? <span className="faint"> ({(r.rate * 100).toFixed(0)}%)</span> : null}
+      <b>{r.num.toLocaleString('en-US')}</b> of {r.den.toLocaleString('en-US')}
+      {r.rate !== null ? <span className="faint"> ({pctText(r.rate)})</span> : null}
       {r.lowSample ? <span className="faint" title={`fewer than ${LEDGER.MIN_SAMPLE} cases`}> · too few to judge</span> : null}
     </span>
   );
@@ -26,20 +36,25 @@ const keyLabel = (group: string, k: string) => {
   return k;
 };
 
-function BreakdownTable({ title, rows, group }: { title: string; rows: Breakdown[]; group: string }) {
+/** Shown instead of a warning rate from a score file made under the old method (baseline rows were in the denominators). */
+function Unscored() {
+  return <span className="faint" title="This score file still counts baseline risk states as warnings. The next hourly run republishes it without them.">unavailable — rescored on the next hourly run</span>;
+}
+
+function BreakdownTable({ title, rows, group, legacy }: { title: string; rows: Breakdown[]; group: string; legacy: boolean }) {
   if (!rows.length) return null;
   return (
     <div>
       <div className="panel-title" style={{ marginBottom: 6 }}>{title}</div>
       <div className="table-wrap">
         <table className="t">
-          <thead><tr><th /><th>Liquidations warned NEAR before</th><th>Warnings followed within 24 h</th></tr></thead>
+          <thead><tr><th /><th>Liquidations warned NEAR before</th><th>New warnings followed within 24 h</th></tr></thead>
           <tbody>
             {rows.map((b) => (
               <tr key={b.key}>
                 <td className="mono">{keyLabel(group, b.key)}</td>
                 <td><RateCell r={b.recall} /></td>
-                <td><RateCell r={b.precision24} /></td>
+                <td>{legacy ? <Unscored /> : <RateCell r={b.precision24} />}</td>
               </tr>
             ))}
           </tbody>
@@ -66,58 +81,95 @@ export function TrackRecord() {
 }
 
 function Scores({ a }: { a: Accountability }) {
+  // a score file published before acct-1.1.0 counted baseline states as warnings: its warning rates aren't shown
+  const legacy = a.version !== LEDGER.ACCOUNT_VERSION;
+  const baseline = a.warnings.atRecordingStart;
+  const fresh = a.warnings.afterRecordingStart ?? a.warnings.total - a.warnings.atRecordingStart;
+  const judged24 = a.windows.find((w) => w.hours === 24)?.precision.den ?? 0;
+  const early = a.recall.den < LEDGER.MIN_SAMPLE || legacy || judged24 < LEDGER.MIN_SAMPLE;
+  const n = (x: number) => x.toLocaleString('en-US');
   return (
     <div className="stack" style={{ gap: 14 }}>
-      <div className="faint" style={{ fontSize: 12 }}>
-        Phrourax uses fixed, published rules — no model is trained or tuned on this. Scored {when(Date.parse(a.generatedAt))} · recording since {a.recordingStart ? when(Date.parse(a.recordingStart)) : '—'}.
+      {early ? (
+        <div className="banner" data-testid="track-early" role="status">
+          EARLY RECORDING PERIOD — performance statistics are not yet representative. Rates appear with their counts; under {LEDGER.MIN_SAMPLE} cases each is marked &ldquo;too few to judge&rdquo;.
+        </div>
+      ) : null}
+      <div className="note-text">
+        Phrourax uses fixed, published rules — no model is trained or tuned on this. Scored {when(Date.parse(a.generatedAt))} · recording since {a.recordingStart ? when(Date.parse(a.recordingStart)) : '—'} · method {a.version}.
       </div>
-      <dl className="kv" data-testid="track-headline">
-        <dt>Liquidations it could judge</dt>
-        <dd>
-          <b>{a.liquidations.evaluable}</b> of {a.liquidations.total} recorded ({a.liquidations.beforeRecording} happened before recording began and are left out of every rate; {a.liquidations.partial} with a field unavailable)
-        </dd>
-        <dt>Had NEAR LIQUIDATION before</dt>
-        <dd><RateCell r={a.recall} /></dd>
-        <dt>Only WATCH before</dt>
-        <dd><RateCell r={a.watchOnly} /></dd>
-        <dt>No warning (missed)</dt>
-        <dd>
-          <RateCell r={a.missed} />
-          {a.liquidations.notSeen ? <span className="faint"> · {a.liquidations.notSeen} of all judged were wallets Phrourax had never seen</span> : null}
-        </dd>
-        <dt>Median warning lead</dt>
-        <dd>{a.leadHoursMedian === null ? '—' : `${a.leadHoursMedian.toFixed(1)} h`}</dd>
-        <dt>Warnings recorded</dt>
-        <dd>{a.warnings.total} ({a.warnings.atRecordingStart} already near when recording began)</dd>
-      </dl>
+
+      <div className="grid two">
+        <div>
+          <div className="panel-title" style={{ marginBottom: 6 }}>Liquidation records</div>
+          <dl className="kv" data-testid="track-liquidations">
+            <dt>Total liquidation records</dt>
+            <dd className="num">{n(a.liquidations.total)}</dd>
+            <dt>Before Phrourax recording began</dt>
+            <dd className="num">{n(a.liquidations.beforeRecording)} <span className="faint">— left out of every rate</span></dd>
+            <dt>Evaluable since recording began</dt>
+            <dd className="num">{n(a.liquidations.evaluable)}</dd>
+            <dt>Records with one or more unavailable fields</dt>
+            <dd className="num">{n(a.liquidations.partial)} <span className="faint">— across all records; overlaps the rows above</span></dd>
+          </dl>
+          <div className="note-text" style={{ marginTop: 4 }}>Before + evaluable = total. A record with an unavailable field (e.g. a size that couldn&apos;t be priced) can be in either group.</div>
+        </div>
+        <div>
+          <div className="panel-title" style={{ marginBottom: 6 }}>Risk states recorded</div>
+          <dl className="kv" data-testid="track-headline">
+            <dt>Baseline risk states imported at recording start</dt>
+            <dd className="num" data-testid="track-baseline">{n(baseline)} <span className="faint">— not warnings; never scored</span></dd>
+            <dt>New warnings after recording began</dt>
+            <dd className="num" data-testid="track-new-warnings">{n(fresh)} <span className="faint">— wallets that entered NEAR LIQUIDATION</span></dd>
+          </dl>
+          <div className="note-text" style={{ marginTop: 4 }}>A baseline state is what the first recorded scan found already near liquidation — Phrourax didn&apos;t predict it, so it isn&apos;t counted as a warning.</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="panel-title" style={{ marginBottom: 6 }}>Evaluable liquidations — what Phrourax had recorded before</div>
+        <dl className="kv">
+          <dt>Had NEAR LIQUIDATION before</dt>
+          <dd><RateCell r={a.recall} /></dd>
+          <dt>Only WATCH before</dt>
+          <dd><RateCell r={a.watchOnly} /></dd>
+          <dt>No warning (missed)</dt>
+          <dd>
+            <RateCell r={a.missed} />
+            {a.liquidations.notSeen ? <span className="faint"> · {n(a.liquidations.notSeen)} were wallets Phrourax had never seen</span> : null}
+          </dd>
+          <dt>Median warning lead</dt>
+          <dd>{a.leadHoursMedian === null ? '—' : `${a.leadHoursMedian.toFixed(1)} h`}</dd>
+        </dl>
+      </div>
 
       <div>
         <div className="panel-title" style={{ marginBottom: 6 }}>By time window</div>
         <div className="table-wrap">
           <table className="t" data-testid="track-windows">
-            <thead><tr><th>Window</th><th>Warnings followed by that wallet's liquidation</th><th>Not judged yet</th><th>Liquidations warned at least this long before</th></tr></thead>
+            <thead><tr><th>Window</th><th>New warnings followed by that wallet's liquidation</th><th>Not judged yet</th><th>Liquidations warned at least this long before</th></tr></thead>
             <tbody>
               {a.windows.map((w) => (
                 <tr key={w.hours}>
                   <td className="mono">{w.hours < 24 ? `${w.hours} h` : w.hours === 24 ? '1 day' : `${w.hours / 24} days`}</td>
-                  <td><RateCell r={w.precision} /></td>
-                  <td className="num">{w.pending}</td>
+                  <td>{legacy ? <Unscored /> : <RateCell r={w.precision} />}</td>
+                  <td className="num">{legacy ? '—' : n(w.pending)}</td>
                   <td><RateCell r={w.leadAtLeast} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>
-          A warning not followed by a liquidation isn't necessarily wrong — the owner may have added collateral. A false-alarm rate here would overstate that, so it's shown as counts.
+        <div className="note-text" style={{ marginTop: 4 }}>
+          Only new warnings (after recording began) are scored here. A warning not followed by a liquidation isn't necessarily wrong — the owner may have added collateral. A false-alarm rate here would overstate that, so it's shown as counts.
         </div>
       </div>
 
       <div className="grid two">
-        <BreakdownTable title="By venue" rows={a.byVenue} group="venue" />
-        <BreakdownTable title="By size range" rows={a.bySize} group="size" />
-        <BreakdownTable title="By position type (at the time)" rows={a.byType} group="type" />
-        <BreakdownTable title="By rules version — never pooled" rows={a.byRules} group="rules" />
+        <BreakdownTable title="By venue" legacy={legacy} rows={a.byVenue} group="venue" />
+        <BreakdownTable title="By size range" legacy={legacy} rows={a.bySize} group="size" />
+        <BreakdownTable title="By position type (at the time)" legacy={legacy} rows={a.byType} group="type" />
+        <BreakdownTable title="By rules version — never pooled" legacy={legacy} rows={a.byRules} group="rules" />
       </div>
       {a.byFamily.length ? (
         <div>

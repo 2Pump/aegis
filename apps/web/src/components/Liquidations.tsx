@@ -143,7 +143,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
         {s.leadHours.length ? (
           <>
             <CountTable rows={buckets.map(([k, n]) => [k, n])} keepOrder />
-            <div className="faint" style={{ fontSize: 12 }}>
+            <div className="note-text">
               Median {hrs(s.leadHoursMedian!)} · {s.leadHours.length} liquidation(s). Recorded hourly, so a lead time is accurate to about an hour; "≥" means the warning was already on when recording began.
             </div>
           </>
@@ -220,7 +220,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
             <button type="button" className="sq-btn" disabled={(page + 1) * PAGE >= rows.length} onClick={() => setPage(page + 1)}>OLDER</button>
           </div>
         ) : null}
-        <div className="faint" style={{ fontSize: 11, marginTop: 6 }}>
+        <div className="note-text" style={{ marginTop: 6 }}>
           Historical, public transactions — not a list of who might be next. Size is a range ({'"'}debt repaid at that block's prices{'"'} on Tydro; the event's quote amount on Nado). Hover "partial" to see what's unavailable.
         </div>
       </div>
@@ -233,7 +233,7 @@ function Tile({ k, v, sub, tone }: { k: string; v: number; sub: string; tone?: '
     <div className="liq-tile">
       <div className="panel-title">{k}</div>
       <div className="num" style={{ fontSize: 22, color: tone ? TONE[tone] : undefined }}>{v.toLocaleString('en-US')}</div>
-      <div className="faint" style={{ fontSize: 11 }}>{sub}</div>
+      <div className="faint tile-sub">{sub}</div>
     </div>
   );
 }
@@ -297,7 +297,7 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
           </li>
         ))}
       </ol>
-      <div className="faint" style={{ fontSize: 12 }}>Why grouped: {c.reasons.map((x) => x.replace(/\.$/, '')).join(' · ')}.</div>
+      <div className="note-text">Why grouped: {c.reasons.map((x) => x.replace(/\.$/, '')).join(' · ')}.</div>
       <div className="table-wrap" style={{ marginTop: 6 }}>
         <table className="t">
           <thead><tr><th>When (UTC)</th><th>Venue</th><th>Wallet</th><th>What</th><th>Size</th><th>Phrourax before</th></tr></thead>

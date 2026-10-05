@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MATERIAL, MATERIAL_LABEL, type AggPoint, type Material } from '@aegis/census';
-import { NO_TYPE_LABEL, TAG_LABEL } from '@aegis/glyphs';
+import { NO_TYPE_LABEL, TAG_LABEL, primaryTypeLabel } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { Panel } from '../components/bits';
 import { LiquidationsPanel } from '../components/Liquidations';
@@ -159,7 +159,7 @@ function Charts({
         <div className="panel-title" style={{ marginBottom: 6 }}>Wallets by risk · {MATERIAL_LABEL[floor].toLowerCase()}</div>
         <CountChart series={series} from={from} to={to} gaps={gaps} label={`Wallet risk counts over time, ${MATERIAL_LABEL[floor]}`} />
         <div className="hist-axis mono faint"><span>{when(from)}</span><span>now</span></div>
-        <div className="faint" style={{ fontSize: 12 }}>
+        <div className="note-text">
           Now: <b>{last.risk[floor][2].toLocaleString('en-US')}</b> near liquidation, <b>{last.risk[floor][1].toLocaleString('en-US')}</b> watch, {last.risk[floor][0].toLocaleString('en-US')} safe,{' '}
           {last.risk[floor][3].toLocaleString('en-US')} couldn't be read · of {(last.risk[floor].reduce((a, b) => a + b, 0)).toLocaleString('en-US')} wallets {MATERIAL_LABEL[floor].toLowerCase()}.
         </div>
@@ -189,7 +189,7 @@ function Charts({
             <tbody>
               {MIX_KEYS.filter((k) => first.mix[k] || last.mix[k]).map((k) => (
                 <tr key={k}>
-                  <td>{k === 'NONE' ? NO_TYPE_LABEL : TAG_LABEL[k as Tag]}</td>
+                  <td>{primaryTypeLabel(k as Tag | 'NONE')}</td>
                   <td className="num">{(first.mix[k] ?? 0).toLocaleString('en-US')}</td>
                   <td className="num">{(last.mix[k] ?? 0).toLocaleString('en-US')}</td>
                 </tr>

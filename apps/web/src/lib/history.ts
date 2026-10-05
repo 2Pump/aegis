@@ -42,6 +42,7 @@ import {
   type WalletState,
 } from '@aegis/census';
 import { CENSUS_URL } from './census';
+import { readJson } from './brandJson';
 
 export const HISTORY_BASE = CENSUS_URL.replace(/census\.json(\?.*)?$/, '');
 
@@ -71,7 +72,7 @@ async function getJson(path: string, mutable: boolean): Promise<unknown | null> 
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${path}`);
     if (!(res.headers.get('content-type') ?? '').includes('json')) return null; // SPA fallback = not there
-    return res.json();
+    return readJson(res);
   })();
   cache.set(path, { at: Date.now(), v });
   v.catch(() => cache.delete(path));

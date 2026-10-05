@@ -21,9 +21,25 @@ export const BRAND = {
 } as const;
 
 /**
- * Text recorded before the rebrand (historical ledger and parameter-change records keep their original wording)
- * shown with the current name. Display only — the stored records are never rewritten.
+ * Human-readable text recorded before the rebrand (historical ledger, parameter-change and check records keep their
+ * original wording) shown with the current name: AEGIS → PHROURAX, Aegis → Phrourax. Display only — the stored
+ * records are never rewritten. Lowercase identifiers (`aegis-…` kinds, `record.aegis`, storage keys) never match.
  */
 export function brandText(s: string): string {
-  return s.replace(/\bAEGIS\b/g, BRAND.display);
+  return s.replace(/\bAEGIS\b/g, BRAND.name).replace(/\bAegis\b/g, BRAND.display);
+}
+
+/** True when text (e.g. a raw JSON file) holds a legacy brand word worth translating. */
+export const hasLegacyBrand = (s: string): boolean => /\bAEGIS\b|\bAegis\b/.test(s);
+
+/** brandText on every string VALUE of a parsed JSON document (keys are never touched). Returns a new value. */
+export function brandJson<T>(x: T): T {
+  if (typeof x === 'string') return brandText(x) as T;
+  if (Array.isArray(x)) return x.map((v) => brandJson(v)) as T;
+  if (x && typeof x === 'object') {
+    const o: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(x as Record<string, unknown>)) o[k] = brandJson(v);
+    return o as T;
+  }
+  return x;
 }

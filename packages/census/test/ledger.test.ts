@@ -181,7 +181,7 @@ describe('cascades (cascade-1.0.0)', () => {
   });
 });
 
-describe('accountability (acct-1.0.0)', () => {
+describe('accountability (acct-1.1.0)', () => {
   const now = 30 * 24 * H;
   const w = (wallet: string, at: number, over: Partial<Warning> = {}): Warning => ({ wallet, block: at, at, kind: 'T', primary: TAGS.indexOf('CARRY'), band: 2, venues: { tydro: true, nado: false }, rulesVersion: 'v1.2.0', ...over });
   it('true positive, false positive, false negative — every rate with its denominator', () => {
@@ -226,6 +226,21 @@ describe('accountability (acct-1.0.0)', () => {
     const many = Array.from({ length: 40 }, (_, i) => w(`0x${String(i).padStart(40, '0')}`, H));
     const a = scoreAccountability({ warnings: many, liquidations: [], nowMs: now, recordingStart: 'x', tags: TAGS });
     expect(a.windows[0]!.precision).toMatchObject({ den: 40, lowSample: false });
+  });
+  it('baseline states imported at recording start are never warnings: out of every warning denominator', () => {
+    const base = Array.from({ length: 500 }, (_, i) => w(`0x${String(i).padStart(40, '0')}`, H, { kind: 'B' }));
+    const a = scoreAccountability({
+      warnings: [...base, w(U1, 10 * H), w(U2, 10 * H)],
+      liquidations: [rec('a', 13 * H, { wallet: U1 }), rec('z', 14 * H, { wallet: base[0]!.wallet })],
+      nowMs: now,
+      recordingStart: 'x',
+      tags: TAGS,
+    });
+    expect(a.version).toBe('acct-1.1.0');
+    expect(a.warnings).toEqual({ total: 502, atRecordingStart: 500, afterRecordingStart: 2 });
+    for (const win of a.windows) expect(win.precision.den + win.pending).toBe(2); // the 500 baseline rows never count
+    expect(a.windows.find((x) => x.hours === 6)!.precision).toMatchObject({ num: 1, den: 2 });
+    expect(a.byVenue.reduce((n, b) => n + b.precision24.den, 0)).toBe(2);
   });
   it('warnings file: idempotent, keeps the rules version', () => {
     let f = appendWarnings(null, '2026-10', [{ ...w(U1, H), at: H }]);

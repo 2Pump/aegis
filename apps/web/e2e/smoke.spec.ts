@@ -158,9 +158,16 @@ test('stress test on a wallet page: thresholds per direction, a custom scenario,
   await expect(page.getByTestId('stress-confidence')).toContainText("can't simulate");
 });
 
-test('Alerts: labelled NOT LIVE, no sign-up form, no bot link, privacy stated', async ({ page }) => {
-  await page.goto('/watch');
-  await expect(page.getByTestId('alerts-unavailable')).toContainText('NOT LIVE YET');
+test('Alerts: in the nav marked SOON (still clickable), coming-soon banner, no sign-up form, no bot link, privacy stated', async ({ page }) => {
+  await page.goto('/');
+  const nav = page.getByTestId('nav-alerts');
+  await expect(nav).toHaveAccessibleName('Alerts, coming soon');
+  await expect(nav).toContainText('SOON');
+  await nav.click();
+  await expect(page).toHaveURL(/\/watch$/);
+  await expect(page.getByTestId('alerts-unavailable')).toContainText('COMING SOON · BUILT AND TESTED');
+  await expect(page.getByTestId('alerts-unavailable')).toContainText('not accepting sign-ups yet');
+  await expect(page.getByText('NOT LIVE YET')).toHaveCount(0);
   await expect(page.getByTestId('alerts-page')).toHaveAttribute('data-live', 'no');
   await expect(page.locator('input, form, a[href*="t.me"]')).toHaveCount(0);
   await expect(page.locator('dt', { hasText: '/delete' })).toBeVisible();
@@ -179,7 +186,8 @@ test('Checks: versions in force are stated; the automatic-checks panel says when
 test('INTEL: in the nav between Pressure and Scan; every section is built and none invents data', async ({ page }) => {
   await page.goto('/');
   const links = await page.locator('nav[aria-label="Primary"] a').allTextContents();
-  expect(links.map((s) => s.trim().toUpperCase())).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
+  // the Alerts item may carry its SOON badge; the order is what's checked here
+  expect(links.map((s) => s.trim().toUpperCase().replace(/SOON$/, ''))).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
   await page.goto('/intel');
   await expect(page.getByTestId('intel-tabs')).toBeVisible();
   // built in Release 4: analysis only, and with nothing recorded it says so
@@ -307,6 +315,89 @@ test('Checks: the track record never shows a rate it cannot back (not scored yet
   await page.goto('/calibration');
   const t = page.getByTestId('track-record');
   await expect(t).toBeVisible();
-  await expect(t.getByText(/NOT SCORED YET|Couldn't load|Liquidations it could judge/).first()).toBeVisible();
+  await expect(t.getByText(/NOT SCORED YET|Couldn't load|Total liquidation records/).first()).toBeVisible();
   await expect(t.getByText(/AI|guaranteed/i)).toHaveCount(0);
+});
+
+/* ───────── refinement pass (2026-10-05) ───────── */
+
+const rate = (num: number, den: number) => ({ num, den, rate: den ? num / den : null, lowSample: den < 30 });
+function accountability(version: string, over: Record<string, unknown> = {}) {
+  const win = (hours: number) => ({ hours, precision: rate(1, 3), pending: 0, leadAtLeast: rate(0, 30) });
+  return {
+    v: 1,
+    kind: 'aegis-accountability',
+    version,
+    generatedAt: new Date().toISOString(),
+    recordingStart: '2026-10-02T00:00:00Z',
+    definitions: { warning: 'x' },
+    liquidations: { total: 139, evaluable: 30, beforeRecording: 109, notSeen: 2, partial: 137 },
+    warnings: { total: 54657, atRecordingStart: 54654, ...(version === 'acct-1.1.0' ? { afterRecordingStart: 3 } : {}) },
+    recall: rate(1, 30),
+    watchOnly: rate(0, 30),
+    missed: rate(29, 30),
+    leadHoursMedian: null,
+    windows: [1, 6, 24, 168].map(win),
+    byVenue: [{ key: 'tydro', recall: rate(1, 30), precision24: rate(1, 3) }],
+    bySize: [],
+    byType: [],
+    byFamily: [],
+    byRules: [],
+    limitations: ['x'],
+    ...over,
+  };
+}
+async function serveAccountability(page: Page, body: unknown) {
+  await page.route('**/census/history/**', (route) => {
+    const u = new URL(route.request().url()).pathname;
+    if (u.endsWith('/history/accountability.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    return route.fulfill({ status: 404, body: '' });
+  });
+}
+
+test('Track record: baseline risk states are not warnings; separate labelled rows; early-period notice', async ({ page }) => {
+  await serveAccountability(page, accountability('acct-1.1.0'));
+  await page.goto('/calibration');
+  const t = page.getByTestId('track-record');
+  await expect(t.getByTestId('track-baseline')).toContainText('54,654');
+  await expect(t.getByTestId('track-new-warnings')).toContainText('3');
+  await expect(t.getByText('Baseline risk states imported at recording start')).toBeVisible();
+  const liq = t.getByTestId('track-liquidations');
+  const rows: Array<[string, string]> = [['Total liquidation records', '139'], ['Before Phrourax recording began', '109'], ['Evaluable since recording began', '30'], ['Records with one or more unavailable fields', '137']];
+  for (const [k, v] of rows) {
+    await expect(liq.locator('dt', { hasText: k })).toBeVisible();
+    await expect(liq).toContainText(v);
+  }
+  await expect(t.getByTestId('track-early')).toContainText('EARLY RECORDING PERIOD — performance statistics are not yet representative.');
+  await expect(t.getByText(/54,654 warnings|54654 warnings/)).toHaveCount(0);
+  await expect(t.getByTestId('track-windows')).toContainText('1 of 3');
+  await expect(t).toContainText('1 of 30 (3.3%)'); // a small non-zero share is never rounded to 0%
+});
+
+test('Track record: a score file made under the old method shows its warning rates as unavailable, never mixed with baseline', async ({ page }) => {
+  await serveAccountability(page, accountability('acct-1.0.0'));
+  await page.goto('/calibration');
+  const t = page.getByTestId('track-record');
+  await expect(t.getByTestId('track-baseline')).toContainText('54,654');
+  await expect(t.getByTestId('track-new-warnings')).toContainText('3');
+  await expect(t.getByTestId('track-windows')).toContainText('unavailable — rescored on the next hourly run');
+  await expect(t.getByTestId('track-windows')).not.toContainText('1 of 3');
+});
+
+test('Legacy AEGIS wording inside stored files is shown as PHROURAX on every page that reads them', async ({ page }) => {
+  await serveRelease3(page);
+  for (const path of ['/intel?tab=changes', '/intel?tab=carry', '/intel?tab=oracles', '/calibration']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).not.toContainText('AEGIS');
+    await expect(page.locator('body')).not.toContainText('Aegis');
+  }
+});
+
+test('Homepage: the value sentence under the address field; the address field stays first', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('home-sub')).toHaveText(
+    'Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.',
+  );
+  await expect(page.getByTestId('paste-input')).toBeVisible();
 });

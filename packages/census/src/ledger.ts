@@ -18,7 +18,8 @@ import { type WalletState } from './history.js';
 export const LEDGER = {
   VERSION: 'ledger-1.0.0',
   CASCADE_VERSION: 'cascade-1.0.0',
-  ACCOUNT_VERSION: 'acct-1.0.0',
+  /** acct-1.1.0: warning precision counts only warnings that started after recording began (baseline 'B' rows excluded) */
+  ACCOUNT_VERSION: 'acct-1.1.0',
   /** evaluation windows (hours) */
   WINDOWS_H: [1, 6, 24, 168] as const,
   /** below this many cases a rate is shown with its counts and marked "too few to judge" */
@@ -344,7 +345,12 @@ export interface Accountability {
   recordingStart: string | null;
   definitions: Record<string, string>;
   liquidations: { total: number; evaluable: number; beforeRecording: number; notSeen: number; partial: number };
-  warnings: { total: number; atRecordingStart: number };
+  /**
+   * total = every row in the warnings files. atRecordingStart = baseline risk states imported when recording began
+   * ('B' rows): they are not warnings and never enter a precision denominator. afterRecordingStart = genuine
+   * transitions into NEAR after recording began ('T' rows) — the only rows scored (acct-1.1.0+; absent before).
+   */
+  warnings: { total: number; atRecordingStart: number; afterRecordingStart?: number };
   /** liquidations with NEAR recorded before / evaluable liquidations */
   recall: Rate;
   /** liquidations with only WATCH (no NEAR) before */
@@ -364,7 +370,8 @@ const BAND_NAMES: readonly SizeBand[] = ['dust', '<1k', '1–10k', '10–100k', 
 
 /**
  * Score Phrourax's warnings against what happened. Definitions (published with the result):
- *  - warning: the hourly scan recorded a wallet entering NEAR LIQUIDATION (or already NEAR when recording began)
+ *  - warning: the hourly scan recorded a wallet entering NEAR LIQUIDATION after recording began. Wallets already NEAR
+ *    when recording began are baseline risk states: counted and shown, never scored as warnings.
  *  - followed within W: that wallet was liquidated in (warning, warning + W]
  *  - warned before a liquidation: Phrourax's last recorded state before the liquidation block was NEAR
  *  - evaluable liquidation: after recording began (earlier ones can't judge Phrourax and are excluded, but counted)
@@ -378,21 +385,23 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
   const followed = (w: Warning, hours: number) => (liqByWallet.get(w.wallet) ?? []).some((t) => t > w.at && t <= w.at + hours * 3_600_000);
   const judged = (w: Warning, hours: number) => o.nowMs - w.at >= hours * 3_600_000;
   const warnedNear = (r: LedgerRecord) => r.aegis.nearSince !== null;
+  // only genuine transitions are warnings; baseline states imported at recording start are never scored
+  const scored = o.warnings.filter((w) => w.kind === 'T');
 
   const windows: WindowScore[] = LEDGER.WINDOWS_H.map((h) => {
-    const j = o.warnings.filter((w) => judged(w, h));
+    const j = scored.filter((w) => judged(w, h));
     return {
       hours: h,
       precision: rate(j.filter((w) => followed(w, h)).length, j.length, min),
-      pending: o.warnings.length - j.length,
+      pending: scored.length - j.length,
       leadAtLeast: rate(ev.filter((r) => (leadHours(r) ?? -1) >= h).length, ev.length, min),
     };
   });
   const breakdown = <K extends string>(keyL: (r: LedgerRecord) => K, keyW: (w: Warning) => K): Breakdown[] => {
-    const keys = new Set<string>([...ev.map(keyL), ...o.warnings.map(keyW)]);
+    const keys = new Set<string>([...ev.map(keyL), ...scored.map(keyW)]);
     return [...keys].sort().map((k) => {
       const l = ev.filter((r) => keyL(r) === k);
-      const w = o.warnings.filter((x) => keyW(x) === k && judged(x, 24));
+      const w = scored.filter((x) => keyW(x) === k && judged(x, 24));
       return { key: k, recall: rate(l.filter(warnedNear).length, l.length, min), precision24: rate(w.filter((x) => followed(x, 24)).length, w.length, min) };
     });
   };
@@ -405,14 +414,15 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
     generatedAt: new Date(o.nowMs).toISOString(),
     recordingStart: o.recordingStart,
     definitions: {
-      warning: 'The hourly scan recorded the wallet entering NEAR LIQUIDATION (or already NEAR when recording began).',
+      warning: 'The hourly scan recorded the wallet entering NEAR LIQUIDATION after recording began.',
+      'baseline risk state': 'A wallet already NEAR LIQUIDATION when recording began. Counted and shown, but not a warning: it is left out of every warning rate.',
       'followed within W': 'That wallet was liquidated within W hours after the warning.',
       'warned before': "Phrourax's last recorded state before the liquidation block was NEAR LIQUIDATION.",
       evaluable: 'A liquidation after Phrourax began recording. Earlier ones are counted but excluded from every rate.',
       'lead time': 'From the start of the uninterrupted NEAR streak to the liquidation.',
     },
     liquidations: { total: liqs.length, evaluable: ev.length, beforeRecording: liqs.length - ev.length, notSeen: ev.filter((r) => r.aegis.before === null).length, partial: liqs.filter((r) => r.completeness === 'PARTIAL').length },
-    warnings: { total: o.warnings.length, atRecordingStart: o.warnings.filter((w) => w.kind === 'B').length },
+    warnings: { total: o.warnings.length, atRecordingStart: o.warnings.length - scored.length, afterRecordingStart: scored.length },
     recall: rate(ev.filter(warnedNear).length, ev.length, min),
     watchOnly: rate(ev.filter((r) => !warnedNear(r) && r.aegis.watchSince !== null).length, ev.length, min),
     missed: rate(ev.filter((r) => !warnedNear(r) && r.aegis.watchSince === null).length, ev.length, min),
