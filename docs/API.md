@@ -101,7 +101,7 @@ Free and best effort, with no uptime promise. It's not advice, and the data can 
 ## Deployment
 
 - **The function is a single file:** `apps/web/api/v1.js`, bundled by `apps/web/scripts/build-api.mjs` from `apps/web/api-src/`, with no workspace TypeScript left for Vercel to compile.
-- **Stale-bundle guard:** `pnpm check` fails if the bundle is out of date. To rebuild:
+- **Stale-bundle guard:** `pnpm check` fails if the bundle wasn't built from the current sources. It compares a fingerprint of the inputs (AEGIS sources with line endings normalised, the lockfile, the esbuild version, the test-wallet list), stored in the bundle's first line, so it gives the same answer on Windows and Linux. To rebuild:
 
   ```
   pnpm --filter @aegis/web build:api
