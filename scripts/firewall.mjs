@@ -17,7 +17,7 @@
  * The token is never printed or stored. Use a short-lived token (vercel.com/account/tokens) and delete it after.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -57,9 +57,12 @@ const RULES = [
   },
 ];
 
-function fail(msg) {
-  console.error(`firewall: ${msg}`);
-  process.exit(1);
+let work = '';
+function cleanup() {
+  if (!work) return;
+  try {
+    rmSync(work, { recursive: true, force: true });
+  } catch {}
 }
 if (!TOKEN) fail('set VERCEL_TOKEN first (vercel.com/account/tokens → Create, scope: the team that owns the project, short expiry). Nothing was changed.');
 
@@ -76,21 +79,47 @@ const bin = JSON.parse(readFileSync(pkg, 'utf8')).bin;
 const entry = join(dir, 'node_modules', 'vercel', typeof bin === 'string' ? bin : bin.vercel);
 
 const global = ['--token', TOKEN, '--non-interactive', '--no-color', ...(SCOPE ? ['--scope', SCOPE] : [])];
-function vc(sub, { json = false, quiet = false } = {}) {
-  const r = spawnSync(process.execPath, [entry, ...sub, '--project', PROJECT, ...global], { encoding: 'utf8', env: { ...process.env, VERCEL_TELEMETRY_DISABLED: '1' } });
-  const out = `${r.stdout ?? ''}`;
-  const err = `${r.stderr ?? ''}`.split(TOKEN).join('<token>');
-  if (r.status !== 0) {
-    console.error(err.trim() || out.trim());
-    fail(`\`vercel ${sub.slice(0, 3).join(' ')}\` failed (exit ${r.status}).${/project/i.test(err) && /not found|could not find/i.test(err) ? ` Is the project called "${PROJECT}"? Pass --project <name>${SCOPE ? '' : ', and --scope <team-slug> if it belongs to a team'}.` : ''}`);
+// A fresh, empty working folder: the CLI reads the project from a `.vercel` link in its working directory, so a
+// leftover link in the repo (another project or account) must never be used. Removed again at the end.
+work = mkdtempSync(join(tmpdir(), 'aegis-firewall-'));
+function run(sub) {
+  const r = spawnSync(process.execPath, [entry, ...sub, ...global], { cwd: work, encoding: 'utf8', env: { ...process.env, VERCEL_TELEMETRY_DISABLED: '1' } });
+  const hide = (s) => `${s ?? ''}`.split(TOKEN).join('<token>');
+  return { status: r.status, out: hide(r.stdout), err: hide(r.stderr) };
+}
+let staged = false;
+function fail(msg) {
+  if (staged) {
+    run(['firewall', 'discard', '--yes']);
+    msg += ' The staged draft was discarded.';
   }
-  if (!quiet && !json) process.stdout.write(out);
-  return json ? out : out;
+  cleanup();
+  console.error(`firewall: ${msg}`);
+  process.exit(1);
+}
+function vc(sub, { quiet = false } = {}) {
+  const r = run(sub);
+  if (r.status !== 0) {
+    console.error(r.err.trim() || r.out.trim());
+    fail(`\`vercel ${sub.slice(0, 3).join(' ')}\` failed (exit ${r.status}). Nothing was published.`);
+  }
+  if (!quiet) process.stdout.write(r.out);
+  return r.out;
+}
+
+// 1b ── link the empty folder to the project (by name, under the token's scope or --scope)
+console.log(`firewall: linking to project "${PROJECT}"${SCOPE ? ` under "${SCOPE}"` : ''} …`);
+const link = run(['link', '--yes', '--project', PROJECT]);
+if (link.status !== 0 || !existsSync(join(work, '.vercel', 'project.json'))) {
+  console.error(link.err.trim() || link.out.trim());
+  const teams = run(['teams', 'list']);
+  if (teams.status === 0) console.error(`\nAccounts/teams this token can see:\n${teams.out.trim() || teams.err.trim()}`);
+  fail(`could not find the project "${PROJECT}"${SCOPE ? ` under "${SCOPE}"` : ''}. Check its exact name and owner in the dashboard URL (vercel.com/<team-slug>/<project-name>) and pass --project <project-name> --scope <team-slug>. Nothing was changed.`);
 }
 
 // 2 ── what exists already (so re-running updates instead of duplicating)
 const listed = (() => {
-  const raw = vc(['firewall', 'rules', 'list', '--json'], { json: true });
+  const raw = vc(['firewall', 'rules', 'list', '--json'], { quiet: true });
   try {
     const j = JSON.parse(raw.slice(raw.indexOf('{')));
     return new Set((Array.isArray(j.rules) ? j.rules : []).map((r) => r?.name).filter(Boolean));
@@ -113,6 +142,7 @@ for (const r of RULES) {
     '--yes',
   ];
   const exists = listed.has(r.name);
+  staged = true;
   console.log(`firewall: ${exists ? 'updating' : 'adding'} "${r.name}" (${r.requests} per IP per ${r.window}s → 429)`);
   vc(exists ? ['firewall', 'rules', 'edit', r.name, ...flags, '--enabled'] : ['firewall', 'rules', 'add', r.name, ...flags], { quiet: true });
 }
@@ -128,3 +158,4 @@ if (DRY) {
   console.log('\nfirewall: published. The rules are live at Vercel\'s edge now (no redeploy needed):');
   vc(['firewall', 'rules', 'list']);
 }
+cleanup();
