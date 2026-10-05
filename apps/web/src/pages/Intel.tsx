@@ -105,7 +105,7 @@ function EcosystemHistory() {
               <summary className="mono dim">Not in this history yet</summary>
               <ul className="dim">
                 <li>Actual liquidations: see the LIQUIDATIONS tab. Oracle prices and events: see ORACLES. Parameter changes: see CHANGES. Pressure forecast scoring: see CHECKS → Track record.</li>
-                <li>Anything before recording began. AEGIS doesn't backfill risk it didn't observe.</li>
+                <li>Anything before recording began. Phrourax doesn't backfill risk it didn't observe.</li>
               </ul>
             </details>
           </>

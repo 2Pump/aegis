@@ -1,5 +1,5 @@
 /**
- * AEGIS webhooks — one delivery run (see packages/census/src/webhooks/). Scheduled by .github/workflows/webhooks.yml,
+ * Phrourax webhooks — one delivery run (see packages/census/src/webhooks/). Scheduled by .github/workflows/webhooks.yml,
  * which does nothing until the repo variable WEBHOOKS_ENABLED is 'true'.
  *
  *   pnpm webhooks --check-env     # validate the environment only (prints problems, never secret values)

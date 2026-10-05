@@ -195,7 +195,7 @@ export async function runAlerts(dbIn: AlertsDb, deps: RunDeps): Promise<{ db: Al
         audit(db, { at: now, chat: deps.hashChat(chat.id), kind: 'held', detail: 'protocol event (rate limit)' }, cfg);
         continue;
       }
-      const text = [`AEGIS · Ink protocol watch`, e.text, '', `${deps.siteUrl.replace(/\/$/, '')}/intel`, FOOTER_TEXT].join('\n');
+      const text = [`Phrourax · Ink protocol watch`, e.text, '', `${deps.siteUrl.replace(/\/$/, '')}/intel`, FOOTER_TEXT].join('\n');
       if (await deliver(chat.id, text, 'alert')) {
         rep.sent++;
         chat.sentAt.push(now);
@@ -222,7 +222,7 @@ export async function runAlerts(dbIn: AlertsDb, deps: RunDeps): Promise<{ db: Al
           rep.held += 1;
           continue;
         }
-        const text = [`AEGIS · LIQUIDATED`, `${e.text}.`, `It happened on-chain at block ${e.block ?? '—'} — what AEGIS had recorded before it is on the wallet page.`, '', `${deps.siteUrl.replace(/\/$/, '')}/hull/${String(e.data.wallet)}`, FOOTER_TEXT].join('\n');
+        const text = [`Phrourax · LIQUIDATED`, `${e.text}.`, `It happened on-chain at block ${e.block ?? '—'} — what Phrourax had recorded before it is on the wallet page.`, '', `${deps.siteUrl.replace(/\/$/, '')}/hull/${String(e.data.wallet)}`, FOOTER_TEXT].join('\n');
         if (await deliver(chat.id, text, 'alert')) {
           rep.sent++;
           chat.sentAt.push(now);

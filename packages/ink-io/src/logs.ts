@@ -4,7 +4,7 @@ import { backoffMs, classifyRpcError, describeRpcError, sleep, type RpcErrorKind
 import { TYDRO_RESERVES } from './tydro-registry.js';
 
 /**
- * On-chain discovery. Every wallet AEGIS knows about came from one of these public events — nothing is scraped,
+ * On-chain discovery. Every wallet Phrourax knows about came from one of these public events — nothing is scraped,
  * nothing comes from a third-party list.
  *
  *  Tydro  — ERC-20 Transfer on every aToken and variableDebtToken (mint = supply/borrow, burn = withdraw/repay/liquidation).

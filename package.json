@@ -2,7 +2,7 @@
   "name": "aegis",
   "private": true,
   "version": "0.1.0",
-  "description": "AEGIS \u2014 THE WELL MAP. A camera on how Ink books are aimed.",
+  "description": "PHROURAX — on-chain risk intelligence for Ink (Tydro and Nado). Read-only.",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=20"

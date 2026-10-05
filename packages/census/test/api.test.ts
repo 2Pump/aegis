@@ -71,7 +71,7 @@ describe('Public API · envelope', () => {
     expect(r.status).toBe(200);
     expect(r.b.schema).toBe('aegis-api-1');
     expect(r.b.meta).toMatchObject({ apiVersion: API.VERSION, rulesVersion: 'v1.2.0', sourceBlock: 1000, freshness: 'FRESH', completeness: 'COMPLETE' });
-    expect(r.b.meta.disclaimer).toMatch(/cannot move your funds/);
+    expect(r.b.meta.disclaimer).toMatch(/^Phrourax is read-only\. It never connects to your wallet and cannot move funds\./);
     const stale = await call(req('/status'), deps(files({ censusAt: NOW - 5 * 3_600_000 })));
     expect(stale.b.meta.freshness).toBe('STALE');
     expect(stale.b.meta.freshnessRule).toMatch(/more than 2 h old/);

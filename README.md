@@ -1,9 +1,11 @@
-# AEGIS — Tydro · Nado · Ink
+# PHROURAX — Tydro · Nado · Ink
 
-A camera on what every Ink wallet is doing. Paste an Ink address and AEGIS reads Tydro (Aave v3 on Ink) and Nado.
+**On-chain risk intelligence. See risk before it moves.** https://phrourax.com
+
+A read-only view of positions, liquidation pressure, oracle conditions, protocol changes and on-chain risk across Tydro and Nado, built for the Ink ecosystem. Paste an Ink address and Phrourax reads Tydro (Aave v3 on Ink) and Nado.
 It classifies the pose (CARRY, NAKED, EQUITY-MARGIN, …) with public rules and draws it as a ship in a gravity well.
 
-> **AEGIS is a camera. It cannot move your funds. Classifications can be wrong.**
+> **Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.**
 
 It takes no custody, requests no approvals, and places no orders. There is no token. `pnpm build` runs `scripts/audit-writes.mjs`, which fails if a write path appears.
 
@@ -16,7 +18,7 @@ It takes no custody, requests no approvals, and places no orders. There is no to
 | Primary tag + reasons visible | ✅ |
 | /rules matches the code constants | ✅ enforced by `rules-doc.test.ts` |
 | Six fixture tests green | ✅ (plus edge tests) |
-| Footer says camera / cannot move funds | ✅ |
+| Footer says read-only / cannot move funds | ✅ |
 | Zero approve() / zero order paths | ✅ `pnpm audit:writes` |
 | **Exit: real address matches official UI within rounding** | ⏳ `pnpm prove 0xYOUR_ADDRESS` — the well is LOCKED until this passes (docs/VERIFICATION.md) |
 

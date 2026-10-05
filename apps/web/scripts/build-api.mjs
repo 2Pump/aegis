@@ -5,7 +5,7 @@
  * `node scripts/build-api.mjs --check` fails if api/v1.js wasn't built from the current sources. It compares a
  * FINGERPRINT OF THE INPUTS (written into the bundle's first line), not the bundle's bytes: esbuild's output can differ
  * slightly between machines (Windows vs Linux, pnpm folder names), while the inputs are the same everywhere:
- *   - every AEGIS source file the bundle uses (line endings normalised)
+ *   - every Phrourax source file the bundle uses (line endings normalised)
  *   - pnpm-lock.yaml (= the exact library versions)
  *   - the esbuild version and the build options
  *   - the test-wallet list baked into it
@@ -23,7 +23,7 @@ const root = join(web, '..', '..');
 const out = join(web, 'api', 'v1.js');
 const MARK = '// aegis-api-inputs:';
 
-// AEGIS's synthetic test wallets: baked in, so the function refuses them without reading the repo at runtime
+// Phrourax's synthetic test wallets: baked in, so the function refuses them without reading the repo at runtime
 const fixtures = new Set();
 for (const f of readdirSync(join(root, 'fixtures')).filter((x) => x.endsWith('.json'))) for (const m of readFileSync(join(root, 'fixtures', f), 'utf8').matchAll(/0x[0-9a-fA-F]{40}\b/g)) fixtures.add(m[0].toLowerCase());
 const fixtureList = [...fixtures].sort();

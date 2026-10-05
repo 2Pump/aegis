@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { INK_EXPLORER } from '@aegis/ink-io';
 import { LEDGER, cascades, leadHours, ledgerSummary, type AggPoint, type Cascade, type LedgerRecord } from '@aegis/census';
-import { SIZE_LABEL } from '@aegis/glyphs';
+import { SIZE_LABEL, brandText } from '@aegis/glyphs';
 import { Panel } from './bits';
 import { CountChart, RangePicker, when } from './HistoryBits';
 import { aggAround, useHistoryIndex, useLedger, type Range } from '../lib/history';
@@ -20,7 +20,7 @@ const PAGE = 50;
 export function aegisBefore(r: LedgerRecord): { text: string; tone: 'red' | 'amber' | 'dim' | 'faint' } {
   const a = r.aegis;
   if (!a.evaluable) return { text: 'before recording', tone: 'faint' };
-  if (!a.before) return { text: 'not seen by AEGIS', tone: 'dim' };
+  if (!a.before) return { text: 'not seen by Phrourax', tone: 'dim' };
   const near = leadHours(r, 'near');
   if (near !== null) return { text: `NEAR ${a.leadIsMinimum ? '≥ ' : ''}${hrs(near)} before`, tone: 'red' };
   const watch = leadHours(r, 'watch');
@@ -115,10 +115,10 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
     <div className="stack" style={{ gap: 14 }}>
       <div className="liq-tiles" data-testid="liq-summary">
         <Tile k="liquidations" v={s.total} sub={Object.entries(s.byVenue).map(([v, n]) => `${v} ${n}`).join(' · ')} />
-        <Tile k="AEGIS had NEAR before" v={s.warnedNear} sub={`of ${s.evaluable} it could judge`} tone="red" />
+        <Tile k="Phrourax had NEAR before" v={s.warnedNear} sub={`of ${s.evaluable} it could judge`} tone="red" />
         <Tile k="WATCH only" v={s.warnedWatchOnly} sub={`of ${s.evaluable}`} tone="amber" />
-        <Tile k="no warning" v={s.notWarned} sub={`${s.notSeen} of them never seen by AEGIS`} />
-        <Tile k="before recording" v={s.beforeRecording} sub="not used to judge AEGIS" tone="faint" />
+        <Tile k="no warning" v={s.notWarned} sub={`${s.notSeen} of them never seen by Phrourax`} />
+        <Tile k="before recording" v={s.beforeRecording} sub="not used to judge Phrourax" tone="faint" />
         <Tile k="partial records" v={s.partial} sub="some field unavailable" tone="faint" />
       </div>
 
@@ -139,7 +139,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
       </div>
 
       <div>
-        <div className="panel-title" style={{ marginBottom: 6 }}>Warning lead time — liquidations AEGIS had marked NEAR</div>
+        <div className="panel-title" style={{ marginBottom: 6 }}>Warning lead time — liquidations Phrourax had marked NEAR</div>
         {s.leadHours.length ? (
           <>
             <CountTable rows={buckets.map(([k, n]) => [k, n])} keepOrder />
@@ -148,7 +148,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
             </div>
           </>
         ) : (
-          <div className="dim">None yet in this range{s.beforeRecording === s.total ? ' — every liquidation here happened before AEGIS began recording' : ''}.</div>
+          <div className="dim">None yet in this range{s.beforeRecording === s.total ? ' — every liquidation here happened before Phrourax began recording' : ''}.</div>
         )}
       </div>
 
@@ -189,7 +189,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
           <table className="t" data-testid="liq-table">
             <caption className="sr-only">Liquidations, newest first</caption>
             <thead>
-              <tr><th>When (UTC)</th><th>Venue</th><th>Wallet</th><th>What</th><th>Size</th><th>AEGIS before</th><th>Record</th></tr>
+              <tr><th>When (UTC)</th><th>Venue</th><th>Wallet</th><th>What</th><th>Size</th><th>Phrourax before</th><th>Record</th></tr>
             </thead>
             <tbody>
               {rows.slice(page * PAGE, page * PAGE + PAGE).map((r) => {
@@ -204,7 +204,7 @@ function Ledger({ records, from, to, index }: { records: LedgerRecord[]; from: n
                     <td className="mono">{r.venue === 'tydro' ? `${r.collateral} seized · ${r.debt} repaid` : `${r.product}${r.isEncodedSpread ? ' (spread)' : ''}`}</td>
                     <td className="mono" title={r.sizeBasis ?? undefined}>{r.sizeBand ? SIZE_LABEL[r.sizeBand] : 'unavailable'}</td>
                     <td className="mono" style={{ color: TONE[b.tone] }}>{b.text}</td>
-                    <td className="mono faint" style={{ fontSize: 11 }} title={r.unavailable.join('; ') || undefined}>{r.completeness === 'COMPLETE' ? 'complete' : 'partial'}</td>
+                    <td className="mono faint" style={{ fontSize: 11 }} title={brandText(r.unavailable.join('; ')) || undefined}>{r.completeness === 'COMPLETE' ? 'complete' : 'partial'}</td>
                   </tr>
                 );
               })}
@@ -278,9 +278,9 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
   const recovered = before ? agg?.find((p) => Date.parse(p.at) > c.end && p.risk['0'][2] <= before.risk['0'][2]) ?? null : null;
   const stressChanges = (agg ?? []).filter((p) => p.stress).map((p) => `${when(Date.parse(p.at))}: ${p.stress!.level}`);
   const steps: Array<[string, string]> = [
-    ['1 · Price or oracle move', 'Not recorded yet — AEGIS starts recording oracle prices with Oracle Watch (Release 3).'],
-    ['2 · First wallet AEGIS had in danger', firstNear !== null ? `${when(firstNear)} — the earliest NEAR warning among these wallets` : agg && agg.length ? 'No member was recorded as NEAR beforehand.' : 'Not recorded (before AEGIS began recording).'],
-    ['3 · AEGIS stress', agg === null ? 'loading…' : agg.length ? `${before ? `${before.risk['0'][2]} wallets near liquidation before` : 'no point before'} → ${peakNear ? `${peakNear.risk['0'][2]} at the busiest recorded hour` : 'no point during'}${stressChanges.length ? ` · Ink Stress Level: ${stressChanges.join(', ')}` : ''}` : 'Not recorded (before AEGIS began recording).'],
+    ['1 · Price or oracle move', 'Not recorded yet — Phrourax starts recording oracle prices with Oracle Watch (Release 3).'],
+    ['2 · First wallet Phrourax had in danger', firstNear !== null ? `${when(firstNear)} — the earliest NEAR warning among these wallets` : agg && agg.length ? 'No member was recorded as NEAR beforehand.' : 'Not recorded (before Phrourax began recording).'],
+    ['3 · Phrourax stress', agg === null ? 'loading…' : agg.length ? `${before ? `${before.risk['0'][2]} wallets near liquidation before` : 'no point before'} → ${peakNear ? `${peakNear.risk['0'][2]} at the busiest recorded hour` : 'no point during'}${stressChanges.length ? ` · Ink Stress Level: ${stressChanges.join(', ')}` : ''}` : 'Not recorded (before Phrourax began recording).'],
     ['4 · First liquidation', `${when(members[0]!.at)} · ${members[0]!.venue} · ${short(members[0]!.wallet)}`],
     ['5 · Then', `${members.length - 1} more over ${hrs((c.end - c.start) / 3_600_000)}`],
     ['6 · Peak', `${c.peak.count} liquidations in the ${LEDGER.CASCADE_PEAK_MIN} minutes from ${when(c.peak.at)}`],
@@ -300,7 +300,7 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
       <div className="faint" style={{ fontSize: 12 }}>Why grouped: {c.reasons.map((x) => x.replace(/\.$/, '')).join(' · ')}.</div>
       <div className="table-wrap" style={{ marginTop: 6 }}>
         <table className="t">
-          <thead><tr><th>When (UTC)</th><th>Venue</th><th>Wallet</th><th>What</th><th>Size</th><th>AEGIS before</th></tr></thead>
+          <thead><tr><th>When (UTC)</th><th>Venue</th><th>Wallet</th><th>What</th><th>Size</th><th>Phrourax before</th></tr></thead>
           <tbody>
             {members.map((r) => (
               <tr key={r.id}>

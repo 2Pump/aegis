@@ -1,5 +1,5 @@
 /**
- * CHECKS → Track record: AEGIS's own warnings scored against what actually happened (acct-1.0.0).
+ * CHECKS → Track record: Phrourax's own warnings scored against what actually happened (acct-1.0.0).
  * Every rate is shown with its numerator and denominator; small samples say so; versions are never pooled.
  */
 import { FORECAST_SCORE, LEDGER, type Accountability, type Breakdown, type ForecastScore, type Rate } from '@aegis/census';
@@ -52,12 +52,12 @@ function BreakdownTable({ title, rows, group }: { title: string; rows: Breakdown
 export function TrackRecord() {
   const s = useAccountability();
   return (
-    <Panel title="Track record — were AEGIS's warnings right?" rail="var(--violet)" testId="track-record" right={<span className="mono">{LEDGER.ACCOUNT_VERSION}</span>}>
+    <Panel title="Track record — were Phrourax's warnings right?" rail="var(--violet)" testId="track-record" right={<span className="mono">{LEDGER.ACCOUNT_VERSION}</span>}>
       {s.status === 'loading' ? <div className="dim" role="status">Loading…</div> : null}
       {s.status === 'error' ? <div className="banner red" role="alert">Couldn't load ({s.message}). Nothing is shown rather than a guess.</div> : null}
       {s.status === 'none' ? (
         <div className="banner" data-testid="track-not-started">
-          NOT SCORED YET — the hourly scan starts recording AEGIS's warnings and real liquidations after this update. Scores appear as both build up; until then there is nothing honest to show.
+          NOT SCORED YET — the hourly scan starts recording Phrourax's warnings and real liquidations after this update. Scores appear as both build up; until then there is nothing honest to show.
         </div>
       ) : null}
       {s.status === 'ok' ? <Scores a={s.a} /> : null}
@@ -69,7 +69,7 @@ function Scores({ a }: { a: Accountability }) {
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="faint" style={{ fontSize: 12 }}>
-        AEGIS uses fixed, published rules — no model is trained or tuned on this. Scored {when(Date.parse(a.generatedAt))} · recording since {a.recordingStart ? when(Date.parse(a.recordingStart)) : '—'}.
+        Phrourax uses fixed, published rules — no model is trained or tuned on this. Scored {when(Date.parse(a.generatedAt))} · recording since {a.recordingStart ? when(Date.parse(a.recordingStart)) : '—'}.
       </div>
       <dl className="kv" data-testid="track-headline">
         <dt>Liquidations it could judge</dt>
@@ -83,7 +83,7 @@ function Scores({ a }: { a: Accountability }) {
         <dt>No warning (missed)</dt>
         <dd>
           <RateCell r={a.missed} />
-          {a.liquidations.notSeen ? <span className="faint"> · {a.liquidations.notSeen} of all judged were wallets AEGIS had never seen</span> : null}
+          {a.liquidations.notSeen ? <span className="faint"> · {a.liquidations.notSeen} of all judged were wallets Phrourax had never seen</span> : null}
         </dd>
         <dt>Median warning lead</dt>
         <dd>{a.leadHoursMedian === null ? '—' : `${a.leadHoursMedian.toFixed(1)} h`}</dd>
@@ -161,7 +161,7 @@ export function ForecastTrack() {
       {s.status === 'error' ? <div className="banner red" role="alert">Couldn&apos;t load ({s.message}). Nothing is shown rather than a guess.</div> : null}
       {s.status === 'none' ? (
         <div className="banner" data-testid="forecast-not-started">
-          NOT SCORED YET — forecasts can only be checked against prices AEGIS recorded, and price recording starts with Oracle Watch. Scores appear once a forecast&apos;s 24 hours have passed with prices recorded throughout.
+          NOT SCORED YET — forecasts can only be checked against prices Phrourax recorded, and price recording starts with Oracle Watch. Scores appear once a forecast&apos;s 24 hours have passed with prices recorded throughout.
         </div>
       ) : null}
       {s.status === 'ok' ? <ForecastBody f={s.v} /> : null}

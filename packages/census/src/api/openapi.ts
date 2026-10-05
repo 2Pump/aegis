@@ -1,3 +1,5 @@
+import { BRAND } from '@aegis/glyphs';
+
 /** OpenAPI 3.1 description of /api/v1 (served at /api/v1/openapi.json). Kept next to the routes it describes. */
 const range = [
   { name: 'from', in: 'query', schema: { type: 'string' }, description: 'ISO date or unix time; default depends on the endpoint' },
@@ -30,15 +32,15 @@ export function openapi() {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'AEGIS Public Risk API',
+      title: `${BRAND.display} Public Risk API`,
       version: 'api-1.0.0',
       summary: 'Read-only risk intelligence for Tydro and Nado on Ink (chain 57073).',
       description: [
-        'AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
+        BRAND.disclaimer,
         '',
         'Every response is an envelope: `schema`, `data`, optional `page`, and `meta` (rules / engine / data versions, source, source block and hash where known, generated time, age, freshness, completeness, approximation, coverage, privacy notes, disclaimer).',
         '',
-        '**Freshness:** each source has its own STALE threshold (stated in `meta.freshnessRule`). **Coverage:** shares of each protocol’s on-chain totals that AEGIS’s known wallets add up to, from the last full sweep.',
+        '**Freshness:** each source has its own STALE threshold (stated in `meta.freshnessRule`). **Coverage:** shares of each protocol’s on-chain totals that Phrourax’s known wallets add up to, from the last full sweep.',
         '',
         '**Privacy:** no endpoint lists wallets or ranks them by closeness to liquidation; no balances, health factors or liquidation prices; aggregate counts of 1–4 are returned as null.',
         '',

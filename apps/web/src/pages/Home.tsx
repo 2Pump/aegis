@@ -107,7 +107,7 @@ export function Home() {
         <h2 className="page">{COPY.oneLiner}</h2>
         <PasteBar autoFocus />
         <div className="faint mono" style={{ fontSize: 11 }}>
-          Read-only. No connect required. AEGIS reads Tydro and Nado straight from the Ink chain and sorts each wallet into a position type.
+          Read-only. No connect required. Phrourax reads Tydro and Nado straight from the Ink chain and sorts each wallet into a position type.
         </div>
       </div>
 

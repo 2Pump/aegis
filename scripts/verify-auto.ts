@@ -40,7 +40,7 @@ async function main() {
   });
   for (const r of recs) {
     console.log(`${r.status.padEnd(18)} ${r.venue.padEnd(5)} ${r.case} · ${r.wallet} · ${r.sourceType} · block ${r.block ?? '—'}${r.failureReason ? ` · ${r.failureReason}` : ''}`);
-    for (const f of r.fields) console.log(`   ${f.pass === null ? 'n/a ' : f.pass ? 'ok  ' : 'FAIL'} ${f.label}: AEGIS ${f.aegis} · source ${f.expected} (±${f.tolerance}${f.unit === 'rel' ? ' rel' : ''})`);
+    for (const f of r.fields) console.log(`   ${f.pass === null ? 'n/a ' : f.pass ? 'ok  ' : 'FAIL'} ${f.label}: Phrourax ${f.aegis} · source ${f.expected} (±${f.tolerance}${f.unit === 'rel' ? ' rel' : ''})`);
   }
   if (recs.some((r) => r.status === 'FAIL')) process.exitCode = 1;
 }

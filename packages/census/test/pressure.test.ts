@@ -123,7 +123,7 @@ describe('Ink Stress Level', () => {
   it('the share text carries counts and labels, never a balance or an address', () => {
     const s = pop(92, 8, 0);
     const q = { dir: 'CRYPTO', sign: 'down' as const, pct: 10, material: '1k' as const, dim: '*' };
-    const t = shareText(s, q, stressLevel(s, ctx), 'https://aegis-web-lake.vercel.app/pressure?d=CRYPTO&s=down&p=10');
+    const t = shareText(s, q, stressLevel(s, ctx), 'https://phrourax.com/pressure?d=CRYPTO&s=down&p=10');
     expect(t).toMatch(/simulation, not a prediction/);
     // the only dollar figure allowed is the size floor's own label ("at least $1,000"), never a balance
     expect(t.replace(/at least \$[\d,]+/gi, '')).not.toMatch(/\$\s?\d/);

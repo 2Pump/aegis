@@ -1,6 +1,6 @@
 # Flight Recorder — history (`hist-1.0.0`)
 
-Release 1 of the INTEL expansion. AEGIS now keeps what it saw, so the site can show how risk changed over time, for one wallet and for the whole of Ink.
+Release 1 of the INTEL expansion. Phrourax now keeps what it saw, so the site can show how risk changed over time, for one wallet and for the whole of Ink.
 
 ## What is recorded
 
@@ -14,7 +14,7 @@ The hourly census writes the records itself, right after it publishes `census.js
 
 **Balance-free, like census.json.** Files hold types, risk levels, size ranges and counts. They never hold balances, health factors, margin buffers or liquidation prices.
 
-**Recorded live, never backfilled.** Every row is what the hourly scan read at the time. History starts when this version first runs. AEGIS doesn't reconstruct risk it didn't observe, and the pages say so.
+**Recorded live, never backfilled.** Every row is what the hourly scan read at the time. History starts when this version first runs. Phrourax doesn't reconstruct risk it didn't observe, and the pages say so.
 
 **Never rewritten.** When the rules change, old rows keep their old rules version, and the wallet table marks the change ("rules changed").
 

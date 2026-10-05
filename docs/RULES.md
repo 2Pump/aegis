@@ -1,6 +1,6 @@
-# AEGIS — Classification Rules (v1.2.0)
+# Phrourax — Classification Rules (v1.2.0)
 
-> AEGIS is a camera. It cannot move your funds. Classifications can be wrong.
+> Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.
 
 The classifier lives in `packages/pose/src/classify.ts`. Every constant lives in
 `packages/pose/src/config.ts`. The table below is **tested against that file**

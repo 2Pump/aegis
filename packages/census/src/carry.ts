@@ -1,5 +1,5 @@
 /**
- * YIELD AND CARRY (pure; no IO) — `carry-1.0.0`. Release 4. Analysis only: AEGIS never executes anything.
+ * YIELD AND CARRY (pure; no IO) — `carry-1.0.0`. Release 4. Analysis only: Phrourax never executes anything.
  *
  * Inputs are protocol state read at the latest block and at daily checkpoints (UTC midnight) for up to 30 days
  * (ink-io carry.ts). What was actually paid between two readings is OBSERVED, not modelled:
@@ -440,7 +440,7 @@ export function buildCarry(o: CarryInput): CarryFile {
   };
   const minCap = (xs: Array<{ usd: number | null; text: string }>, scale: number[]) => {
     const vals = xs.map((x, i) => (x.usd === null ? null : x.usd / scale[i]!)).filter((x): x is number => x !== null);
-    return { usd: vals.length ? Math.min(...vals) : null, text: `${xs.map((x) => x.text).join('; ')}${vals.length ? ` → about ${usd(Math.min(...vals))} of capital before a limit binds (before slippage)` : ' → no cap AEGIS can read'}` };
+    return { usd: vals.length ? Math.min(...vals) : null, text: `${xs.map((x) => x.text).join('; ')}${vals.length ? ` → about ${usd(Math.min(...vals))} of capital before a limit binds (before slippage)` : ' → no cap Phrourax can read'}` };
   };
   const nadoWithdrawUsd = (s: NadoSpotMarket | null) => (s ? s.withdrawFee * s.priceUsd : null);
   const fees = (txs: number, nadoWithdrawals: Array<NadoSpotMarket | null>, nadoTrades: boolean): Structure['fees'] => {
@@ -522,7 +522,7 @@ export function buildCarry(o: CarryInput): CarryFile {
         ctx,
         {
           fees: fees(3, [s], false),
-          capacity: { usd: null, text: 'Nado: no deposit cap AEGIS can read' },
+          capacity: { usd: null, text: 'Nado: no deposit cap Phrourax can read' },
           liquidity: [`Nado ${label} deposits ${usd(s.deposits * s.priceUsd)} · borrowed ${usd(s.borrows * s.priceUsd)}`],
           liquidation: { pctUp: null, pctDown: null, text: 'no borrowing: no liquidation path' },
           stables: [label],
@@ -565,7 +565,7 @@ export function buildCarry(o: CarryInput): CarryFile {
         ctx,
         {
           fees: fees(3, [s], true),
-          capacity: { usd: null, text: `Nado: no position cap AEGIS can read; ${h.perp} open interest ≈ ${usd(p.openInterest * p.priceUsd)} (market size, not a limit)` },
+          capacity: { usd: null, text: `Nado: no position cap Phrourax can read; ${h.perp} open interest ≈ ${usd(p.openInterest * p.priceUsd)} (market size, not a limit)` },
           liquidity: [`${h.perp} open interest ≈ ${usd(p.openInterest * p.priceUsd)}`, `Nado ${label} deposits ${usd(s.deposits * s.priceUsd)}`],
           liquidation: {
             pctUp: up,

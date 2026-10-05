@@ -196,7 +196,7 @@ export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteRe
   });
   if (needBaseline && failed === 0) index.baselined = [...index.baselined, month].sort();
 
-  /* ── AEGIS's own warnings (for the track record): wallets entering NEAR LIQUIDATION ── */
+  /* ── Phrourax's own warnings (for the track record): wallets entering NEAR LIQUIDATION ── */
   try {
     // the first run that records warnings marks every wallet already NEAR as a starting warning ('B')
     const firstRun = !index.warningsSince;

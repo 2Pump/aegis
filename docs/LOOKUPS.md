@@ -1,6 +1,6 @@
 # LOOKUPS — Phase 0 cartography
 
-Everything AEGIS reads, where the address/endpoint came from, and how sure we are.
+Everything Phrourax reads, where the address/endpoint came from, and how sure we are.
 **PROVEN** = read from a primary source or verified by live response. **GUESSED** = inferred; must be verified live.
 Fetched **2026-09-28** unless noted.
 
@@ -38,7 +38,7 @@ Addresses are never hand-typed: `node scripts/sync-tydro-registry.mjs` regenerat
 | UiPoolDataProvider | 0x2E549104c516b8657A7D888494DfbAbD7C70b464 | PROVEN (address book) — not used (struct ABI varies by version) |
 | WalletBalanceProvider | 0xB1532b76D054c9F9E61b25c4d91f69B4133E4671 | PROVEN (address book) — not used |
 
-**How AEGIS reads Tydro (all `view`, pinned to one block):**
+**How Phrourax reads Tydro (all `view`, pinned to one block):**
 1. `Pool.getUserAccountData(user)` → totalCollateralBase, totalDebtBase, currentLiquidationThreshold (bps), healthFactor (1e18). **This is the HF liquidators see.** No debt → HF shown as ∞.
 2. `AaveOracle.BASE_CURRENCY_UNIT()` and `getAssetsPrices(underlyings)` → USD prices (label: TYDRO ORACLE).
 3. `aToken.balanceOf(user)` / `variableDebtToken.balanceOf(user)` per registry reserve → legs.
@@ -52,10 +52,10 @@ On-chain spot check (Blockscout, 2026-09-28): kBTC aToken = `aInkWlKBTC`, USDC v
 
 ## C. Nado
 
-### C.0 How AEGIS reads Nado now: ON-CHAIN (2026-09-28)
+### C.0 How Phrourax reads Nado now: ON-CHAIN (2026-09-28)
 
 Nado's HTTP API sits behind a Cloudflare challenge that only its own frontend passes. This was proven from Brandon's machine: curl → 403 `Cf-Mitigated: challenge`, and the browser from localhost → CORS failure. The SDK source confirms it: *"CORS set to the relevant frontend endpoint … will NOT work from other domains"*.
-So AEGIS reads Nado from the **Ink chain** with a `view` call to Nado's own `FQuerier.getSubaccountInfo(bytes32)`. It returns the same struct as the gateway's `subaccount_info`.
+So Phrourax reads Nado from the **Ink chain** with a `view` call to Nado's own `FQuerier.getSubaccountInfo(bytes32)`. It returns the same struct as the gateway's `subaccount_info`.
 
 | Contract | Address | Status |
 |---|---|---|
@@ -81,7 +81,7 @@ Price label: **NADO ON-CHAIN**, the last oracle price settled on Ink. Caveats: s
 
 ### C.1 HTTP API (kept for reference; not used by default)
 
-Docs: https://docs.nado.xyz (index: `/llms.txt`). **Queries need no signature** — docs, *Core Concepts*: “Read operations (queries) don't require signing!” AEGIS never calls `/execute`.
+Docs: https://docs.nado.xyz (index: `/llms.txt`). **Queries need no signature** — docs, *Core Concepts*: “Read operations (queries) don't require signing!” Phrourax never calls `/execute`.
 
 | Item | Value | Status |
 |---|---|---|
@@ -91,14 +91,14 @@ Docs: https://docs.nado.xyz (index: `/llms.txt`). **Queries need no signature** 
 | Rate limit | 2400 weight/min or 400/10s per IP; `subaccount_info` weight 2, `symbols` 2 | PROVEN (docs) |
 | Archive `subaccounts` limit | 1200 req/min per IP, weight 2 | PROVEN (docs) |
 | Cloudflare bot protection | **PROVEN 2026-09-28**: every non-browser client (curl, curl with honest UA, Vite proxy, legacy `gateway.prod.nado.xyz`) gets `403` + `Cf-Mitigated: challenge`. A real browser (Chicago, US) gets `200` JSON. Not a location block. | → Nado is read **directly from the viewer's browser**. No server proxy. We do not disguise as a browser or solve challenges. |
-| CORS for browser calls | **UNKNOWN — the app now reports it in the sensor log** ("browser blocked the reply (CORS…)") | if blocked: ask Nado to allow the AEGIS origin, or run read-only via their SDK where allowed |
+| CORS for browser calls | **UNKNOWN — the app now reports it in the sensor log** ("browser blocked the reply (CORS…)") | if blocked: ask Nado to allow the Phrourax origin, or run read-only via their SDK where allowed |
 | `Accept-Encoding: gzip/br/deflate` required | browsers send it; proxy passes it | PROVEN (docs) |
 
 **Subaccount id** = 20-byte address ‖ 12-byte ASCII name, right-padded. Default name `default` → `…64656661756c740000000000`. PROVEN (docs example; unit-tested).
 
 **Queries used:**
 1. `GET /query?type=symbols` → `data.symbols` is an **object keyed by symbol** `{type, product_id, symbol, …}`. PROVEN (live response).
-2. (Gateway mode only — not used since 2026-09-28; wallet pages read the chain.) `POST archive {"subaccounts": {"address": "0x…"}}` → list of subaccounts incl. isolated. **Request shape GUESSED** from the docs description (“Query all subaccounts associated to an address”). On any failure AEGIS reads `default` only and **says so on the plate**.
+2. (Gateway mode only — not used since 2026-09-28; wallet pages read the chain.) `POST archive {"subaccounts": {"address": "0x…"}}` → list of subaccounts incl. isolated. **Request shape GUESSED** from the docs description (“Query all subaccounts associated to an address”). On any failure Phrourax reads `default` only and **says so on the plate**.
 3. `GET /query?type=subaccount_info&subaccount=0x…` → balances, healths, product oracle prices. PROVEN (docs example payload; parser unit-tested on it).
 
 **Units:** every amount/price is x18 (“amounts come back normalized to 18 decimal places”). Spot `amount` < 0 = borrow. Perp `amount` = signed base size; `v_quote_balance` = quote leg in USD.
@@ -132,7 +132,7 @@ Status: **PROVEN by arithmetic on the docs example** — the example's liabiliti
 | HOODx | — | — | **ABSENT** on Nado |
 | GHO, USDG | — | — | **ABSENT** on Nado (Tydro only) |
 
-Note the dossier's tickers (SPYx, QQQx…) are listed on Nado as **wrapped** `wSPYx`, `wQQQx`… Per docs *xStocks Spot Trading*: wrapped price = stock price × `exchange_rate` (ERC-4626 redemption rate). AEGIS values xStocks at Nado's oracle price for the wrapped token, so no conversion is needed for USD.
+Note the dossier's tickers (SPYx, QQQx…) are listed on Nado as **wrapped** `wSPYx`, `wQQQx`… Per docs *xStocks Spot Trading*: wrapped price = stock price × `exchange_rate` (ERC-4626 redemption rate). Phrourax values xStocks at Nado's oracle price for the wrapped token, so no conversion is needed for USD.
 
 Carry family choice: **BTC** (KBTC spot + BTC-PERP both exist). ETH and every xStock family with a perp are also mapped, because the data supports it.
 

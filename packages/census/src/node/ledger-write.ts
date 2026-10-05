@@ -121,7 +121,7 @@ export async function recordLiquidations(o: LedgerOpts): Promise<LedgerResult> {
     prices.set(b, p.ok ? p.value.usd : null);
   });
 
-  /* ── what AEGIS had recorded before each liquidation ── */
+  /* ── what Phrourax had recorded before each liquidation ── */
   const recordingStart = index.firstBlock !== null ? { block: index.firstBlock } : null;
   const shardCache = new Map<string, Promise<WalletFile | null>>();
   const getShard = (month: string, shard: string) => {
@@ -198,7 +198,7 @@ function toRecord(r: RawLiquidation, at: number, usd: number[] | null, aegis: Le
     }
     if (!usd) unavailable.push("size range and bonus (the RPC couldn't serve oracle prices at that block)");
     else if (!c || !d) unavailable.push('size range and bonus (asset not in the Tydro registry)');
-    if (aegis.evaluable === false) unavailable.push('prior AEGIS state (before recording began)');
+    if (aegis.evaluable === false) unavailable.push('prior Phrourax state (before recording began)');
     return {
       ...base,
       subaccountKind: null,
@@ -219,8 +219,8 @@ function toRecord(r: RawLiquidation, at: number, usd: number[] | null, aegis: Le
   const band = Number.isFinite(quote) && quote > 0 ? sizeBand(quote) : null;
   unavailable.push('direction (the event does not state which side the liquidated position was on)');
   if (!band) unavailable.push('size range (quote amount missing or zero)');
-  if (!r.symbol) unavailable.push(`product name (product ${r.productId} is not in AEGIS's Nado list)`);
-  if (aegis.evaluable === false) unavailable.push('prior AEGIS state (before recording began)');
+  if (!r.symbol) unavailable.push(`product name (product ${r.productId} is not in Phrourax's Nado list)`);
+  if (aegis.evaluable === false) unavailable.push('prior Phrourax state (before recording began)');
   return {
     ...base,
     subaccountKind: subaccountKind(r.subaccount),

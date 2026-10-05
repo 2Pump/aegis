@@ -106,7 +106,7 @@ export function StressTest({ book, pose, idx }: { book: Book; pose: Pose; idx: s
       {!exposed ? (
         <div className="dim st-note" data-testid="stress-none">No debt and no perps, so price moves alone can't liquidate this wallet. There's nothing to stress.</div>
       ) : conf.confidence === 'UNSUPPORTED' ? (
-        <div className="banner st-note">No stress numbers: part of this wallet couldn't be read, and AEGIS won't guess the missing half.</div>
+        <div className="banner st-note">No stress numbers: part of this wallet couldn't be read, and Phrourax won't guess the missing half.</div>
       ) : (
         <>
           {worst ? (

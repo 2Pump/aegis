@@ -8,7 +8,7 @@ import { readTydro } from './tydro.js';
 export interface SensorsConfig {
   client: PublicClient;
   nado: NadoConfig;
-  /** what AEGIS already knows about an owner's Nado subaccounts (the census); null/absent = default only, PARTIAL */
+  /** what Phrourax already knows about an owner's Nado subaccounts (the census); null/absent = default only, PARTIAL */
   nadoDiscovery?: (address: string) => Promise<NadoDiscovery | null>;
 }
 

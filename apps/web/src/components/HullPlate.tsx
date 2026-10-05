@@ -45,7 +45,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
       {!isFixture && book.nado.status === 'OK' && book.nado.data.coverage?.status === 'PARTIAL' ? (
         <div className="banner red" data-testid="nado-partial" role="status">
           PARTIAL — this report may be missing Nado isolated positions: {book.nado.data.coverage.why.join('; ')}. The position type, risk and stress
-          test below cover only what was read. Re-read in a minute, or open the Scan page to load AEGIS's subaccount list.
+          test below cover only what was read. Re-read in a minute, or open the Scan page to load Phrourax's subaccount list.
         </div>
       ) : null}
 
@@ -142,7 +142,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
       {/* 6 EXPOSURE */}
       <Panel idx="06" title="Exposure" rail="var(--cyan)">
         {pose.residualDeltaUsd === null ? (
-          <div className="dim">Can't be worked out — one venue couldn't be read, and AEGIS does not guess from half the picture.</div>
+          <div className="dim">Can't be worked out — one venue couldn't be read, and Phrourax does not guess from half the picture.</div>
         ) : (
           <>
             <dl className="kv">
@@ -221,7 +221,7 @@ function MyWalletToggle({ address }: { address: string }) {
       ✓ My wallet · forget
     </button>
   ) : (
-    <button className="pill-btn" onClick={() => setMyWallet(address)} title="Adds a My wallet shortcut to the header. Saved in this browser only; AEGIS never connects to your wallet." data-testid="my-wallet-toggle">
+    <button className="pill-btn" onClick={() => setMyWallet(address)} title="Adds a My wallet shortcut to the header. Saved in this browser only; Phrourax never connects to your wallet." data-testid="my-wallet-toggle">
       Set as my wallet
     </button>
   );

@@ -4,7 +4,7 @@
 until Phases 1–2 shipped). The `/watch` page says "NOT LIVE YET" and offers no bot link and no sign-up until the steps
 below are done and a real message has been received end to end.
 
-AEGIS stays a camera: alerts read the chain (view calls) and send a Telegram message to someone who asked. No keys, no
+Phrourax stays read-only: alerts read the chain (view calls) and send a Telegram message to someone who asked. No keys, no
 wallet connection, no approvals, no orders.
 
 ## What fires (transitions only, never every run)
@@ -48,7 +48,7 @@ They're sent from the moment it's turned on, once each, inside the same rate lim
 `/hf <addr> <1.0–5|off>` `/buffer <addr> <1–90|off>` `/scenario <addr> <DIR> <±pct|off>` `/help` `/delete`
 
 Nothing is stored before `/start`. Private chats only (groups are ignored). Rejected: malformed addresses, the zero
-address, AEGIS's fixture wallets. Limits: 10 wallets per chat, 500 chats, 300 wallet reads per run (oldest-checked first).
+address, Phrourax's fixture wallets. Limits: 10 wallets per chat, 500 chats, 300 wallet reads per run (oldest-checked first).
 
 ## Architecture
 ```
@@ -72,7 +72,7 @@ scheduler lags; cron-job.org can dispatch the workflow like the census). The pag
 | `ALERTS_STORE_KEY` | GitHub secret | 32 random bytes, base64 — losing it loses the db |
 | `BLOB_READ_WRITE_TOKEN` | GitHub secret (exists) | same store as the census |
 | `INK_RPC` | GitHub secret (optional, exists) | |
-| `ALERTS_SITE_URL` | optional | link base, default https://aegis-web-lake.vercel.app |
+| `ALERTS_SITE_URL` | optional | link base, default https://phrourax.com |
 | `ALERTS_ENABLED` | GitHub **variable** | `true` switches the workflow on |
 | `VITE_ALERTS_BOT` | Vercel env | bot username; set ONLY after the end-to-end test — it flips the page to live |
 

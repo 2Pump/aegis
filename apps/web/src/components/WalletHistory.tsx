@@ -59,7 +59,7 @@ export function WalletHistory({ address }: { address: string }) {
           <summary className="mono dim">What this history doesn't contain (yet)</summary>
           <ul className="dim">
             <li>
-              <b>Health factor, margin buffer, leverage, net exposure over time</b> — not stored: AEGIS's public files never carry a wallet's numbers. Read them for
+              <b>Health factor, margin buffer, leverage, net exposure over time</b> — not stored: Phrourax's public files never carry a wallet's numbers. Read them for
               any past block below (computed from the chain in your browser).
             </li>
             <li>
@@ -285,7 +285,7 @@ function WalletLiquidations({ address, range, index }: { address: string; range:
       {mine.length ? (
         <div className="table-wrap">
           <table className="t">
-            <thead><tr><th>When (UTC)</th><th>Venue</th><th>What</th><th>Size</th><th>AEGIS before</th></tr></thead>
+            <thead><tr><th>When (UTC)</th><th>Venue</th><th>What</th><th>Size</th><th>Phrourax before</th></tr></thead>
             <tbody>
               {mine.map((r) => (
                 <tr key={r.id}>

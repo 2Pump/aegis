@@ -118,7 +118,7 @@ export interface RunOpts {
   log?: (msg: string) => void;
   /** Flight Recorder (history.ts): record this run. Default true. */
   history?: boolean;
-  /** addresses never recorded (AEGIS's synthetic test wallets) */
+  /** addresses never recorded (Phrourax's synthetic test wallets) */
   exclude?: ReadonlySet<string>;
   /** Liquidation Ledger (ledger.ts): scan liquidations and score the track record. Default true (needs history). */
   ledger?: boolean;

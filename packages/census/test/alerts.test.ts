@@ -65,7 +65,7 @@ function seq(w: Watch, list: Observation[]) {
 }
 
 describe('alerts · addresses', () => {
-  it('accepts a wallet, rejects junk, the zero address and AEGIS fixtures', () => {
+  it('accepts a wallet, rejects junk, the zero address and Phrourax fixtures', () => {
     expect(checkWatchAddress(` ${A.toUpperCase().replace('0X', '0x')} `, FIX)).toEqual({ ok: true, address: A });
     expect(checkWatchAddress('0x123', FIX).ok).toBe(false);
     expect(checkWatchAddress('0x0000000000000000000000000000000000000000', FIX).ok).toBe(false);
@@ -130,7 +130,7 @@ describe('alerts · transitions', () => {
     const old = obs({ dataAt: T0 - 3 * 3600_000 });
     const r = evaluate(watch(), freshState(), old, T0);
     expect(kinds(r)).toEqual(['STALE']);
-    expect(formatAlert(r.events, old, { now: T0, siteUrl: 'https://x.test', alertsVersion: ALERTS.VERSION })).toMatch(/STALE: the chain data AEGIS could read is 3 h old/);
+    expect(formatAlert(r.events, old, { now: T0, siteUrl: 'https://x.test', alertsVersion: ALERTS.VERSION })).toMatch(/STALE: the chain data Phrourax could read is 3 h old/);
     expect(kinds(evaluate(watch(), r.next, old, T0))).toEqual([]);
   });
 
@@ -183,7 +183,7 @@ describe('alerts · messages', () => {
   });
 
   it('footer text matches the site footer verbatim', () => {
-    expect(FOOTER_TEXT).toBe('AEGIS is a camera. It cannot move your funds. Classifications can be wrong.');
+    expect(FOOTER_TEXT).toBe('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
   });
 });
 
@@ -212,7 +212,7 @@ const deps = (read: (a: string) => Observation | null) => ({
 
 describe('alerts · commands', () => {
   it('parses commands, including @BotName suffixes; plain text is ignored', () => {
-    expect(parseCommand('/watch@AegisBot 0xabc tydro')).toEqual({ ok: true, cmd: 'watch', args: ['0xabc', 'tydro'] });
+    expect(parseCommand('/watch@ExampleBot 0xabc tydro')).toEqual({ ok: true, cmd: 'watch', args: ['0xabc', 'tydro'] });
     expect(parseCommand('hello')).toBeNull();
     expect(parseCommand('/sell 0xabc')).toMatchObject({ ok: false });
   });

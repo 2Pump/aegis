@@ -2,7 +2,7 @@ import type { Log, PublicClient } from 'viem';
 import { NADO_CONTRACTS, TOPIC, TYDRO, TYDRO_RESERVES, TYDRO_TOKENS, nadoSubaccount } from '@aegis/ink-io';
 
 /**
- * A tiny in-memory Ink: serves eth_getLogs and the read calls AEGIS makes, and deliberately rejects
+ * A tiny in-memory Ink: serves eth_getLogs and the read calls Phrourax makes, and deliberately rejects
  * oversized requests (like real RPC nodes do) so the self-sizing code paths are exercised.
  */
 export const U = {

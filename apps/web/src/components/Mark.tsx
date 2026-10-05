@@ -1,5 +1,5 @@
 /**
- * The AEGIS mark: a camera aperture ("AEGIS is a camera"). Outer ring, hexagonal opening, six blade edges.
+ * The Phrourax mark: an aperture — it watches and never touches. Outer ring, hexagonal opening, six blade edges.
  * One colour (currentColor), so it follows whatever palette the site uses. Source of the favicon and share image too
  * (public/favicon.svg, apple-touch-icon.png, icon-*.png, og.png — regenerate those if this shape changes).
  */

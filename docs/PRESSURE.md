@@ -1,6 +1,6 @@
 # Pressure Map
 
-What happens to the wallets AEGIS can see if prices move. It's a simulation from today's readings, not a prediction and not advice.
+What happens to the wallets Phrourax can see if prices move. It's a simulation from today's readings, not a prediction and not advice.
 
 **Where it shows up**
 - **`/pressure`:** ecosystem-wide counts, plus the **Ink stress level**.
@@ -82,7 +82,7 @@ The level is deterministic and versioned (`STRESS` in `packages/census/src/press
 - Tydro per-asset liquidation thresholds and e-mode: one threshold per wallet is assumed when collateral is mixed.
 - Oracle lag and market impact.
 - Moves beyond 50%.
-- Coverage: the map counts only wallets AEGIS can see. The Scan page has the coverage numbers.
+- Coverage: the map counts only wallets Phrourax can see. The Scan page has the coverage numbers.
 
 ## Freshness (`fresh-1.0.0`)
 

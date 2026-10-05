@@ -48,7 +48,7 @@ function validWallets(x: unknown, fixtures: ReadonlySet<string>): string[] | { c
   for (const a of x) {
     const p = parseAddress(typeof a === 'string' ? a : '');
     if (!p.ok) return { code: 'INVALID_ADDRESS', msg: `not a valid address: ${String(a).slice(0, 60)}` };
-    if (fixtures.has(p.value.lower)) return { code: 'FIXTURE_REJECTED', msg: `${p.value.lower} is an AEGIS test wallet, not a real account` };
+    if (fixtures.has(p.value.lower)) return { code: 'FIXTURE_REJECTED', msg: `${p.value.lower} is a Phrourax test wallet, not a real account` };
     out.push(p.value.lower);
   }
   return [...new Set(out)];
@@ -80,7 +80,7 @@ export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixt
           status: created.sub.status,
           secret: created.secret,
           token: created.token,
-          shownOnce: 'Store the secret (verifies signatures) and the token (manages this webhook) now — AEGIS keeps neither in readable form and cannot show them again.',
+          shownOnce: 'Store the secret (verifies signatures) and the token (manages this webhook) now — Phrourax keeps neither in readable form and cannot show them again.',
           next: 'Your endpoint will receive a webhook.verification event within the next delivery run. Respond 2xx with data.challenge in the body to activate it. No other event is sent until then.',
         },
       });

@@ -98,7 +98,7 @@ describe('Oracle Watch · checks', () => {
     });
     expect(kinds(w, 'WETH')['source-age']).toBe('STALE');
     expect(kinds(w, 'kBTC')['source-age']).toBe('UNAVAILABLE');
-    expect(row(w, 'USDG').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/no price AEGIS can read|no update time/);
+    expect(row(w, 'USDG').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/no price Phrourax can read|no update time/);
   });
 
   it('decimals other than 8 are flagged; a protocol price that differs from its own source is shown', () => {
@@ -522,7 +522,7 @@ describe('Alerts · /protocol (Ink-wide events, opt-in)', () => {
     ({ db } = await runAlerts(db, deps));
     expect(tx.to('1').filter((t) => t.includes('USDe: DEPEG'))).toHaveLength(1);
     expect(tx.to('2').some((t) => t.includes('USDe'))).toBe(false);
-    expect(tx.to('1').at(-1)).toMatch(/AEGIS is a camera/);
+    expect(tx.to('1').at(-1)).toMatch(/Phrourax is read-only/);
   });
 });
 

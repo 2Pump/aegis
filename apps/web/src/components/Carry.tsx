@@ -31,7 +31,7 @@ export function CarryPanel() {
       <Panel title="Yield and carry" rail="var(--amber)" testId="intel-carry" right={<span className="mono">{CARRY.VERSION}</span>}>
         <div className="stack" style={{ gap: 10 }}>
           <div className="banner" data-testid="carry-disclaimer">
-            ANALYSIS ONLY — estimated from what the chain paid. Rates change every block, everything is before slippage, and nothing here is a promise of a return. AEGIS cannot trade, borrow or move funds.
+            ANALYSIS ONLY — estimated from what the chain paid. Rates change every block, everything is before slippage, and nothing here is a promise of a return. Phrourax cannot trade, borrow or move funds.
           </div>
           {s.status === 'loading' ? <div className="dim" role="status">Loading…</div> : null}
           {s.status === 'error' ? <div className="banner red" role="alert">Couldn&apos;t load ({s.message}). Nothing is shown rather than a guess.</div> : null}

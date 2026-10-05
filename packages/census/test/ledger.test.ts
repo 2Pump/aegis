@@ -90,7 +90,7 @@ const st = (block: number, at: number, hullTemp: WalletState['hullTemp'], primar
 });
 const H = 3_600_000;
 
-describe('what AEGIS knew before a liquidation', () => {
+describe('what Phrourax knew before a liquidation', () => {
   it('before recording began → not evaluable (excluded from every rate)', () => {
     expect(priorState([], 50, { block: 100 }).evaluable).toBe(false);
   });
@@ -274,7 +274,7 @@ async function seededStore(firstBlock: number, month = '2026-10') {
 
 describe('ledger writer (fake chain; nothing real is touched)', () => {
   const T = (b: number) => Date.parse('2026-10-03T00:00:00Z') + (b - 25_500_000) * 1000;
-  it('backfill + forward: records each liquidation once, joins what AEGIS knew, never stores raw amounts, excludes fixtures', async () => {
+  it('backfill + forward: records each liquidation once, joins what Phrourax knew, never stores raw amounts, excludes fixtures', async () => {
     const store = await seededStore(20_000_000);
     const logs = [tydroLog(U1, 25_500_000), nadoLog(U2, 25_600_000), tydroLog(FIX, 25_700_000, 2)];
     const times = Object.fromEntries([25_500_000, 25_600_000, 25_700_000].map((b) => [b, T(b)]));

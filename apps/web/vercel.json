@@ -10,7 +10,7 @@
       "destination": "/api/v1?__path=$1"
     },
     {
-      "source": "/((?!assets/|api/|robots.txt|favicon.svg).*)",
+      "source": "/((?!assets/|api/|robots.txt|sitemap.xml|favicon.svg).*)",
       "destination": "/index.html"
     }
   ],

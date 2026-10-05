@@ -1,4 +1,4 @@
-# AEGIS census — hourly.
+# Phrourax census — hourly.
 # Finds every wallet that has used Tydro or Nado (from public on-chain events), reads them from the Ink chain,
 # classifies them with the same rules as the site, and publishes census.json to Vercel Blob.
 # Read-only: the only secret is a storage token for Vercel Blob. Nothing here can move funds.

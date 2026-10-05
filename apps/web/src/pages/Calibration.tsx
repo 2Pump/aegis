@@ -5,7 +5,7 @@ import { useVerificationLog } from '../lib/verificationLog';
 import { ForecastTrack, TrackRecord } from '../components/TrackRecord';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
-import { RISK_LABEL } from '@aegis/glyphs';
+import { RISK_LABEL, brandText } from '@aegis/glyphs';
 import { Panel, TagChip } from '../components/bits';
 import { FIXTURES } from '../lib/fixtures';
 import { PROOFS, PROOF_STALE_DAYS, VENUE_VERIFIED, VERIFIED, proofStatus, verificationText } from '../lib/verification';
@@ -95,7 +95,7 @@ export function CalibrationPage() {
 const DISPLAY_TONE: Record<CheckDisplay, string> = { CURRENT: 'var(--cyan)', STALE: 'var(--amber)', FAILED: 'var(--red)', 'SOURCE UNAVAILABLE': 'var(--slate)', 'NOT CHECKED': 'var(--amber)' };
 const SOURCE_TYPE: Record<string, string> = { 'on-chain': 'on-chain contract', 'official-api': 'official API', 'official-app': 'official app' };
 
-/** The automatic cross-checks every 4 h (verify.yml). Real wallets, compared with authoritative sources AEGIS doesn't read from. */
+/** The automatic cross-checks every 4 h (verify.yml). Real wallets, compared with authoritative sources Phrourax doesn't read from. */
 function AutoChecks() {
   const log = useVerificationLog();
   const now = useNow(60_000);
@@ -111,7 +111,7 @@ function AutoChecks() {
       {log.status === 'ok' ? (
         <>
           <div className="dim" style={{ fontSize: 12, marginBottom: 8 }}>
-            Real wallets read with this site's own readers, then compared with sources AEGIS does not read from: Tydro's AaveProtocolDataProvider (balances and a recomputed
+            Real wallets read with this site's own readers, then compared with sources Phrourax does not read from: Tydro's AaveProtocolDataProvider (balances and a recomputed
             health factor, same block) and Nado's Clearinghouse (every subaccount's maintenance health). Nado's official API is compared too, as a third source; when it refuses (it sits behind a Cloudflare check) the row says SOURCE UNAVAILABLE, which never counts as a pass. A case with no suitable wallet that run says NOT CHECKED. These are not the by-hand matches against the official apps further down.
           </div>
           <div className="table-wrap">
@@ -144,7 +144,7 @@ function AutoChecks() {
                       <td className="mono" style={{ fontSize: 11 }}>{SOURCE_TYPE[r.sourceType] ?? r.sourceType}<div className="faint">{r.source}</div></td>
                       <td className="mono" style={{ fontSize: 11 }}>
                         {fmtAge(Date.parse(r.at), now)} ago{r.block !== null ? ` · block ${r.block.toLocaleString('en-US')}` : ''}
-                        {r.failureReason ? <div className="neg">{r.failureReason}</div> : null}
+                        {r.failureReason ? <div className="neg">{brandText(r.failureReason)}</div> : null}
                         {g.display !== 'CURRENT' && g.lastSuccess && g.lastSuccess !== r ? (
                           <div className="faint">last success {fmtAge(Date.parse(g.lastSuccess.at), now)} ago ({g.lastSuccessDisplay})</div>
                         ) : null}
@@ -166,8 +166,8 @@ function AutoChecks() {
               {[...log.records].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 60).map((r, i) => (
                 <li key={`${r.at}${i}`}>
                   {r.status.replace('_', ' ')} · {r.venue} · {caseName(r.case)} · {r.wallet} · {SOURCE_TYPE[r.sourceType] ?? r.sourceType} · {r.at} · block {r.block ?? '—'} · rules {r.rulesVersion}
-                  {r.fields.length ? ` · ${r.fields.map((f) => `${f.label} ${f.pass === null ? 'n/a' : f.pass ? 'ok' : `FAIL (AEGIS ${f.aegis}, source ${f.expected}, ±${f.tolerance})`}`).join('; ')}` : ''}
-                  {r.failureReason ? ` · ${r.failureReason}` : ''}
+                  {r.fields.length ? ` · ${r.fields.map((f) => `${f.label} ${f.pass === null ? 'n/a' : f.pass ? 'ok' : `FAIL (Phrourax ${f.aegis}, source ${f.expected}, ±${f.tolerance})`}`).join('; ')}` : ''}
+                  {r.failureReason ? ` · ${brandText(r.failureReason)}` : ''}
                 </li>
               ))}
             </ul>

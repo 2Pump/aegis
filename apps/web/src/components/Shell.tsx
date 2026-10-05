@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mark } from './Mark';
 import { useMyWallet } from '../lib/myWallet';
-import { COPY } from '@aegis/glyphs';
+import { BRAND, COPY } from '@aegis/glyphs';
 import { INK_CHAIN_ID } from '@aegis/ink-io';
 import { fmtAge } from '../lib/fmt';
 import { useChainHead, useNow } from '../lib/hulls';
@@ -15,7 +15,19 @@ import { RulesContent } from './RulesContent';
  */
 export const RULES_LINK = { search: '?rules=1' } as const;
 
+/** Canonical and og:url follow the page (path only — never a query or a wallet address). */
+function useCanonical() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const path = pathname.startsWith('/hull/') || pathname.startsWith('/fixture/') ? '/' : pathname;
+    const href = `${BRAND.siteUrl}${path}`;
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', href);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', href);
+  }, [pathname]);
+}
+
 export function Shell() {
+  useCanonical();
   const [params, setParams] = useSearchParams();
   const drawer = params.get('rules') === '1';
   const setDrawer = (open: boolean) =>
@@ -43,7 +55,7 @@ export function Shell() {
         <div className="brand">
           <span className="brand-mark"><Mark size={28} /></span>
           <div>
-            <h1>AEGIS</h1>
+            <h1>{BRAND.name}</h1>
             <small>TYDRO · NADO · INK {INK_CHAIN_ID}</small>
           </div>
         </div>
@@ -84,7 +96,7 @@ function MyWalletButton() {
   const nav = useNavigate();
   if (!mine) return null;
   return (
-    <button className="pill-btn" onClick={() => nav(`/hull/${mine}`)} title="Saved in this browser only. AEGIS never connects to your wallet." data-testid="my-wallet">
+    <button className="pill-btn" onClick={() => nav(`/hull/${mine}`)} title="Saved in this browser only. Phrourax never connects to your wallet." data-testid="my-wallet">
       My wallet {mine.slice(0, 6)}…{mine.slice(-4)}
     </button>
   );
@@ -113,7 +125,7 @@ function Footer() {
         </>
       ) : null}
       <span className="sep">·</span>
-      <span>camera, not a broker</span>
+      <span>read-only, not a broker</span>
       <span className="sep">·</span>
       <Link to={RULES_LINK}>rules</Link>
       <span className="camera" style={{ flexBasis: '100%' }}>{COPY.footer}</span>

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * AEGIS's synthetic test wallets (every address in /fixtures). They are never real accounts: the census history
+ * Phrourax's synthetic test wallets (every address in /fixtures). They are never real accounts: the census history
  * and the alerts both refuse them. A missing folder gives an empty set (then nothing extra is excluded).
  */
 export function fixtureAddresses(repoRoot: string): Set<string> {

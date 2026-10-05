@@ -3,10 +3,10 @@
  *
  * Picks representative real wallets from the latest census (a Tydro borrower, a Nado default-only wallet, a Nado
  * wallet with an isolated subaccount), reads each with the exact readers the site uses, and compares them with
- * authoritative sources AEGIS's own path does NOT use:
+ * authoritative sources Phrourax's own path does NOT use:
  *   Tydro  AaveProtocolDataProvider.getUserReserveData (balances) + Σ(collateral × liquidation threshold) / debt
  *          recomputed from getReserveConfigurationData and the oracle, at the SAME block      → source type on-chain
- *   Nado   Clearinghouse.getHealth(subaccount, MAINTENANCE) for EVERY subaccount read (AEGIS reads FQuerier)
+ *   Nado   Clearinghouse.getHealth(subaccount, MAINTENANCE) for EVERY subaccount read (Phrourax reads FQuerier)
  *                                                                                              → source type on-chain
  *          Nado's official API (gateway subaccount_info), plain request; it sits behind a Cloudflare challenge
  *          that only Nado's own site passes, so this is expected to be SOURCE UNAVAILABLE — recorded as such,
@@ -145,7 +145,7 @@ type Base = Pick<VerificationRecord, 'v' | 'kind' | 'rulesVersion' | 'engineVers
 
 async function verifyTydro(client: PublicClient, book: Book, name: string, at: string, base: Base): Promise<VerificationRecord> {
   const rec = { ...base, venue: 'tydro' as const, wallet: shortWallet(book.address), case: name, source: 'AaveProtocolDataProvider + AaveOracle (on-chain, same block)', sourceType: 'on-chain' as const, at, block: book.asOfBlock };
-  if (book.tydro.status !== 'OK' || book.asOfBlock === null) return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "AEGIS couldn't read Tydro for this wallet" });
+  if (book.tydro.status !== 'OK' || book.asOfBlock === null) return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "Phrourax couldn't read Tydro for this wallet" });
   const t = book.tydro.data;
   const blockNumber = BigInt(book.asOfBlock);
   try {
@@ -179,8 +179,8 @@ async function verifyTydro(client: PublicClient, book: Book, name: string, at: s
 }
 
 async function verifyNadoChain(client: PublicClient, book: Book, name: string, at: string, base: Base): Promise<VerificationRecord> {
-  const rec = { ...base, venue: 'nado' as const, wallet: shortWallet(book.address), case: name, source: 'Nado Clearinghouse.getHealth per subaccount (on-chain; AEGIS reads FQuerier)', sourceType: 'on-chain' as const, at, block: book.asOfBlock };
-  if (book.nado.status !== 'OK') return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "AEGIS couldn't read Nado for this wallet" });
+  const rec = { ...base, venue: 'nado' as const, wallet: shortWallet(book.address), case: name, source: 'Nado Clearinghouse.getHealth per subaccount (on-chain; Phrourax reads FQuerier)', sourceType: 'on-chain' as const, at, block: book.asOfBlock };
+  if (book.nado.status !== 'OK') return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "Phrourax couldn't read Nado for this wallet" });
   const n = book.nado.data;
   const subs = n.subHealth ?? [];
   try {
@@ -204,11 +204,11 @@ async function verifyNadoApi(doFetch: NonNullable<VerifyOpts['fetch']>, book: Bo
   try {
     const res = await doFetch(url);
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) {
-      return finalize({ ...rec, fields: [], sourceUnavailable: true, failureReason: `HTTP ${res.status} — Nado's API only answers its own website (Cloudflare challenge); AEGIS does not get around that` });
+      return finalize({ ...rec, fields: [], sourceUnavailable: true, failureReason: `HTTP ${res.status} — Nado's API only answers its own website (Cloudflare challenge); Phrourax does not get around that` });
     }
     const parsed = parseSubaccountInfo(await res.json(), NADO_PRODUCTS, 'NADO_ORACLE');
     if (!parsed.ok) return finalize({ ...rec, fields: [], sourceUnavailable: true, failureReason: `reply didn't parse: ${parsed.error.message}` });
-    if (book.nado.status !== 'OK') return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "AEGIS couldn't read Nado for this wallet" });
+    if (book.nado.status !== 'OK') return finalize({ ...rec, fields: [], sourceUnavailable: false, failureReason: "Phrourax couldn't read Nado for this wallet" });
     const api = aggregate([parsed.value], []);
     const mine = book.nado.data;
     const def = nadoSubaccount(book.address);

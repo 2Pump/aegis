@@ -309,7 +309,7 @@ function Events({ w }: { w: OracleWatch }) {
   return (
     <Panel title="Oracle events" rail="var(--cyan)" testId="oracles-events" right={<span className="mono">newest first</span>}>
       {!w.events.length ? (
-        <div className="dim" data-testid="oracles-no-events">No events recorded — every problem AEGIS has seen since recording began would be listed here, with the time and block it was first seen.</div>
+        <div className="dim" data-testid="oracles-no-events">No events recorded — every problem Phrourax has seen since recording began would be listed here, with the time and block it was first seen.</div>
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           <div className="table-wrap">

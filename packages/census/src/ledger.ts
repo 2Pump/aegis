@@ -2,10 +2,10 @@
  * LIQUIDATION LEDGER, CASCADES, ACCOUNTABILITY (pure; no IO). Release 2 of the INTEL expansion.
  *
  *  Ledger          every actual Tydro and Nado liquidation on Ink, from the protocols' own events (ink-io
- *                  liquidations.ts), with what AEGIS had recorded about that wallet before it happened.
+ *                  liquidations.ts), with what Phrourax had recorded about that wallet before it happened.
  *  Cascades        liquidations grouped by a published, versioned, deterministic rule (time proximity), with the
  *                  reasons for each grouping. Grouping is not causation and is never presented as such.
- *  Accountability  AEGIS's own warnings (a wallet recorded as NEAR LIQUIDATION) scored against what actually
+ *  Accountability  Phrourax's own warnings (a wallet recorded as NEAR LIQUIDATION) scored against what actually
  *                  happened: with denominators, sample sizes and the versions they ran under — never a bare %.
  *
  * Privacy: public files carry size RANGES and percentages, never balances or health factors. Liquidations are
@@ -36,7 +36,7 @@ export const LEDGER = {
 export type Venue = 'tydro' | 'nado';
 
 export interface PriorState {
-  /** false = AEGIS wasn't recording yet, so this liquidation can't be used to judge AEGIS */
+  /** false = Phrourax wasn't recording yet, so this liquidation can't be used to judge Phrourax */
   evaluable: boolean;
   why: string;
   /** the last state the hourly scan recorded for this wallet BEFORE the liquidation block */
@@ -104,20 +104,20 @@ export function appendLedger(file: unknown, month: string, recs: readonly Ledger
   return base;
 }
 
-/* ───────────────────────── what AEGIS knew before ───────────────────────── */
+/* ───────────────────────── what Phrourax knew before ───────────────────────── */
 
 /**
- * From a wallet's recorded timeline (history.ts), what AEGIS had recorded before a liquidation at `block`.
+ * From a wallet's recorded timeline (history.ts), what Phrourax had recorded before a liquidation at `block`.
  * Only rows strictly before the liquidation block count. A liquidation before recording began is not evaluable.
  */
 export function priorState(timeline: readonly WalletState[], block: number, recordingStart: { block: number } | null): PriorState {
   if (!recordingStart || block <= recordingStart.block) {
-    return { evaluable: false, why: 'before AEGIS began recording — not used to judge AEGIS', before: null, nearSince: null, watchSince: null, leadIsMinimum: false };
+    return { evaluable: false, why: 'before Phrourax began recording — not used to judge Phrourax', before: null, nearSince: null, watchSince: null, leadIsMinimum: false };
   }
   const rows = timeline.filter((s) => s.block < block);
   const last = rows[rows.length - 1];
   if (!last) {
-    return { evaluable: true, why: 'AEGIS had no recorded position for this wallet before it was liquidated (not found, or no position when scanned)', before: null, nearSince: null, watchSince: null, leadIsMinimum: false };
+    return { evaluable: true, why: 'Phrourax had no recorded position for this wallet before it was liquidated (not found, or no position when scanned)', before: null, nearSince: null, watchSince: null, leadIsMinimum: false };
   }
   const streak = (ok: (h: HullTemp) => boolean) => {
     if (!ok(last.hullTemp) || last.primary === 'EMPTY') return { since: null as number | null, minimum: false };
@@ -324,7 +324,7 @@ export interface WindowScore {
   precision: Rate;
   /** warnings younger than the window — not yet judged */
   pending: number;
-  /** evaluable liquidations where AEGIS had recorded NEAR for at least this long before */
+  /** evaluable liquidations where Phrourax had recorded NEAR for at least this long before */
   leadAtLeast: Rate;
 }
 
@@ -363,11 +363,11 @@ export interface Accountability {
 const BAND_NAMES: readonly SizeBand[] = ['dust', '<1k', '1–10k', '10–100k', '100k+'];
 
 /**
- * Score AEGIS's warnings against what happened. Definitions (published with the result):
+ * Score Phrourax's warnings against what happened. Definitions (published with the result):
  *  - warning: the hourly scan recorded a wallet entering NEAR LIQUIDATION (or already NEAR when recording began)
  *  - followed within W: that wallet was liquidated in (warning, warning + W]
- *  - warned before a liquidation: AEGIS's last recorded state before the liquidation block was NEAR
- *  - evaluable liquidation: after recording began (earlier ones can't judge AEGIS and are excluded, but counted)
+ *  - warned before a liquidation: Phrourax's last recorded state before the liquidation block was NEAR
+ *  - evaluable liquidation: after recording began (earlier ones can't judge Phrourax and are excluded, but counted)
  */
 export function scoreAccountability(o: { warnings: readonly Warning[]; liquidations: readonly LedgerRecord[]; nowMs: number; recordingStart: string | null; tags: readonly string[]; min?: number }): Accountability {
   const min = o.min ?? LEDGER.MIN_SAMPLE;
@@ -407,8 +407,8 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
     definitions: {
       warning: 'The hourly scan recorded the wallet entering NEAR LIQUIDATION (or already NEAR when recording began).',
       'followed within W': 'That wallet was liquidated within W hours after the warning.',
-      'warned before': "AEGIS's last recorded state before the liquidation block was NEAR LIQUIDATION.",
-      evaluable: 'A liquidation after AEGIS began recording. Earlier ones are counted but excluded from every rate.',
+      'warned before': "Phrourax's last recorded state before the liquidation block was NEAR LIQUIDATION.",
+      evaluable: 'A liquidation after Phrourax began recording. Earlier ones are counted but excluded from every rate.',
       'lead time': 'From the start of the uninterrupted NEAR streak to the liquidation.',
     },
     liquidations: { total: liqs.length, evaluable: ev.length, beforeRecording: liqs.length - ev.length, notSeen: ev.filter((r) => r.aegis.before === null).length, partial: liqs.filter((r) => r.completeness === 'PARTIAL').length },
@@ -440,7 +440,7 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
     ),
     limitations: [
       'The hourly scan records each wallet once an hour: a wallet that goes from safe to liquidated inside one hour can only be a miss.',
-      'Only wallets AEGIS has found can be warned; a liquidation of a wallet it never saw counts as a miss ("not seen").',
+      'Only wallets Phrourax has found can be warned; a liquidation of a wallet it never saw counts as a miss ("not seen").',
       'Warnings are scored against liquidations only. A warned wallet that added collateral and survived is a correct warning acted on, but counts as "not followed".',
       'Scenario forecasts (Pressure Map) are recorded but not scored yet: scoring them needs recorded prices (Oracle Watch, a later release).',
       'Different rules versions are reported separately; never pooled as if identical.',

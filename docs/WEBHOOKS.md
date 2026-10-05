@@ -1,6 +1,6 @@
 # Webhooks (`webhooks-1.0.0`): built and tested, OFF
 
-Webhooks are signed HTTPS POSTs of AEGIS events to an endpoint you control. They use the **same transition engine as Telegram alerts** for wallet events (`alerts/engine.ts`) and the **same Ink-wide event feed** (`events.ts`).
+Webhooks are signed HTTPS POSTs of Phrourax events to an endpoint you control. They use the **same transition engine as Telegram alerts** for wallet events (`alerts/engine.ts`) and the **same Ink-wide event feed** (`events.ts`).
 
 **They are not switched on.** Until the owner does it (see the last section), every `/api/v1/webhooks` call answers `503 NOT_ENABLED` and the delivery workflow skips itself.
 
@@ -27,7 +27,7 @@ The Pressure state is covered by `stress.level_changed`. Test wallets (fixtures)
   "deliveryId": "dlv_…", "sentAt": "2026-10-05T18:05:11.000Z",
   "event": { "id": "oracle|…", "type": "oracle.depeg", "at": "…", "block": 57725110, "subject": "USDe",
              "text": "USDe: Tydro: $0.9750 (−2.50% from $1)", "data": { "symbol": "USDe", "status": "DEPEG", "…": "…" } },
-  "disclaimer": "AEGIS is a camera. It cannot move your funds. Classifications can be wrong."
+  "disclaimer": "Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice."
 }
 ```
 
@@ -41,6 +41,8 @@ The Pressure state is covered by `stress.level_changed`. Test wallets (fixtures)
 | `AEGIS-Signature` | `t=<unix seconds>,v1=<hex>` — HMAC-SHA256 with your secret over `` `${t}.${rawBody}` ``. During a secret rotation there's one `v1` per live secret. |
 | `AEGIS-Delivery` | unique per delivery attempt chain: dedupe on it |
 | `AEGIS-Event` | the event type |
+
+The header names (and the `aegis-webhook-1` schema) predate the rename to Phrourax and are part of the signed `webhooks-1.0.0` contract, so they keep the `AEGIS-` prefix.
 | `Idempotency-Key` | the event id; every retry of one event carries the same key |
 
 ### Verifying (receiver)

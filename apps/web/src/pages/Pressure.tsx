@@ -25,7 +25,7 @@ import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 
 /*
- * PRESSURE MAP — what happens to the wallets AEGIS can see if prices move.
+ * PRESSURE MAP — what happens to the wallets Phrourax can see if prices move.
  * Everything here is counts from pressure.json (aggregates written by the census full sweep). No wallet is named,
  * ranked or priced. The engine and its limits: packages/pose/src/scenario.ts and docs/PRESSURE.md.
  */
@@ -160,7 +160,7 @@ function PressureBody({
           </div>
           {refreshError ? <div className="banner" data-testid="pressure-refresh-failed">The last refresh failed ({refreshError}). Showing the last good map, with its own age above — nothing was replaced by a guess.</div> : null}
           <div className="mono faint pm-stamp" data-testid="pressure-stamp">
-            Based on wallets currently visible to AEGIS · rules {s.rulesVersion}
+            Based on wallets currently visible to Phrourax · rules {s.rulesVersion}
             {s.rulesVersion !== RULES.RULES_VERSION ? ` (site now on ${RULES.RULES_VERSION})` : ''} · engine {s.engine}
             {s.engine !== SCENARIO_ENGINE_VERSION ? ` (site on ${SCENARIO_ENGINE_VERSION})` : ''} · {STRESS.VERSION} · {FRESHNESS.VERSION}
           </div>

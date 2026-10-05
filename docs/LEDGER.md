@@ -28,7 +28,7 @@ The census does this after the Flight Recorder (`packages/census/src/node/ledger
 - assets or product, and asset family
 - **size range** and its basis
 - Tydro's implied bonus
-- what AEGIS had recorded before
+- what Phrourax had recorded before
 - completeness, and the list of unavailable fields
 - source and versions
 
@@ -41,7 +41,7 @@ The census does this after the Flight Recorder (`packages/census/src/node/ledger
 - **Health factor immediately before and after** is not stored, because public files carry no per-wallet numbers. On a wallet page, "Read at a past block" shows it for any block (needs an RPC that keeps old state).
 - A record is **COMPLETE** only when no field is unavailable.
 
-## What AEGIS knew before (the join)
+## What Phrourax knew before (the join)
 
 For each liquidation, the Flight Recorder's rows for that wallet strictly before the liquidation block give:
 
@@ -49,7 +49,7 @@ For each liquidation, the Flight Recorder's rows for that wallet strictly before
 - **WATCH only:** the last state was WATCH, with no NEAR.
 - **No warning:** recorded without a warning.
 - **Not seen:** no recorded position for that wallet.
-- **Before recording:** the liquidation happened before AEGIS began recording. It's kept in the ledger but **excluded from every rate**.
+- **Before recording:** the liquidation happened before Phrourax began recording. It's kept in the ledger but **excluded from every rate**.
 
 Rows are hourly, so lead times are accurate to about an hour, and a wallet that goes from safe to liquidated within the hour can only be a miss.
 
@@ -66,8 +66,8 @@ Cascades without a dominant family, or spanning both venues, are labelled **unce
 
 **Replay** steps through seven parts, from what was actually recorded:
 1. The price or oracle move: recorded hourly since Oracle Watch (Release 3); see INTEL → ORACLES for the time of the liquidation.
-2. The first wallet AEGIS had in danger.
-3. AEGIS's near-liquidation count and Ink Stress Level around the cascade (6 hours either side).
+2. The first wallet Phrourax had in danger.
+3. Phrourax's near-liquidation count and Ink Stress Level around the cascade (6 hours either side).
 4. The first liquidation.
 5. The ones after it.
 6. The peak 10 minutes.
@@ -79,7 +79,7 @@ Where something wasn't recorded, the step says so.
 
 - **Warnings:** recorded by the hourly census in `history/warn/<YYYY-MM>.json` each time a wallet enters NEAR LIQUIDATION. The first run that records warnings marks wallets already NEAR as starting warnings.
 - **Scored:** each run, from every warning and liquidation since recording began (at most 13 months), into `history/accountability.json`:
-  - Liquidations AEGIS could judge: warned NEAR before, WATCH only, missed, and never seen.
+  - Liquidations Phrourax could judge: warned NEAR before, WATCH only, missed, and never seen.
   - For windows of 1 h, 6 h, 24 h and 7 days: warnings followed by that wallet's liquidation within the window (warnings younger than the window count as *pending*, not misses), and liquidations warned at least that long before.
   - Breakdowns by venue, size range, position type at the time, asset family and **rules version, never pooled**.
 - **Every rate** is shown as *n of N*. Under 30 cases it's marked "too few to judge".

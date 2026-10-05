@@ -1,5 +1,5 @@
 /**
- * PROVE — read one real Ink address with the exact AEGIS sensors, cross-check it against
+ * PROVE — read one real Ink address with the exact Phrourax sensors, cross-check it against
  * independent sources, then have a human confirm the numbers against the official UIs.
  *
  *   pnpm prove 0xYOURADDRESS                 # interactive (asks for the UI numbers)
@@ -78,7 +78,7 @@ async function main() {
   const pa = parseAddress(addrArg);
   if (!pa.ok) throw new Error(pa.error.message);
   const user = pa.value.lower;
-  console.log(`\nAEGIS PROVE · ${pa.value.checksum}\nrpc ${rpc} · nado via Ink chain (FQuerier)\n`);
+  console.log(`\nPHROURAX PROVE · ${pa.value.checksum}\nrpc ${rpc} · nado via Ink chain (FQuerier)\n`);
 
   /* ── 1. The exact sensors the app uses ── */
   const client = makeInkClient(rpc);
@@ -177,7 +177,7 @@ async function main() {
   let nadoSource: 'ui' | 'api' = 'ui';
   if (book.nado.status === 'OK' && nadoHas && nadoJsonPath) {
     /* Nado reference = Nado's OWN API reply (what app.nado.xyz is built on), fetched by you in your browser.
-       Independent of AEGIS's path (Ink chain via FQuerier). The API is the sequencer's live state, the chain is settled
+       Independent of Phrourax's path (Ink chain via FQuerier). The API is the sequencer's live state, the chain is settled
        state, so fetch the JSON and run prove within a minute of each other. */
     nadoSource = 'api';
     const nd = book.nado.data;
@@ -250,7 +250,7 @@ async function main() {
     console.log('Type the number the official UI shows (Enter = skip). Tolerance: HF ±0.01, USD ±1%, amounts ±0.1%, perp sizes ±0.01%.');
     console.log('Read the UI right now — prices and interest move, so compare numbers from the same minute.\n');
     for (const f of toAsk) {
-      const ans = (await rl.question(`${f.label}  [AEGIS: ${n(f.aegis ?? NaN, 6)}]  UI = `)).replace(/[$,\s]/g, '');
+      const ans = (await rl.question(`${f.label}  [Phrourax: ${n(f.aegis ?? NaN, 6)}]  UI = `)).replace(/[$,\s]/g, '');
       if (!ans) {
         add({ id: f.id, what: f.label, aegis: n(f.aegis ?? NaN, 6), other: '—', source: 'official UI', verdict: 'SKIP' });
         continue;
@@ -261,7 +261,7 @@ async function main() {
     }
     rl.close();
   } else if (toAsk.length) {
-    toAsk.forEach((f) => console.log(`  ${f.label.padEnd(44)} AEGIS ${n(f.aegis ?? NaN, 6)}   UI ______`));
+    toAsk.forEach((f) => console.log(`  ${f.label.padEnd(44)} Phrourax ${n(f.aegis ?? NaN, 6)}   UI ______`));
   }
 
   /* ── 6. Verdict per venue + record ──
@@ -330,7 +330,7 @@ async function main() {
     pose: { tags: pose.tags, hullTemp: pose.hullTemp, reasons: pose.reasons },
     checks,
     provenVenues: venues,
-    /** the same structured format as the automatic checks (verify-1.0.0): per-field expected / AEGIS / tolerance / pass */
+    /** the same structured format as the automatic checks (verify-1.0.0): per-field expected / Phrourax / tolerance / pass */
     structured: structuredRecords(),
     nadoReference: nadoSource === 'api' ? `Nado official API (${nadoUrl})` : 'app.nado.xyz',
   };

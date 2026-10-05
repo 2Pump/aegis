@@ -18,13 +18,14 @@ import { FOOTER_TEXT } from './text.js';
 import { evaluate } from './engine.js';
 import { riskLine, provenance, short, watchLine } from './format.js';
 import { ALERTS, audit, checkWatchAddress, freshState, stateKey, type AlertsConfig, type AlertsDb, type Chat, type Observation, type Watch } from './model.js';
+import { BRAND } from '@aegis/glyphs';
 
 export const COMMANDS = ['start', 'watch', 'unwatch', 'list', 'pause', 'resume', 'status', 'hf', 'buffer', 'scenario', 'protocol', 'help', 'delete'] as const;
 export type Command = (typeof COMMANDS)[number];
 
 export type Parsed = { ok: true; cmd: Command; args: string[] } | { ok: false; why: string };
 
-/** "/watch@AegisBot 0xabc tydro" → { cmd: 'watch', args: ['0xabc', 'tydro'] }. Plain text that isn't a command is ignored. */
+/** "/watch@ExampleBot 0xabc tydro" → { cmd: 'watch', args: ['0xabc', 'tydro'] }. Plain text that isn't a command is ignored. */
 export function parseCommand(text: string): Parsed | null {
   const t = text.trim();
   if (!t.startsWith('/')) return null;
@@ -46,8 +47,8 @@ export interface CommandDeps {
 }
 
 export const HELP_TEXT = [
-  'AEGIS alerts — a read-only camera on Ink wallets (Tydro and Nado).',
-  'AEGIS never asks for keys, never connects to a wallet and cannot move funds.',
+  `${BRAND.display} alerts — read-only risk intelligence on Ink wallets (Tydro and Nado).`,
+  'Phrourax never asks for keys, never connects to a wallet and cannot move funds.',
   '',
   '/watch <address> [tydro|nado] — watch a wallet',
   '/unwatch <address> — stop watching it',
@@ -60,7 +61,7 @@ export const HELP_TEXT = [
   '/pause, /resume — hold or restart your alerts',
   '/delete — erase this chat and everything stored for it',
   '',
-  "You're told when a watched wallet's risk level changes (SAFE → WATCH → NEAR → LIQUIDATABLE and back), when its classification changes, when AEGIS can't read it, and when a reading is stale or partial. Messages never include balances.",
+  "You're told when a watched wallet's risk level changes (SAFE → WATCH → NEAR → LIQUIDATABLE and back), when its classification changes, when Phrourax can't read it, and when a reading is stale or partial. Messages never include balances.",
   'Alerts are checked on a schedule, not instantly — a message can arrive minutes after the chain moved. Do not rely on it as your only warning.',
   FOOTER_TEXT,
 ].join('\n');
@@ -81,7 +82,7 @@ export async function handleCommand(db: AlertsDb, chatId: string, text: string, 
     if (chat) return `Already set up. ${chat.watches.length} wallet(s) watched.${chat.paused ? ' Alerts are PAUSED — /resume to restart.' : ''}\n\n${HELP_TEXT}`;
     if (Object.keys(db.chats).length >= cfg.MAX_CHATS) {
       audit(db, { at: deps.now, chat: h, kind: 'limit', detail: 'MAX_CHATS' }, cfg);
-      return 'AEGIS alerts are full right now — no new chats can be added. Nothing about you was stored.';
+      return 'Phrourax alerts are full right now — no new chats can be added. Nothing about you was stored.';
     }
     db.chats[chatId] = { id: chatId, createdAt: deps.now, paused: false, watches: [], sentAt: [], held: 0 };
     return `Set up. Stored: this chat's id and the wallets you add — nothing else. /delete erases it all.\n\n${HELP_TEXT}`;
@@ -92,7 +93,7 @@ export async function handleCommand(db: AlertsDb, chatId: string, text: string, 
     for (const k of Object.keys(db.state)) if (k.startsWith(`${chatId}|`)) delete db.state[k];
     delete db.chats[chatId];
     audit(db, { at: deps.now, chat: h, kind: 'deleted', detail: 'chat and all its watches erased' }, cfg);
-    return 'Erased: this chat and every wallet it watched. Nothing about it remains in AEGIS alerts. /start to begin again.';
+    return 'Erased: this chat and every wallet it watched. Nothing about it remains in Phrourax alerts. /start to begin again.';
   }
   if (p.cmd === 'protocol') {
     const v = (p.args[0] ?? '').toLowerCase();
@@ -170,7 +171,7 @@ export async function handleCommand(db: AlertsDb, chatId: string, text: string, 
   if (p.cmd === 'status') {
     const obs = await deps.read(a, w?.scenario ? [w.scenario] : []).catch(() => null);
     if (!obs) return `Couldn't read ${short(a)} just now. Try again shortly.`;
-    return [`AEGIS · ${short(a)}${w ? '' : ' (not watched)'}`, riskLine(obs), ...provenance(obs, deps.now), `${deps.siteUrl.replace(/\/$/, '')}/hull/${a}`].join('\n');
+    return [`Phrourax · ${short(a)}${w ? '' : ' (not watched)'}`, riskLine(obs), ...provenance(obs, deps.now), `${deps.siteUrl.replace(/\/$/, '')}/hull/${a}`].join('\n');
   }
   if (!w) return `Not watching ${short(a)} — /watch it first.`;
   const st = db.state[stateKey(chatId, a)];

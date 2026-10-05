@@ -1,8 +1,8 @@
 /**
  * ALERTS — domain model (pure; no IO).
  *
- * A person messages the AEGIS bot, picks wallets to watch, and gets a Telegram message when something about one of
- * those wallets changes. Read-only like everything else: AEGIS reads the chain and sends a message. It never asks
+ * A person messages the Phrourax bot, picks wallets to watch, and gets a Telegram message when something about one of
+ * those wallets changes. Read-only like everything else: Phrourax reads the chain and sends a message. It never asks
  * for a key, never connects a wallet, never signs, never moves funds.
  *
  * Privacy:
@@ -231,13 +231,13 @@ export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 export type AddressCheck = { ok: true; address: string } | { ok: false; why: string };
 
 /**
- * A wallet anyone may watch: a well-formed 0x address that isn't the zero address and isn't one of AEGIS's own
+ * A wallet anyone may watch: a well-formed 0x address that isn't the zero address and isn't one of Phrourax's own
  * synthetic test wallets (fixtures are never treated as real accounts).
  */
 export function checkWatchAddress(raw: string, fixtures: ReadonlySet<string>): AddressCheck {
   const a = raw.trim().toLowerCase();
   if (!/^0x[0-9a-f]{40}$/.test(a)) return { ok: false, why: "That isn't a wallet address (0x followed by 40 hex characters)." };
   if (a === ZERO_ADDRESS) return { ok: false, why: "That's the zero address — nobody's wallet." };
-  if (fixtures.has(a)) return { ok: false, why: "That's one of AEGIS's synthetic test wallets, not a real account — it can't be watched." };
+  if (fixtures.has(a)) return { ok: false, why: "That's one of Phrourax's synthetic test wallets, not a real account — it can't be watched." };
   return { ok: true, address: a };
 }

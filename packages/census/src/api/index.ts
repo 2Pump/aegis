@@ -20,6 +20,7 @@ import { MATERIAL, PRIVACY_MIN_CELL, queryPressure, stressLevel, type Material, 
 import { latestChecks, type VerificationRecord } from '../verify.js';
 import { decodeShip, type CensusSnapshot } from '../index.js';
 import { openapi } from './openapi.js';
+import { BRAND } from '@aegis/glyphs';
 
 export const API = {
   VERSION: 'api-1.0.0',
@@ -36,7 +37,7 @@ export const API = {
 } as const;
 
 export const DISCLAIMER =
-  'AEGIS is a camera. It cannot move your funds. Classifications can be wrong. Read-only observations of public on-chain data, which can be late, incomplete or wrong — not advice.';
+  `${BRAND.disclaimer} Observations of public on-chain data, which can be late, incomplete or wrong.`;
 
 export type LimitClass = keyof typeof API.LIMITS;
 export interface ApiRequest {

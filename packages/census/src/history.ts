@@ -333,7 +333,7 @@ export interface HistoryIndex {
   /** Liquidation Ledger (ledger.ts): months with a ledger file, and how far the scans have got */
   ledgerMonths?: string[];
   ledger?: LedgerCursor;
-  /** when AEGIS began recording its own NEAR LIQUIDATION warnings (the track record starts here) */
+  /** when Phrourax began recording its own NEAR LIQUIDATION warnings (the track record starts here) */
   warningsSince?: string;
   /** Protocol Change Monitor: months with a change file */
   changeMonths?: string[];

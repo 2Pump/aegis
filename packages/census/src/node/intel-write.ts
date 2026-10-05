@@ -84,7 +84,7 @@ export async function recordChanges(o: IntelOpts): Promise<ChangeRecord[]> {
   if (diffs.length) {
     // Tydro: the PoolConfigurator's transactions in that block range are the candidates
     let txCandidates: string[] | null = null;
-    let txNote = 'Nado: the transaction is not identified (Nado does not emit a dedicated configuration event AEGIS reads)';
+    let txNote = 'Nado: the transaction is not identified (Nado does not emit a dedicated configuration event Phrourax reads)';
     const cfg = next.params['tydro:protocol:poolConfigurator']?.v;
     if (diffs.some((d) => d.protocol === 'tydro') && cfg && /^0x[0-9a-f]{40}$/.test(cfg)) {
       const r = await scanLogs(o.client, { address: cfg as `0x${string}`, topics: [], fromBlock: prev.block + 1, toBlock: o.head, maxRetries: 3, paceMs: o.scan?.paceMs, backoffBaseMs: o.scan?.backoffBaseMs });
@@ -101,7 +101,7 @@ export async function recordChanges(o: IntelOpts): Promise<ChangeRecord[]> {
         ...d,
         between: { fromBlock: prev.block, toBlock: o.head, fromAt: prev.at, toAt: at },
         txCandidates: d.protocol === 'tydro' ? txCandidates : null,
-        txNote: d.protocol === 'tydro' ? txNote : 'not identified (no configuration event on Nado that AEGIS reads)',
+        txNote: d.protocol === 'tydro' ? txNote : 'not identified (no configuration event on Nado that Phrourax reads)',
         verification: `read on-chain at block ${prev.block.toLocaleString('en-US')} (old) and ${o.head.toLocaleString('en-US')} (new) with ${d.source}`,
         reader: `${READER_VERSION} · ${CHANGES.VERSION}`,
         impact: {
@@ -109,7 +109,7 @@ export async function recordChanges(o: IntelOpts): Promise<ChangeRecord[]> {
           after: summarize(after && after.block > (before?.block ?? -1) ? after : null),
           note:
             before && after && after.block > before.block
-              ? "AEGIS's own counts just before and just after — observed, not isolated: price moves in the same hour are in them too."
+              ? "Phrourax's own counts just before and just after — observed, not isolated: price moves in the same hour are in them too."
               : 'No recorded point on one side of the change — no impact shown rather than a reconstructed one.',
         },
       });

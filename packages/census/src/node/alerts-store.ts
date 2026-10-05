@@ -40,7 +40,7 @@ export function seal(key: Buffer, body: unknown): Sealed {
 
 export function unseal(key: Buffer, s: unknown): unknown {
   const x = s as Sealed;
-  if (!x || x.v !== 1 || x.alg !== 'AES-256-GCM') throw new Error('alerts store: not an AEGIS sealed object');
+  if (!x || x.v !== 1 || x.alg !== 'AES-256-GCM') throw new Error('alerts store: not a Phrourax sealed object');
   const d = createDecipheriv('aes-256-gcm', key, Buffer.from(x.iv, 'base64'));
   d.setAuthTag(Buffer.from(x.tag, 'base64'));
   try {

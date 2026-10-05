@@ -1,4 +1,4 @@
-# AEGIS webhooks — OFF until the owner turns it on (docs/WEBHOOKS.md).
+# Phrourax webhooks — OFF until the owner turns it on (docs/WEBHOOKS.md).
 # Every job is skipped unless the repository VARIABLE WEBHOOKS_ENABLED is 'true' (Settings → Secrets and variables →
 # Actions → Variables). Secrets it needs (Settings → Secrets → Actions):
 #   WEBHOOKS_STORE_KEY  32 random bytes, base64 — the SAME value as WEBHOOKS_STORE_KEY in Vercel (encrypts subscriptions)

@@ -1,5 +1,5 @@
 import { useRouteError } from 'react-router-dom';
-import { COPY } from '@aegis/glyphs';
+import { BRAND, COPY } from '@aegis/glyphs';
 import { Mark } from './Mark';
 import { isStaleBuildError, reloadForNewBuild } from '../lib/staleBuild';
 
@@ -11,13 +11,13 @@ export function AppError() {
   const msg = err instanceof Error ? err.message : String(err);
   return (
     <main className="stack" style={{ maxWidth: 720, paddingTop: 48 }}>
-      <h2 className="page row" style={{ gap: 10 }}><Mark size={22} /> AEGIS</h2>
+      <h2 className="page row" style={{ gap: 10 }}><Mark size={22} /> {BRAND.name}</h2>
       {reloading ? (
-        <div className="banner cyan" data-testid="app-updating">AEGIS was just updated. Loading the new version…</div>
+        <div className="banner cyan" data-testid="app-updating">Phrourax was just updated. Loading the new version…</div>
       ) : (
         <>
           <div className="banner red" data-testid="app-error">
-            {stale ? 'AEGIS was updated while this page was open, and the reload did not pick it up.' : 'Something went wrong on this page.'}
+            {stale ? 'Phrourax was updated while this page was open, and the reload did not pick it up.' : 'Something went wrong on this page.'}
           </div>
           <div className="mono dim" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>{msg}</div>
           <div className="row">

@@ -1,11 +1,13 @@
 import { TAG_COLORS, type HullTemp, type Pose, type Tag } from '@aegis/pose';
 import { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
+import { BRAND } from './brand.js';
 import { NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from './labels.js';
 
 export { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
 export * from './glass.js';
 export * from './sphere.js';
 export * from './labels.js';
+export * from './brand.js';
 
 /* ───────────────────────── size bands (privacy default) ───────────────────────── */
 
@@ -322,13 +324,13 @@ export const HULL_COPY: Record<HullTemp, string> = {
 };
 
 export const COPY = {
-  footer: 'AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
+  footer: BRAND.disclaimer,
   wellEmpty: 'No wallets yet. Paste an address to read the first one.',
   census: 'Mix of the wallets read so far. Counts wallets, not money. Not advice.',
-  censusFull: 'Every Tydro and Nado wallet AEGIS has found on-chain. Counts wallets, not money. Not advice.',
-  share: 'Position type per AEGIS rules. Rules are public. Camera, not a broker.',
+  censusFull: `Every Tydro and Nado wallet ${BRAND.display} has found on-chain. Counts wallets, not money. Not advice.`,
+  share: `Position type per ${BRAND.display} rules. Rules are public. Read-only, not a broker.`,
   woundedTape: 'Near liquidation — not a hit list.',
-  oneLiner: 'A camera on what every Ink wallet is doing.',
+  oneLiner: BRAND.tagline,
 } as const;
 
 /** Share text — no balances, ever. */
@@ -337,5 +339,5 @@ export function summaryText(address: string, pose: Pose, sensors: { tydro: boole
   const types = pose.tags.length ? pose.tags.map((t) => TAG_LABEL[t]).join(' + ') : NO_TYPE_LABEL;
   const data =
     sensors.tydro && sensors.nado ? 'data Tydro+Nado OK' : sensors.tydro ? "data Tydro OK, Nado couldn't be read" : sensors.nado ? "data Nado OK, Tydro couldn't be read" : "data couldn't be read";
-  return `AEGIS wallet ${short}  ${types}  risk: ${RISK_LABEL[pose.hullTemp]}  ${data}\n${url}`;
+  return `${BRAND.display} wallet ${short}  ${types}  risk: ${RISK_LABEL[pose.hullTemp]}  ${data}\n${url}`;
 }

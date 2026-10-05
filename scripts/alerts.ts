@@ -1,5 +1,5 @@
 /**
- * AEGIS alerts — one run (see packages/census/src/alerts/). Scheduled by .github/workflows/alerts.yml, which does
+ * Phrourax alerts — one run (see packages/census/src/alerts/). Scheduled by .github/workflows/alerts.yml, which does
  * nothing until the repo variable ALERTS_ENABLED is 'true'.
  *
  *   pnpm alerts --check-env          # validate the environment only (prints problems, never secret values)
@@ -48,7 +48,7 @@ async function main() {
     read: makeAlertsReader(client, census),
     now: () => Date.now(),
     fixtures: fixtureAddresses(root),
-    siteUrl: process.env.ALERTS_SITE_URL?.trim() || 'https://aegis-web-lake.vercel.app',
+    siteUrl: process.env.ALERTS_SITE_URL?.trim() || 'https://phrourax.com',
     hashChat: chatHasher(key),
     log: (m) => console.log(`[alerts +${Math.round((Date.now() - t0) / 1000)}s] ${m}`),
   });

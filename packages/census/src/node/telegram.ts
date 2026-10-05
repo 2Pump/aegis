@@ -1,5 +1,5 @@
 /**
- * Telegram adapter for AEGIS alerts (Bot API over HTTPS, long-poll-free: one getUpdates per run).
+ * Telegram adapter for Phrourax alerts (Bot API over HTTPS, long-poll-free: one getUpdates per run).
  * The bot token is read from the environment on the server only; it is never logged, never written to the store,
  * never sent to the browser. Only PRIVATE chats are served — in a group, other members would see someone's wallets.
  */

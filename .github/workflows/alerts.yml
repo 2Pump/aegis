@@ -1,4 +1,4 @@
-# AEGIS Telegram alerts — OFF until the owner turns it on.
+# Phrourax Telegram alerts — OFF until the owner turns it on.
 # Every job is skipped unless the repository VARIABLE ALERTS_ENABLED is 'true' (Settings → Secrets and variables →
 # Actions → Variables). Secrets it needs (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN  from @BotFather

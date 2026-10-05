@@ -24,7 +24,7 @@ export function CensusPage() {
   }
   return (
     <div className="stack">
-      <h2 className="page">Scan — every wallet AEGIS has found</h2>
+      <h2 className="page">Scan — every wallet Phrourax has found</h2>
       {WELL_PREVIEW ? <div className="banner">PREVIEW — {verificationText()}.</div> : null}
       {census.status === 'loading' ? <div className="dim">Loading the latest scan…</div> : null}
       {census.status === 'missing' || census.status === 'error' ? <div className="banner">{census.message}</div> : null}
@@ -66,14 +66,14 @@ export function WatchPage() {
         </div>
       )}
       <Panel title="What alerts will do" rail="var(--slate)">
-        <p className="dim">You pick wallets in a private Telegram chat with the AEGIS bot. You get a message when one of them changes:</p>
+        <p className="dim">You pick wallets in a private Telegram chat with the Phrourax bot. You get a message when one of them changes:</p>
         <ul className="dim">
           <li>risk level SAFE → WATCH → NEAR LIQUIDATION → LIQUIDATABLE, and back (a recovery must hold on consecutive readings before it&apos;s announced);</li>
           <li>your own lines: Tydro health factor below a number, Nado margin buffer below a percent (worst subaccount), or &ldquo;if ETH fell 20% this would be liquidated&rdquo;;</li>
           <li>the classification changes, a venue can&apos;t be read, or a reading is stale or partial — said plainly, never shown as current.</li>
           <li>a watched wallet is actually liquidated on-chain (always on, from the Liquidation Ledger).</li>
         </ul>
-        <p className="dim">Prefer your own system? The same events will be available as signed <Link to="/developers">webhooks</Link>. Same readers, rules and scenario engine as the rest of AEGIS. The same alert isn&apos;t repeated inside an hour, and each chat has an hourly cap (the worst news always goes through).</p>
+        <p className="dim">Prefer your own system? The same events will be available as signed <Link to="/developers">webhooks</Link>. Same readers, rules and scenario engine as the rest of Phrourax. The same alert isn&apos;t repeated inside an hour, and each chat has an hourly cap (the worst news always goes through).</p>
       </Panel>
       <Panel title="Commands" rail="var(--slate)">
         <dl className="kv">
@@ -89,7 +89,7 @@ export function WatchPage() {
         <ul className="dim">
           <li>Stored: your Telegram chat id and the wallets and lines you set — encrypted at rest. Nothing else. <span className="mono">/delete</span> erases it at once.</li>
           <li>Messages carry the risk level, HF / margin buffer, data age and block — never balances or position sizes.</li>
-          <li>AEGIS never asks for a key, never connects to a wallet and cannot move funds. Private chats only.</li>
+          <li>Phrourax never asks for a key, never connects to a wallet and cannot move funds. Private chats only.</li>
         </ul>
       </Panel>
     </div>
@@ -124,7 +124,7 @@ export function DevelopersPage() {
           <a className="mono" href="/api/v1/openapi.json">/api/v1/openapi.json</a> (OpenAPI 3.1).
         </p>
         <pre className="mono dev-pre" data-testid="dev-example">{`# example (values change every scan)
-curl https://aegis-web-lake.vercel.app/api/v1/stress
+curl https://phrourax.com/api/v1/stress
 
 { "schema": "aegis-api-1",
   "data": { "level": "CALM", "confidence": "NORMAL", … },
@@ -145,7 +145,7 @@ curl https://aegis-web-lake.vercel.app/api/v1/stress
           <li>Errors: <span className="mono">{'{ "error": { "code", "status", "message" } }'}</span> — codes are listed in the OpenAPI file.</li>
           <li>Privacy: no endpoint lists wallets or ranks them by closeness to liquidation; no balances, health factors or liquidation prices; small counts are suppressed. Ranges are bounded (90 days) and paged (100 per page).</li>
           <li>Versioning: fields are only added within v1. A breaking change becomes /api/v2, and v1 keeps working for at least 90 days after notice.</li>
-          <li>Free, best effort, no uptime promise. Not advice. AEGIS cannot trade or move funds.</li>
+          <li>Free, best effort, no uptime promise. Not advice. Phrourax cannot trade or move funds.</li>
         </ul>
       </Panel>
       <Panel title="Webhooks" rail="var(--slate)">

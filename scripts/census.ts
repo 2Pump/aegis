@@ -1,5 +1,5 @@
 /**
- * AEGIS census — find every wallet that has used Tydro or Nado, read them from the Ink chain, classify, publish.
+ * Phrourax census — find every wallet that has used Tydro or Nado, read them from the Ink chain, classify, publish.
  *
  *   pnpm census                              # local: writes apps/web/public/census/{census,known}.json
  *   pnpm census --since-blocks 200000        # quick local test: only wallets active in the last ~2.3 days
@@ -110,7 +110,7 @@ async function main() {
     sinceBlocks: flag('--since-blocks') ? Number(flag('--since-blocks')) : undefined,
     // several nodes can be a few blocks apart: stay a little further behind the tip so every node has every block we scan
     confirmations: rpcs.length > 1 ? 12 : 2,
-    // the Flight Recorder never records AEGIS's synthetic test wallets
+    // the Flight Recorder never records Phrourax's synthetic test wallets
     exclude: fixtureAddresses(root),
     log,
   });

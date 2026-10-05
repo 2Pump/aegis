@@ -55,7 +55,7 @@ export function chainInfoToGatewayShape(info: ChainInfo): unknown {
 }
 
 /**
- * What AEGIS already knows about this owner's subaccounts (from the census: every trade and deposit since launch,
+ * What Phrourax already knows about this owner's subaccounts (from the census: every trade and deposit since launch,
  * scanned from the chain). `throughBlock` = the block the census had scanned to. null discovery = the census isn't
  * available, so only the default subaccount can be read and the result is PARTIAL.
  */
@@ -87,12 +87,12 @@ async function readNadoChainAt(client: PublicClient, address: string, blockNumbe
     const why: string[] = [];
     let complete = discovery !== null && discovery.throughBlock !== null;
     if (!discovery || discovery.throughBlock === null) {
-      why.push("AEGIS's subaccount list wasn't available, so only the default subaccount was read — isolated positions may be missing");
+      why.push("Phrourax's subaccount list wasn't available, so only the default subaccount was read — isolated positions may be missing");
     } else if (Number(block) > discovery.throughBlock) {
       const gap = Number(block) - discovery.throughBlock;
       if (gap > RECENT_SUB_SCAN_MAX_BLOCKS) {
         complete = false;
-        why.push(`AEGIS's subaccount list is ${gap.toLocaleString('en-US')} blocks old — an isolated position opened since then may be missing`);
+        why.push(`Phrourax's subaccount list is ${gap.toLocaleString('en-US')} blocks old — an isolated position opened since then may be missing`);
       } else {
         const r = await scanNadoTouched(client, discovery.throughBlock + 1, Number(block), { maxRetries: 3 });
         for (const x of r.subs) if (x.slice(0, 42) === owner) subs.add(x);
@@ -131,7 +131,7 @@ async function readNadoChainAt(client: PublicClient, address: string, blockNumbe
     ];
     if (complete) {
       why.push(
-        `every subaccount AEGIS has found for this wallet (discovery through block ${discovery!.throughBlock!.toLocaleString('en-US')}${Number(block) > discovery!.throughBlock! ? ', plus trades since' : ''})`,
+        `every subaccount Phrourax has found for this wallet (discovery through block ${discovery!.throughBlock!.toLocaleString('en-US')}${Number(block) > discovery!.throughBlock! ? ', plus trades since' : ''})`,
       );
     }
     const def0 = parsedAll[0]!;

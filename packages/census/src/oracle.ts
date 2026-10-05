@@ -1,7 +1,7 @@
 /**
  * ORACLE WATCH (pure; no IO) — `oracle-1.0.0`. Release 3.
  *
- * Every feed is an observation, not the truth. AEGIS compares:
+ * Every feed is an observation, not the truth. Phrourax compares:
  *   - Tydro's protocol price (AaveOracle) with the source contract behind it (staleness, decimals, mismatch)
  *   - Tydro and Nado on the SAME token — joined by contract address (Nado spot config.token == Tydro underlying),
  *     never by ticker
@@ -145,7 +145,7 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
     const src = t.source ? { ...t.source, kind: t.source.kind ?? (t.source.updatedAt !== null ? 'chainlink' : t.source.answer !== null ? 'answer-only' : 'none') } : null;
     const viaText = src?.via?.length ? ` over ${src.via.map((v) => v.description ?? `${v.address.slice(0, 10)}…`).join(' + ')}` : '';
     if (!src) checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: "Tydro's source for this asset couldn't be read", pct: null });
-    else if (src.kind === 'none') checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: `source ${src.address.slice(0, 10)}… answers no price AEGIS can read`, pct: null });
+    else if (src.kind === 'none') checks.push({ kind: 'source-age', status: 'UNAVAILABLE', text: `source ${src.address.slice(0, 10)}… answers no price Phrourax can read`, pct: null });
     else if (src.updatedAt === null && src.kind === 'answer-only' && src.answer === 1 && PEGGED.has(t.symbol))
       // e.g. Aave's GhoOracle: a constant $1 by design — nothing to go stale, and nothing that could show a depeg
       checks.push({ kind: 'source-age', status: 'OK', text: `fixed-price source: answers exactly $1 with no update time (Aave's GHO oracle works this way by design). Tydro values ${t.symbol} at $1 whatever it trades at, so a market depeg would not show in Tydro's price.`, pct: null });
@@ -156,7 +156,7 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
         text:
           src.kind === 'adapter'
             ? `source is an adapter${viaText}; a feed underneath doesn't expose its update time`
-            : `source ${src.address.slice(0, 10)}… answers a price but exposes no update time and no feed AEGIS recognises`,
+            : `source ${src.address.slice(0, 10)}… answers a price but exposes no update time and no feed Phrourax recognises`,
         pct: null,
       });
     else {

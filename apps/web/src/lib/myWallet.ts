@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { parseAddress } from '@aegis/ink-io';
 
 /*
- * "My wallet" without a wallet connection. AEGIS is a camera: it never asks a wallet extension for anything, so
+ * "My wallet" without a wallet connection. Phrourax is read-only: it never asks a wallet extension for anything, so
  * there is no connect prompt and nothing for a wallet's phishing check to trip on. You open any wallet page and
  * press "Set as my wallet"; the address is remembered in this browser only (never sent anywhere), and the header
  * gets a "My wallet" shortcut.

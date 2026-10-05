@@ -109,7 +109,7 @@ export function appendChanges(file: unknown, month: string, recs: readonly Chang
   return base;
 }
 
-/** Human labels for parameter names (units included where AEGIS knows them). */
+/** Human labels for parameter names (units included where Phrourax knows them). */
 export const PARAM_LABEL: Record<string, string> = {
   ltv: 'Loan-to-value (bps)',
   liquidationThreshold: 'Liquidation threshold (bps)',

@@ -1,5 +1,5 @@
 /**
- * AEGIS — Vercel Firewall rate limits for the public API (/api/v1). Run once; safe to run again.
+ * Phrourax — Vercel Firewall rate limits for the public API (/api/v1). Run once; safe to run again.
  *
  *   $env:VERCEL_TOKEN="…"; pnpm firewall              # stage the rules, show them, publish, then verify they're live
  *   $env:VERCEL_TOKEN="…"; pnpm firewall --dry-run    # stage the rules, show them, then DISCARD (nothing goes live)
@@ -9,6 +9,7 @@
  * it) — no CLI, no `.vercel` link, no shell quoting. If the project already has unpublished firewall edits, it stops
  * and changes nothing, so it can never publish someone else's half-finished draft.
  *
+ * Rule names keep their original "AEGIS API - …" prefix: the script finds its rules by name (docs/BRAND.md).
  * The rules never overlap, so their order doesn't matter:
  *   1. live wallet scenario   /api/v1/wallets/…/scenario   15 per IP per minute (the API itself allows 6 per instance)
  *   2. webhook management     /api/v1/webhooks…            30 per IP per minute (API: 20 per instance)

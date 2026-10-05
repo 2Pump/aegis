@@ -69,7 +69,7 @@ export interface AggregatorRead {
    * chainlink   — answers latestRoundData itself (a feed or a feed proxy)
    * adapter     — answers latestAnswer and points at feed(s) underneath (Aave price-cap / peg adapters); its age
    *               is the OLDEST of those feeds
-   * answer-only — answers a price but exposes no update time and no feed AEGIS recognises
+   * answer-only — answers a price but exposes no update time and no feed Phrourax recognises
    * none        — doesn't answer a price at all
    */
   kind?: 'chainlink' | 'adapter' | 'answer-only' | 'none';
@@ -278,7 +278,7 @@ export interface ParamRead {
 export interface ParamSnapshot {
   block: number;
   params: ParamRead[];
-  /** parameters AEGIS tried to read but couldn't (not supported by the contract, or the read failed) — never claimed */
+  /** parameters Phrourax tried to read but couldn't (not supported by the contract, or the read failed) — never claimed */
   unsupported: string[];
   /** Tydro's PoolConfigurator (where Tydro's admin changes are emitted), when readable */
   tydroConfigurator: string | null;

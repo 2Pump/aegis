@@ -14,7 +14,7 @@ export interface FieldCheck {
   label: string;
   /** the authoritative source's value; null = the source didn't give one */
   expected: number | null;
-  /** what AEGIS read; null = AEGIS had no value */
+  /** what Phrourax read; null = Phrourax had no value */
   aegis: number | null;
   tolerance: number;
   /** 'abs': |a − e| ≤ tol · 'rel': |a − e| / max(|a|, |e|, tiny) ≤ tol */
@@ -38,7 +38,7 @@ export interface VerificationRecord {
   rulesVersion: string;
   engineVersion: string | null;
   fields: FieldCheck[];
-  /** NOT_CHECKED: no suitable wallet could be found this run — nothing was compared (never a pass, not a failure of AEGIS) */
+  /** NOT_CHECKED: no suitable wallet could be found this run — nothing was compared (never a pass, not a failure of Phrourax) */
   status: 'PASS' | 'FAIL' | 'SOURCE_UNAVAILABLE' | 'NOT_CHECKED';
   failureReason: string | null;
   sourceUnavailable: boolean;
@@ -54,7 +54,7 @@ export function compareField(f: Omit<FieldCheck, 'pass'>): FieldCheck {
 /** Status: unreachable → SOURCE_UNAVAILABLE; a stated failure, any mismatch or nothing compared → FAIL; else PASS. */
 export function finalize(r: Omit<VerificationRecord, 'status' | 'failureReason'> & { failureReason?: string | null }): VerificationRecord {
   if (r.sourceUnavailable) return { ...r, status: 'SOURCE_UNAVAILABLE', failureReason: r.failureReason ?? 'the source could not be reached' };
-  // a stated failure (e.g. AEGIS couldn't read the venue, or a machine check failed) is never turned into a pass
+  // a stated failure (e.g. Phrourax couldn't read the venue, or a machine check failed) is never turned into a pass
   if (r.failureReason) return { ...r, status: 'FAIL', failureReason: r.failureReason };
   const bad = r.fields.filter((f) => f.pass === false);
   const compared = r.fields.filter((f) => f.pass !== null);

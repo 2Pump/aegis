@@ -1,12 +1,12 @@
 # VERIFICATION — prove one real address before drawing the well
 
-**Rule:** the well is not drawn until one real Ink address has been read by the exact AEGIS sensors and matched, field by field, against the official Tydro and Nado UIs.
+**Rule:** the well is not drawn until one real Ink address has been read by the exact Phrourax sensors and matched, field by field, against the official Tydro and Nado UIs.
 The gate is `verification/status.json`. Only `pnpm prove` can flip it, and only when every check passes.
 Until then, `/` shows a red **WELL LOCKED — SENSORS UNVERIFIED** banner. Every live hull plate says **SENSORS UNVERIFIED**, and fixtures appear only on `/calibration`.
 
 ## Known issue (2026-09-28)
 
-Nado's HTTP API refuses everything except its own website (Cloudflare challenge + CORS). **Resolved:** AEGIS and `pnpm prove` now read Nado from the Ink chain via Nado's `FQuerier` contract, so both work in Node and in the browser. Tydro works live: block 57,115,786 on the test vector, HF 1.389 = $2,994,782 × 0.87 ÷ $1,875,960.
+Nado's HTTP API refuses everything except its own website (Cloudflare challenge + CORS). **Resolved:** Phrourax and `pnpm prove` now read Nado from the Ink chain via Nado's `FQuerier` contract, so both work in Node and in the browser. Tydro works live: block 57,115,786 on the test vector, HF 1.389 = $2,994,782 × 0.87 ÷ $1,875,960.
 When comparing with app.nado.xyz, allow a few seconds of lag: on-chain is *settled* state.
 
 ## Per-venue proofs with a watch-only address (2026-09-28)
@@ -31,7 +31,7 @@ Tydro Dashboard labels map to: **Health Factor**, **Assets** (Σ supplied USD), 
 
 app.nado.xyz answers some regions with `{"reason":"ip_query_only","blocked":true}`. That means the app is off, but **queries** still work. Don't bypass it with a VPN; that breaks Nado's terms.
 
-Nado's official API, the one the app is built on, still answers `subaccount_info` in your browser. It is an independent path from AEGIS's own read, which goes through the Ink chain via FQuerier:
+Nado's official API, the one the app is built on, still answers `subaccount_info` in your browser. It is an independent path from Phrourax's own read, which goes through the Ink chain via FQuerier:
 
 ```powershell
 pnpm prove 0xNADO_ADDRESS                  # prints the API link for that address
@@ -57,10 +57,10 @@ pnpm prove 0xYOUR_ADDRESS
 
 1. **Same sensors.** `prove` calls `readBook()` from `@aegis/ink-io`, the same function the web app uses. It talks to Nado directly, since there is no browser and no CORS.
 2. **Tydro independent path, same block.**
-   - Every reserve is re-read via `AaveProtocolDataProvider.getUserReserveData`, a different contract from AEGIS's aToken/debtToken `balanceOf`. The amounts must match exactly.
+   - Every reserve is re-read via `AaveProtocolDataProvider.getUserReserveData`, a different contract from Phrourax's aToken/debtToken `balanceOf`. The amounts must match exactly.
    - HF is recomputed as Σ(collateral × liquidation threshold) / debt from `getReserveConfigurationData`. It must be within 0.5% of `Pool.getUserAccountData`.
 3. **Blockscout.** The chain indexer's token balances are a third source. The indexer lags, so this check can only warn, not fail.
-4. **Nado self-consistency.** `healths[2]` must equal the equity AEGIS computes. It also reports whether the archive found your subaccounts, or whether AEGIS fell back to `default` only.
+4. **Nado self-consistency.** `healths[2]` must equal the equity Phrourax computes. It also reports whether the archive found your subaccounts, or whether Phrourax fell back to `default` only.
 5. **Human.** Open app.tydro.com and app.nado.xyz connected as that address, and type in what they show:
    - Tydro HF: must be within ±0.01.
    - Tydro supplied and borrowed: within ±1%.
@@ -99,7 +99,7 @@ A large USDC borrower, taken from the top holders of the USDC variable-debt toke
 
 `0x0B3fadeF84ea8877cA3C898133b4056950b75eC5`
 
-| Token | Raw | Human | AEGIS leg expected |
+| Token | Raw | Human | Phrourax leg expected |
 |---|---|---|---|
 | aInkWlKBTC | 3582283279 | 35.82283279 kBTC | SUPPLY kBTC ≈ 35.8228 (grows with interest) |
 | variableDebtInkWlUSDC | 1800680231150 | 1,800,680.23 USDC | DEBT USDC ≈ 1,800,680 (grows) |
@@ -113,11 +113,11 @@ This vector cannot pass the human step unless you control that wallet. It proves
 
 `pnpm verify:auto` — run about every 4 hours by the hourly census itself (census.yml → "Checks (when due)": it runs when the last automatic check is ≥ 3¾ h old, so cron-job.org's hourly timer keeps the checks on time with no timer of their own). By hand: Actions → verify → Run workflow, same secrets as the census.
 - Picks real wallets from the latest census (a different set each run): a Tydro borrower, a Nado default-only wallet, a Nado wallet with an isolated subaccount.
-- Reads each with the site's own readers and compares with sources AEGIS does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
+- Reads each with the site's own readers and compares with sources Phrourax does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
 - Compares Nado's official API too, with a plain request (it answered from GitHub's runners on 2026-10-04). When Cloudflare refuses it, the row is SOURCE UNAVAILABLE — never a pass, never worked around.
 - Tydro: wallets the census already flags as borrowing (a Tydro wound, a same-family loop, an at-risk watch) are tried first, up to 40.
 - A case with no suitable wallet that run is recorded as NOT CHECKED. Every expected check always has a row on the page, so a missing one is never silently left out.
-- Each record: venue, short wallet, case, source + type, time, block, rules and engine versions, fields (expected / AEGIS / tolerance / pass), status, failure reason.
+- Each record: venue, short wallet, case, source + type, time, block, rules and engine versions, fields (expected / Phrourax / tolerance / pass), status, failure reason.
 - Appended to `verification-log.json` on Blob; history is never deleted.
 - Checks page: per case the latest status — CURRENT, STALE (> 6 h: one missed run plus slack), FAILED, SOURCE UNAVAILABLE, NOT CHECKED — plus the last success, versions (older flagged) and the full history. A FAIL makes the workflow run red.
 

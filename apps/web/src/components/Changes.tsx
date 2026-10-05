@@ -10,6 +10,7 @@ import { Panel } from './bits';
 import { when } from './HistoryBits';
 import { useChanges, useHistoryIndex, useParams } from '../lib/history';
 import { WELL_ON } from '../lib/census';
+import { brandText } from '@aegis/glyphs';
 
 const ADDR = /^0x[0-9a-fA-F]{40}$/;
 const Val = ({ v }: { v: string | null }) =>
@@ -32,7 +33,7 @@ export function ChangesPanel() {
           {p.status === 'error' ? <div className="banner red" role="alert">Couldn&apos;t load ({p.message}). Nothing is shown rather than a guess.</div> : null}
           {notStarted ? (
             <div className="banner" data-testid="changes-not-started">
-              NOT MONITORING YET — the hourly scan takes its first reading of every parameter after this update. Changes before that aren&apos;t known to AEGIS and aren&apos;t reconstructed.
+              NOT MONITORING YET — the hourly scan takes its first reading of every parameter after this update. Changes before that aren&apos;t known to Phrourax and aren&apos;t reconstructed.
             </div>
           ) : null}
           {p.status === 'ok' ? <Since p={p.v} /> : null}
@@ -59,7 +60,7 @@ function Since({ p }: { p: ParamsLatest }) {
   return (
     <div className="stack" style={{ gap: 6 }}>
       <p className="dim" style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-        Every hour AEGIS reads the parameters that decide when a position is liquidated — thresholds, weights, caps, oracle sources, contract upgrades — straight from the protocols&apos; contracts, and compares them with the previous reading. A change is shown with the two blocks it happened between.
+        Every hour Phrourax reads the parameters that decide when a position is liquidated — thresholds, weights, caps, oracle sources, contract upgrades — straight from the protocols&apos; contracts, and compares them with the previous reading. A change is shown with the two blocks it happened between.
       </p>
       <div className="faint mono" style={{ fontSize: 11 }} data-testid="changes-since">
         Monitoring {Object.keys(p.params).length.toLocaleString('en-US')} parameters since {when(Date.parse(p.since))} · last read at block {p.block.toLocaleString('en-US')} ({when(p.at)})
@@ -114,19 +115,19 @@ function ChangeList({ records }: { records: ChangeRecord[] }) {
                   {r.txCandidates.map((t, i) => (
                     <span key={t}>{i ? ', ' : ''}<a className="mono" href={`${INK_EXPLORER}/tx/${t}`} target="_blank" rel="noreferrer">{t.slice(0, 10)}…</a></span>
                   ))}
-                  <span className="faint"> — {r.txNote}</span>
+                  <span className="faint"> — {brandText(r.txNote)}</span>
                 </>
               ) : (
-                <span className="faint">{r.txNote}</span>
+                <span className="faint">{brandText(r.txNote)}</span>
               )}
             </div>
             {WELL_ON ? (
               <>
                 <div className="grid two" style={{ gap: 8 }}>
-                  <Impact label="AEGIS COUNTS JUST BEFORE" s={r.impact.before} />
+                  <Impact label="PHROURAX COUNTS JUST BEFORE" s={r.impact.before} />
                   <Impact label="JUST AFTER" s={r.impact.after} />
                 </div>
-                <div className="faint" style={{ fontSize: 11.5 }}>{r.impact.note}</div>
+                <div className="faint" style={{ fontSize: 11.5 }}>{brandText(r.impact.note)}</div>
               </>
             ) : (
               <div className="faint" style={{ fontSize: 11.5 }}>Before/after wallet counts are locked with the well until the readings are verified.</div>
@@ -184,7 +185,7 @@ function Browser({ p }: { p: ParamsLatest }) {
             <ul className="dim" style={{ fontSize: 12.5, lineHeight: 1.55 }}>
               {p.unsupported.map((u) => <li key={u} className="wrap-text">{u}</li>)}
             </ul>
-            <div className="faint" style={{ fontSize: 11.5 }}>A parameter AEGIS can&apos;t read is listed here rather than claimed as watched.</div>
+            <div className="faint" style={{ fontSize: 11.5 }}>A parameter Phrourax can&apos;t read is listed here rather than claimed as watched.</div>
           </details>
         ) : null}
       </div>

@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
-test('home boots gated: no well, no fixture stars, camera footer', async ({ page }) => {
+test('home boots gated: no well, no fixture stars, read-only footer', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('unverified-banner')).toBeVisible();
   await expect(page.getByTestId('well-canvas')).toHaveCount(0);
   await expect(page.getByText('EX1 CARRY')).toHaveCount(0);
-  await expect(page.getByTestId('footer')).toContainText('AEGIS is a camera. It cannot move your funds. Classifications can be wrong.');
+  await expect(page.getByTestId('footer')).toContainText('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
   await expect(page.getByTestId('footer')).toContainText('chain 57073');
 });
 
@@ -140,7 +140,7 @@ test('Pressure Map: in the nav after Well (then Intel); locked with the well unt
   await page.getByRole('link', { name: 'Pressure' }).click();
   await expect(page).toHaveURL(/\/pressure$/);
   await expect(page.getByTestId('pressure-locked')).toBeVisible();
-  await expect(page.locator('footer, .footer').first()).toContainText('AEGIS is a camera. It cannot move your funds. Classifications can be wrong.');
+  await expect(page.locator('footer, .footer').first()).toContainText('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
 });
 
 test('stress test on a wallet page: thresholds per direction, a custom scenario, no network, nothing to stress when nothing can be liquidated', async ({ page }) => {
@@ -269,7 +269,7 @@ test('CARRY: estimated net per structure, every leg and risk factor, nothing to 
   await expect(d).toContainText('Nado trading fee');
   await expect(d).toContainText(/liquidated only if/);
   await expect(page.getByTestId('carry-funding')).toBeVisible();
-  // no execution path: no links out of AEGIS and no buttons other than expand / show-more / tabs / nav
+  // no execution path: no links out of Phrourax and no buttons other than expand / show-more / tabs / nav
   const main = page.locator('main, .stack').first();
   await expect(main.getByText(/guarantee|risk[- ]free|\bAPY\b/i)).toHaveCount(0);
   const buttons = await page.getByTestId('intel-carry').getByRole('button').allTextContents();

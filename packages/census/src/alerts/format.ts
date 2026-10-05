@@ -35,11 +35,11 @@ export function eventLine(e: AlertEvent, obs: Observation): string {
     case 'CLASS_CHANGE':
       return `• Classification changed: ${e.fromTag ?? 'no rule fired'} → ${e.toTag ?? 'no rule fired'}`;
     case 'UNREADABLE':
-      return `• ${e.venue === 'tydro' ? 'Tydro' : 'Nado'} couldn't be read on the last readings — AEGIS can't see this side of the wallet right now, so it can't tell you if it gets worse`;
+      return `• ${e.venue === 'tydro' ? 'Tydro' : 'Nado'} couldn't be read on the last readings — Phrourax can't see this side of the wallet right now, so it can't tell you if it gets worse`;
     case 'READABLE_AGAIN':
       return `• ${e.venue === 'tydro' ? 'Tydro' : 'Nado'} can be read again`;
     case 'STALE':
-      return `• STALE: the chain data AEGIS could read is ${obs.dataAt !== null ? ageText(obs.readAt - obs.dataAt) : 'of unknown age'} old — treat this as "as of then", not now`;
+      return `• STALE: the chain data Phrourax could read is ${obs.dataAt !== null ? ageText(obs.readAt - obs.dataAt) : 'of unknown age'} old — treat this as "as of then", not now`;
     case 'PARTIAL':
       return '• PARTIAL: Nado isolated subaccounts may be missing from this reading — the real risk can be higher than shown';
     case 'SCENARIO_LIQ':
@@ -70,7 +70,7 @@ export function provenance(obs: Observation, now: number): string[] {
 
 export function formatAlert(events: readonly AlertEvent[], obs: Observation, opts: { now: number; siteUrl: string; held?: number; alertsVersion: string }): string {
   return [
-    `AEGIS · ${short(obs.address)}`,
+    `Phrourax · ${short(obs.address)}`,
     ...events.map((e) => eventLine(e, obs)),
     '',
     riskLine(obs),

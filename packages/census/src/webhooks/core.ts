@@ -13,6 +13,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { AlertEvent, Observation } from '../alerts/model.js';
 import { EVENTS_VERSION, INK_EVENT_TYPES, WALLET_EVENT_TYPES, type EventType, type InkEvent } from '../events.js';
+import { BRAND } from '@aegis/glyphs';
 
 export const WEBHOOKS = {
   VERSION: 'webhooks-1.0.0',
@@ -214,7 +215,7 @@ export function toWalletEvents(evs: readonly AlertEvent[], obs: Observation, now
   return out;
 }
 
-export const DISCLAIMER = 'AEGIS is a camera. It cannot move your funds. Classifications can be wrong.';
+export const DISCLAIMER = BRAND.disclaimer;
 
 export function payload(deliveryId: string, ev: Pick<InkEvent, 'id' | 'type' | 'at' | 'block' | 'subject' | 'text' | 'data'> | { id: string; type: SystemEvent; at: number; block: null; subject: string; text: string; data: Record<string, string | number | boolean | null> }, nowMs: number): string {
   return JSON.stringify({ schema: WEBHOOKS.SCHEMA, version: WEBHOOKS.VERSION, deliveryId, sentAt: new Date(nowMs).toISOString(), event: { id: ev.id, type: ev.type, at: new Date(ev.at).toISOString(), block: ev.block, subject: ev.subject, text: ev.text, data: ev.data }, disclaimer: DISCLAIMER });

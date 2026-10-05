@@ -40,14 +40,14 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
     "generatedAt": "…", "servedAt": "…", "ageSeconds": 1840,
     "freshness": "FRESH", "freshnessRule": "STALE when the source is more than 3 h old",
     "completeness": "COMPLETE", "completenessNotes": [], "approximate": false,
-    "coverage": { "…": 0.99 }, "privacy": ["…"], "disclaimer": "AEGIS is a camera. …"
+    "coverage": { "…": 0.99 }, "privacy": ["…"], "disclaimer": "Phrourax is read-only. …"
   }
 }
 ```
 
 - **Freshness:** each source has its own STALE threshold: census 2 h, oracles 3 h, carry 3 h, Pressure Map 6 h, checks 8 h. `UNKNOWN` means the source has no time.
 - **`sourceBlockHash`:** given where the Flight Recorder recorded that block; `null` otherwise.
-- **Coverage:** the shares of each protocol's own on-chain totals that AEGIS's known wallets add up to, from the last full sweep that read every wallet at one block.
+- **Coverage:** the shares of each protocol's own on-chain totals that Phrourax's known wallets add up to, from the last full sweep that read every wallet at one block.
 
 ## Errors
 
@@ -110,12 +110,12 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
 
 ## Terms
 
-Free and best effort, with no uptime promise. It's not advice, and the data can be late, incomplete or wrong. AEGIS cannot trade or move funds.
+Free and best effort, with no uptime promise. It's not advice, and the data can be late, incomplete or wrong. Phrourax cannot trade or move funds.
 
 ## Deployment
 
 - **The function is a single file:** `apps/web/api/v1.js`, bundled by `apps/web/scripts/build-api.mjs` from `apps/web/api-src/`, with no workspace TypeScript left for Vercel to compile.
-- **Stale-bundle guard:** `pnpm check` fails if the bundle wasn't built from the current sources. It compares a fingerprint of the inputs (AEGIS sources with line endings normalised, the lockfile, the esbuild version, the test-wallet list), stored in the bundle's first line, so it gives the same answer on Windows and Linux. To rebuild:
+- **Stale-bundle guard:** `pnpm check` fails if the bundle wasn't built from the current sources. It compares a fingerprint of the inputs (Phrourax sources with line endings normalised, the lockfile, the esbuild version, the test-wallet list), stored in the bundle's first line, so it gives the same answer on Windows and Linux. To rebuild:
 
   ```
   pnpm --filter @aegis/web build:api

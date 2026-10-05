@@ -16,7 +16,7 @@ export const RULE_TEXT: RuleText[] = [
   {
     tag: 'DARK',
     kind: 'STATE',
-    human: "A data source couldn't be read. AEGIS won't guess the missing half of the wallet.",
+    human: "A data source couldn't be read. Phrourax won't guess the missing half of the wallet.",
     predicate: 'tydro.status = DARK OR nado.status = DARK (RPC dead, venue timeout, parse fail, rate limit)',
   },
   {

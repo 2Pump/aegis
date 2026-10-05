@@ -2,7 +2,7 @@
 
 Both run inside the hourly census, after the ledger. Both are read-only on the chain. The site shows them under **INTEL → ORACLES** and **INTEL → CHANGES**. Pressure forecast scoring, which needs the recorded prices, is on **CHECKS**.
 
-Every feed is an observation, not the truth. When two feeds disagree, one of them is wrong; AEGIS doesn't say which.
+Every feed is an observation, not the truth. When two feeds disagree, one of them is wrong; Phrourax doesn't say which.
 
 ## Oracle Watch (`oracle-1.0.0`)
 
@@ -80,8 +80,8 @@ A divergence is modelled with the Pressure engine as the protocol price convergi
 - A value that fails to read on one run keeps its last reading. A failed read is not a change.
 - "Removed" applies only to a Nado product that is no longer listed, and only when the product list itself was read.
 - **Tydro:** the PoolConfigurator's transactions in that block range are listed as candidates (one of them made the change).
-- **Nado:** the transaction isn't identified, because Nado doesn't emit a configuration event AEGIS reads.
-- **Impact:** AEGIS's own counts just before and just after the change, from the Flight Recorder. These are observed, not isolated, because price moves in the same hour are in them too. With no recorded point on one side, no impact is shown.
+- **Nado:** the transaction isn't identified, because Nado doesn't emit a configuration event Phrourax reads.
+- **Impact:** Phrourax's own counts just before and just after the change, from the Flight Recorder. These are observed, not isolated, because price moves in the same hour are in them too. With no recorded point on one side, no impact is shown.
 
 ### Files
 

@@ -1,3 +1,5 @@
 User-agent: *
 Disallow: /hull/
 Allow: /
+
+Sitemap: https://phrourax.com/sitemap.xml

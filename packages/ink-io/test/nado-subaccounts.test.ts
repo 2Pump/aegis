@@ -7,7 +7,7 @@ import { TOPIC } from '../src/logs.js';
 import { nadoSubaccount, subaccountKind } from '../src/index.js';
 
 /*
- * Wallet-page reads of every Nado subaccount AEGIS knows of. Made-up wallets; the FQuerier struct round-trips through
+ * Wallet-page reads of every Nado subaccount Phrourax knows of. Made-up wallets; the FQuerier struct round-trips through
  * the real ABI like a node's reply would.
  */
 const OWNER = '0x1111111111111111111111111111111111111111';

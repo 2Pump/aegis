@@ -27,6 +27,7 @@ import {
   type Pose,
 } from '@aegis/pose';
 import type { SizeBand } from '@aegis/glyphs';
+import { BRAND } from '@aegis/glyphs';
 
 export const PRESSURE_VERSION = 1 as const;
 export const MAX_PCT = 50;
@@ -330,12 +331,12 @@ export function shareText(s: PressureSnapshot, q: PressureQuery, stress: StressR
   const all = queryPressure(s, { ...q, material: '0' });
   const f = pressureFreshness(s, nowMs);
   return [
-    `AEGIS Pressure Map — ${d.label} ${q.sign === 'down' ? '−' : '+'}${q.pct}% (a simulation, not a prediction)`,
+    `Phrourax Pressure Map — ${d.label} ${q.sign === 'down' ? '−' : '+'}${q.pct}% (a simulation, not a prediction)`,
     ...(f.status === 'CURRENT' ? [] : [`${f.status}: this map is ${f.why}`]),
     `Ink Stress Level: ${stress.level}${f.status === 'STALE' ? ' (as of then, not now)' : ''}${stress.confidence === 'REDUCED' ? ' (reduced confidence)' : ''}`,
-    `Wallets pushed toward liquidation: ${all.affected} of ${all.population} visible to AEGIS · ${r.affected} of ${r.population} ${MATERIAL_LABEL[q.material].toLowerCase()}`,
+    `Wallets pushed toward liquidation: ${all.affected} of ${all.population} visible to Phrourax · ${r.affected} of ${r.population} ${MATERIAL_LABEL[q.material].toLowerCase()}`,
     `Block ${s.block.toLocaleString('en-US')} · ${s.at}`,
-    'Based on wallets currently visible to AEGIS. AEGIS is a camera. It cannot move your funds. Classifications can be wrong.',
+    `Based on wallets currently visible to ${BRAND.display}. ${BRAND.disclaimer}`,
     url,
   ].join('\n');
 }
