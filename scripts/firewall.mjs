@@ -17,7 +17,7 @@
  * The token is never printed or stored. Use a short-lived token (vercel.com/account/tokens) and delete it after.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -107,15 +107,51 @@ function vc(sub, { quiet = false } = {}) {
   return r.out;
 }
 
-// 1b ── link the empty folder to the project (by name, under the token's scope or --scope)
-console.log(`firewall: linking to project "${PROJECT}"${SCOPE ? ` under "${SCOPE}"` : ''} …`);
-const link = run(['link', '--yes', '--project', PROJECT]);
-if (link.status !== 0 || !existsSync(join(work, '.vercel', 'project.json'))) {
-  console.error(link.err.trim() || link.out.trim());
-  const teams = run(['teams', 'list']);
-  if (teams.status === 0) console.error(`\nAccounts/teams this token can see:\n${teams.out.trim() || teams.err.trim()}`);
-  fail(`could not find the project "${PROJECT}"${SCOPE ? ` under "${SCOPE}"` : ''}. Check its exact name and owner in the dashboard URL (vercel.com/<team-slug>/<project-name>) and pass --project <project-name> --scope <team-slug>. Nothing was changed.`);
+// 1b ── find the project through Vercel's REST API (personal account + every team the token can see), then write the
+// `.vercel/project.json` link into the empty folder ourselves — no interactive `vercel link`.
+console.log(`firewall: looking up project "${PROJECT}"${SCOPE ? ` under "${SCOPE}"` : ''} …`);
+async function api(path) {
+  try {
+    const r = await fetch(`https://api.vercel.com${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    const body = await r.json().catch(() => ({}));
+    return { status: r.status, body };
+  } catch (e) {
+    return { status: 0, body: { error: { message: String(e?.message ?? e) } } };
+  }
 }
+const who = await api('/v2/user');
+if (who.status === 401 || who.status === 403) {
+  const t = await api('/v2/teams');
+  if (t.status === 401) fail('Vercel says this token is not valid (deleted, expired or mistyped). Create a new one and set VERCEL_TOKEN again. Nothing was changed.');
+}
+if (who.status === 0) fail(`could not reach api.vercel.com (${who.body.error.message}). Nothing was changed.`);
+const teamsRes = await api('/v2/teams?limit=100');
+const teams = Array.isArray(teamsRes.body?.teams) ? teamsRes.body.teams : [];
+const scopes = [
+  ...(SCOPE ? [] : [{ label: who.body?.user?.username ? `${who.body.user.username} (personal)` : 'personal account', q: '' }]),
+  ...teams.filter((t) => !SCOPE || t.slug === SCOPE || t.id === SCOPE).map((t) => ({ label: `${t.slug} (team)`, q: `teamId=${encodeURIComponent(t.id)}` })),
+];
+if (SCOPE && !scopes.length) fail(`this token cannot see a team "${SCOPE}". Teams it can see: ${teams.map((t) => t.slug).join(', ') || 'none (personal account only)'}. Nothing was changed.`);
+let found = null;
+for (const sc of scopes) {
+  const r = await api(`/v9/projects/${encodeURIComponent(PROJECT)}${sc.q ? `?${sc.q}` : ''}`);
+  if (r.status === 200 && r.body?.id) {
+    found = { projectId: r.body.id, orgId: r.body.accountId, where: sc.label };
+    break;
+  }
+}
+if (!found) {
+  console.error(`\nProjects this token can see:`);
+  for (const sc of scopes) {
+    const r = await api(`/v9/projects?limit=100${sc.q ? `&${sc.q}` : ''}`);
+    const names = Array.isArray(r.body?.projects) ? r.body.projects.map((p) => p.name) : [];
+    console.error(`  ${sc.label}: ${r.status === 200 ? names.join(', ') || '(none)' : `not readable (HTTP ${r.status})`}`);
+  }
+  fail(`no project called "${PROJECT}" in any of these. Rerun with --project <name from the list>${teams.length ? ' (and --scope <team-slug> if it is under a team)' : ''}. If the list is empty, the token's scope is wrong — recreate it with the team that owns the project. Nothing was changed.`);
+}
+mkdirSync(join(work, '.vercel'));
+writeFileSync(join(work, '.vercel', 'project.json'), JSON.stringify({ projectId: found.projectId, orgId: found.orgId }));
+console.log(`firewall: found "${PROJECT}" in ${found.where}`);
 
 // 2 ── what exists already (so re-running updates instead of duplicating)
 const listed = (() => {
