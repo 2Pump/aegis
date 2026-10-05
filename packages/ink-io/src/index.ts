@@ -55,3 +55,4 @@ export const READER_VERSION = 'ink-io-2026.10.04';
 export const PRICE_SOURCE_VERSION = 'tydro-aaveoracle+nado-fquerier-1';
 export { LIQ_TOPIC, LIQ_SOURCES, decodeLiquidations, scanLiquidations, type RawLiquidation } from './liquidations.js';
 export { PYTH, EIP1967_IMPL_SLOT, readOracleSnapshot, readProtocolParams, type OracleSnapshot, type AggregatorRead, type ParamRead, type ParamSnapshot } from './oracles.js';
+export { readCarryPoint, blockAtTime, readGas, OP_GAS_PRICE_ORACLE, type GasRead, type CarryPoint, type TydroMarket, type NadoSpotMarket, type NadoPerpMarket } from './carry.js';

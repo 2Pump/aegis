@@ -161,7 +161,7 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
       });
     else {
       const ageH = (now - src.updatedAt) / 3_600_000;
-      const what = src.kind === 'adapter' ? `adapter${viaText}: oldest feed underneath` : 'source';
+      const what = src.kind === 'adapter' ? `adapter${viaText}:` : 'source';
       checks.push(ageH > ORACLE.STALE_H ? { kind: 'source-age', status: 'STALE', text: `${what} last updated ${ageH.toFixed(1)} h ago (over ${ORACLE.STALE_H} h)`, pct: null } : { kind: 'source-age', status: 'OK', text: `${what} updated ${ageH.toFixed(1)} h ago`, pct: null });
     }
     if (src && src.decimals !== null && src.decimals !== 8) checks.push({ kind: 'source-decimals', status: 'WARN', text: `source reports ${src.decimals} decimals (USD feeds normally use 8; an adapter may rescale)`, pct: null });

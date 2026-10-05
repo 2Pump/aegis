@@ -48,6 +48,7 @@ import type { CensusStore } from './store.js';
 import { recordHistory } from './history-write.js';
 import { recordLiquidations, rescoreAccountability } from './ledger-write.js';
 import { recordChanges, recordOracles, rescoreForecasts } from './intel-write.js';
+import { recordCarry } from './carry-write.js';
 import { appendForecast, forecastPath, type ForecastRecord } from '../ledger.js';
 
 /** Job state (known.json). Addresses only — public chain facts, no balances. */
@@ -123,8 +124,10 @@ export interface RunOpts {
   ledger?: boolean;
   /** time the ledger backfill may use per run. Default 8 minutes. */
   ledgerBudgetMs?: number;
-  /** Oracle Watch, Protocol Change Monitor, forecast scoring (Release 3). Default true. */
+  /** Oracle Watch, Protocol Change Monitor, forecast scoring (Release 3), Yield and Carry (Release 4). Default true. */
   intel?: boolean;
+  /** Yield and Carry (Release 4). Default true; false skips only this step. */
+  carry?: boolean;
 }
 
 /** Logs a progress line only when the percentage crosses a new 10% step. */
@@ -776,6 +779,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
       for (const [name, step] of [
         ['oracles', () => recordOracles(io)],
         ['changes', () => recordChanges(io)],
+        ['carry', () => (o.carry === false ? Promise.resolve(null) : recordCarry(io))],
       ] as const) {
         try {
           await step();

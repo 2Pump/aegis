@@ -366,6 +366,36 @@ describe('Oracle reads (fake chain)', () => {
     expect(buildOracleWatch({ snap: r.value }).rows[0]!.tydro?.via?.[0]?.under?.[0]?.description).toBe('USDT / USD');
   });
 
+  it('an adapter that ALSO answers latestRoundData is still followed to the feed underneath (its own time kept)', async () => {
+    const TOP = '0x00000000000000000000000000000000000000c1';
+    const LEAF = '0x00000000000000000000000000000000000000c3';
+    const client = {
+      getBlock: async () => ({ timestamp: BigInt(T0 / 1000) }),
+      multicall: async ({ contracts }: { contracts: Array<{ functionName: string; address: string }> }) =>
+        contracts.map((c) => {
+          const a = c.address.toLowerCase();
+          const f = c.functionName;
+          if (f === 'BASE_CURRENCY_UNIT') return { status: 'success', result: 100_000_000n };
+          if (f === 'getAssetsPrices') return { status: 'success', result: TYDRO_RESERVES.map(() => 100_000_000n) };
+          if (f === 'getSourceOfAsset') return { status: 'success', result: TOP };
+          if (a === TOP && f === 'latestRoundData') return { status: 'success', result: [1n, 100_000_000n, 0n, BigInt(T0 / 1000 - 3600), 1n] };
+          if (a === TOP && f === 'description') return { status: 'success', result: 'Capped USDT/USD' };
+          if (a === TOP && f === 'ASSET_TO_USD_AGGREGATOR') return { status: 'success', result: LEAF };
+          if (a === LEAF && f === 'latestRoundData') return { status: 'success', result: [1n, 100_000_000n, 0n, BigInt(T0 / 1000 - 7200), 1n] };
+          if (a === LEAF && f === 'description') return { status: 'success', result: 'USDT / USD' };
+          if (f === 'decimals') return { status: 'success', result: 8 };
+          return { status: 'failure', error: new Error('execution reverted') };
+        }),
+      readContract: async () => ({ spotProducts: [], perpProducts: [] }),
+    } as unknown as PublicClient;
+    const r = await readOracleSnapshot(client, 1000n);
+    if (!r.ok) throw new Error('read failed');
+    const src = r.value.tydro[0]!.source!;
+    expect(src.kind).toBe('adapter');
+    expect(src.updatedAt).toBe(T0 - 3_600_000);
+    expect(src.via).toMatchObject([{ role: 'ASSET_TO_USD_AGGREGATOR', description: 'USDT / USD', updatedAt: T0 - 7_200_000 }]);
+  });
+
   it('an Aave-style adapter (latestAnswer only) is followed to the feed underneath for its age; an active price cap is flagged', async () => {
     const FEED = '0x00000000000000000000000000000000000000f4';
     const ADAPTER = '0x00000000000000000000000000000000000000a3';

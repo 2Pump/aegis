@@ -322,3 +322,22 @@ export {
   type AggSummary,
 } from './changes.js';
 export { FORECAST_SCORE, FORECAST_SCORE_PATH, scoreForecasts, worstMove, type ForecastScore, type ScenarioScore } from './forecast.js';
+export {
+  CARRY,
+  CARRY_LATEST,
+  CARRY_DAYS,
+  HEDGE,
+  STABLES,
+  RATE as CARRY_RATE,
+  FORBIDDEN_WORDS,
+  buildCarry,
+  isCarryDays,
+  wantedDays,
+  pruneDays,
+  type CarryFile,
+  type CarryDays,
+  type CarryInput,
+  type Structure as CarryStructure,
+  type Component as CarryComponent,
+  type Risk as CarryRisk,
+} from './carry.js';

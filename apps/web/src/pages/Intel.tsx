@@ -4,7 +4,7 @@
  *   LIQUIDATIONS  the liquidation ledger (Release 2)
  *   ORACLES       Oracle Watch (Release 3)
  *   CHANGES       Protocol Change Monitor (Release 3)
- *   CARRY         Release 4 — shown as NOT BUILT, never as working
+ *   CARRY         Yield and Carry (Release 4) — analysis only
  */
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -15,6 +15,7 @@ import { Panel } from '../components/bits';
 import { LiquidationsPanel } from '../components/Liquidations';
 import { OraclesPanel } from '../components/Oracles';
 import { ChangesPanel } from '../components/Changes';
+import { CarryPanel } from '../components/Carry';
 import { CountChart, RangePicker, RiskStrip, when } from '../components/HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useAggHistory, useHistoryIndex, type Range } from '../lib/history';
@@ -54,23 +55,8 @@ export function IntelPage() {
       {tab === 'liquidations' ? (WELL_ON ? <LiquidationsPanel /> : <div className="banner red">Locked with the well until the readings are verified against the official apps.</div>) : null}
       {tab === 'oracles' ? <OraclesPanel /> : null}
       {tab === 'changes' ? <ChangesPanel /> : null}
-      {tab === 'carry' ? (
-        <NotBuilt
-          title="Yield and carry"
-          release="Release 4"
-          what="Estimated rates, funding, costs and risks of observable carry structures — analysis only, never a button to trade, never a promised return."
-        />
-      ) : null}
+      {tab === 'carry' ? <CarryPanel /> : null}
     </div>
-  );
-}
-
-function NotBuilt({ title, release, what }: { title: string; release: string; what: string }) {
-  return (
-    <Panel title={title} rail="var(--slate)" testId="intel-not-built">
-      <div className="banner" role="status">NOT BUILT YET — planned for {release}. Nothing here is live, and nothing is shown in its place.</div>
-      <p className="dim" style={{ fontSize: 13, lineHeight: 1.55 }}>{what}</p>
-    </Panel>
   );
 }
 

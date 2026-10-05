@@ -11,7 +11,7 @@ Every feed is an observation, not the truth. When two feeds disagree, one of the
 | Source | What is read | Where the address comes from |
 |---|---|---|
 | Tydro protocol price | `AaveOracle.getAssetsPrices` at `0x4758213271BFdC72224A7a8742dC865fC97756e1` | Tydro deployment |
-| Tydro's source per asset | `AaveOracle.getSourceOfAsset(asset)`, then `latestRoundData` / `latestAnswer` / `decimals` / `description` / `isCapped` on that contract. If it's an Aave-style adapter (price cap or peg-to-base), it's followed through `BASE_TO_USD_AGGREGATOR`, `ASSET_TO_USD_AGGREGATOR`, `ASSET_TO_PEG` or `PEG_TO_BASE` to the feeds underneath (at most two levels). The adapter's age is the age of its **oldest** underlying feed. | discovered on-chain each run |
+| Tydro's source per asset | `AaveOracle.getSourceOfAsset(asset)`, then `latestRoundData` / `latestAnswer` / `decimals` / `description` / `isCapped` on that contract. If it's an Aave-style adapter (price cap or peg-to-base), it's followed through `BASE_TO_USD_AGGREGATOR`, `ASSET_TO_USD_AGGREGATOR`, `ASSET_TO_PEG` or `PEG_TO_BASE` to the feeds underneath (at most two levels). The adapter's age is the age of its **oldest** underlying feed. An adapter that also answers `latestRoundData` itself keeps its own update time, but its feeds are still followed and named. | discovered on-chain each run |
 | Nado oracle prices | `FQuerier.getSubaccountInfo` for the zero subaccount, which returns every product with its oracle price, spot token and risk weights | Nado contracts |
 | Pyth (external reference) | `getPriceUnsafe(id)` at `0x2880aB155794e7179c9eE2e38200202908C17B43`: ETH/USD, BTC/USD, USDC/USD | Pyth's published Ink address and feed IDs. USDT is left out because its feed ID wasn't verified. |
 

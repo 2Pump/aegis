@@ -176,14 +176,16 @@ test('Checks: versions in force are stated; the automatic-checks panel says when
   await expect(auto.getByText('CURRENT', { exact: true })).toHaveCount(0);
 });
 
-test('INTEL: in the nav between Pressure and Scan; CARRY says NOT BUILT; oracles and changes never invent data', async ({ page }) => {
+test('INTEL: in the nav between Pressure and Scan; every section is built and none invents data', async ({ page }) => {
   await page.goto('/');
   const links = await page.locator('nav[aria-label="Primary"] a').allTextContents();
   expect(links.map((s) => s.trim().toUpperCase())).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN', 'ALERTS', 'CHECKS']);
   await page.goto('/intel');
   await expect(page.getByTestId('intel-tabs')).toBeVisible();
+  // built in Release 4: analysis only, and with nothing recorded it says so
   await page.getByTestId('intel-tab-carry').click();
-  await expect(page.getByTestId('intel-not-built')).toContainText('NOT BUILT YET');
+  await expect(page.getByTestId('carry-disclaimer')).toContainText('ANALYSIS ONLY');
+  await expect(page.getByTestId('intel-carry').getByText(/NOT RECORDING YET|Couldn't load/).first()).toBeVisible();
   // built in Release 3: with nothing recorded they say so — never a table of made-up prices
   await page.getByTestId('intel-tab-oracles').click();
   await expect(page.getByTestId('intel-oracles').getByText(/NOT RECORDING YET|Couldn't load/).first()).toBeVisible();
@@ -210,6 +212,7 @@ async function serveRelease3(page: Page) {
     if (u.endsWith('/history/params/latest.json')) return route.fulfill(json(R3('params-latest.json')));
     if (u.endsWith(`/history/changes/${month}.json`)) return route.fulfill(json(R3('changes.json')));
     if (u.endsWith('/history/forecast-score.json')) return route.fulfill(json(R3('forecast-score.json')));
+    if (u.endsWith('/history/carry/latest.json')) return route.fulfill(json(R3('carry-latest.json')));
     return route.fulfill({ status: 404, body: '' });
   });
 }
@@ -251,6 +254,27 @@ test('Checks: Pressure forecasts are scored only where prices were recorded', as
   await expect(f).toBeVisible();
   await expect(f.getByTestId('forecast-table')).toBeVisible();
   await expect(f).toContainText(/neither hits nor misses/);
+});
+
+test('CARRY: estimated net per structure, every leg and risk factor, nothing to act with, no promised-return language', async ({ page }) => {
+  await serveRelease3(page);
+  await page.goto('/intel?tab=carry');
+  await expect(page.getByTestId('carry-table-cash-and-carry')).toBeVisible();
+  const row = page.getByTestId('carry-row-cc-nado-3-4');
+  await expect(row).toContainText('%');
+  await row.getByRole('button').click();
+  const d = page.getByTestId('carry-detail-cc-nado-3-4');
+  await expect(d).toContainText('ETH-PERP funding received by a short');
+  await expect(d).toContainText('funding-reversal');
+  await expect(d).toContainText('Nado trading fee');
+  await expect(d).toContainText(/liquidated only if/);
+  await expect(page.getByTestId('carry-funding')).toBeVisible();
+  // no execution path: no links out of AEGIS and no buttons other than expand / show-more / tabs / nav
+  const main = page.locator('main, .stack').first();
+  await expect(main.getByText(/guarantee|risk[- ]free|\bAPY\b/i)).toHaveCount(0);
+  const buttons = await page.getByTestId('intel-carry').getByRole('button').allTextContents();
+  for (const b of buttons) expect(b).not.toMatch(/buy|sell|borrow now|trade|deposit now|connect|approve|open position/i);
+  await expect(page.getByTestId('intel-carry').locator('a[href^="http"]')).toHaveCount(0);
 });
 
 test('wallet page: a HISTORY section that never invents history (no recording → says so)', async ({ page }) => {

@@ -128,11 +128,14 @@ async function readSources(client: PublicClient, addrs: string[], blockNumber: b
     const raw = round ? round[1] : ans;
     const answer = raw !== null && dec !== null ? Number(raw) / 10 ** Number(dec) : null;
     const own = round && round[3] > 0n ? Number(round[3]) * 1000 : ts && ts > 0n ? Number(ts) * 1000 : null;
-    // a Chainlink proxy also answers aggregator(): it is a feed, not an adapter
-    const isAdapter = !round && feeds.length > 0;
+    // a Chainlink proxy also answers aggregator(): that alone makes it a feed, not an adapter. Aave's adapter
+    // getters (BASE_TO_USD_AGGREGATOR, ASSET_TO_PEG, …) make it an adapter even when it also answers
+    // latestRoundData itself — its own update time is then kept, and the feeds underneath are still named.
+    const adapterFeeds = feeds.filter((f) => f.role !== 'aggregator');
+    const isAdapter = adapterFeeds.length > 0 || (!round && feeds.length > 0);
     out.set(a, {
       address: a,
-      kind: round ? 'chainlink' : isAdapter ? 'adapter' : raw !== null ? 'answer-only' : 'none',
+      kind: isAdapter ? 'adapter' : round ? 'chainlink' : raw !== null ? 'answer-only' : 'none',
       answer,
       decimals: dec !== null ? Number(dec) : null,
       description: desc,
@@ -141,7 +144,7 @@ async function readSources(client: PublicClient, addrs: string[], blockNumber: b
       capped: capped,
       error: raw === null ? `answers neither latestRoundData nor latestAnswer (${(at(0) as { error?: string })?.error?.slice(0, 80) ?? 'failed'})` : null,
     });
-    if (isAdapter && depth < 2) for (const f of feeds) found.push({ src: a, role: f.role, feed: f.feed });
+    if (isAdapter && depth < 2) for (const f of adapterFeeds.length ? adapterFeeds : feeds) found.push({ src: a, role: f.role, feed: f.feed });
   });
   if (found.length) {
     const under = await readSources(client, [...new Set(found.map((f) => f.feed))], blockNumber, depth + 1);

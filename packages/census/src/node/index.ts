@@ -9,3 +9,4 @@ export { recordHistory, type HistoryWriteOpts, type HistoryWriteResult } from '.
 export { fixtureAddresses } from './fixtures.js';
 export { recordLiquidations, rescoreAccountability, type LedgerOpts, type LedgerResult } from './ledger-write.js';
 export { recordOracles, recordChanges, rescoreForecasts, type IntelOpts } from './intel-write.js';
+export { recordCarry, type CarryOpts } from './carry-write.js';

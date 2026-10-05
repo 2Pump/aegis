@@ -19,6 +19,8 @@ import {
   type ChangeRecord,
   type ChangesFile,
   type ForecastScore,
+  CARRY_LATEST,
+  type CarryFile,
   isLedgerFile,
   ledgerPath,
   type Accountability,
@@ -246,6 +248,8 @@ const isScore = (j: unknown): j is ForecastScore => (j as ForecastScore)?.kind =
 export const useOracleWatch = () => useLatest(ORACLE_LATEST, isWatch);
 export const useParams = () => useLatest(PARAMS_LATEST, isParamsLatest as (j: unknown) => j is ParamsLatest);
 export const useForecastScore = () => useLatest(FORECAST_SCORE_PATH, isScore);
+const isCarry = (j: unknown): j is CarryFile => (j as CarryFile)?.kind === 'aegis-carry' && Array.isArray((j as CarryFile).structures);
+export const useCarry = () => useLatest(CARRY_LATEST, isCarry);
 
 /** Recorded oracle prices (one point per census run) within the range — recording began with Release 3. */
 export function usePrices(range: Range): Loaded<{ points: PricePoint[]; from: number; to: number }> {
