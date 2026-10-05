@@ -178,6 +178,11 @@ function AssetRowView({ r }: { r: AssetRow }) {
                       {r.tydro.via.map((v) => (
                         <div key={v.role + v.address}>
                           <ExplorerAddr a={v.address} /> <span className="faint">{v.description ?? ''} · {v.role} · {v.updatedAt ? `updated ${when(v.updatedAt)}` : 'update time not exposed'}</span>
+                          {(v.under ?? []).map((u) => (
+                            <div key={u.role + u.address} style={{ paddingLeft: 14 }}>
+                              <span className="faint">↳ </span><ExplorerAddr a={u.address} /> <span className="faint">{u.description ?? ''} · {u.role} · {u.updatedAt ? `updated ${when(u.updatedAt)}` : 'update time not exposed'}</span>
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </dd>
@@ -189,8 +194,17 @@ function AssetRowView({ r }: { r: AssetRow }) {
                   <>
                     <dt>External</dt>
                     <dd>
-                      Pyth {r.external.key}/USD {price(r.external.price)}
-                      {r.external.conf ? <span className="faint"> ±{price(r.external.conf)}</span> : null}
+                      {r.external.note ? (
+                        // not compared (dormant or not pushed lately): its last price is history, never shown as current
+                        <span className="faint" data-testid={`oracle-ext-stale-${r.symbol}`}>
+                          Pyth {r.external.key}/USD last price {price(r.external.price)} <b>(stale — not a current price)</b>
+                        </span>
+                      ) : (
+                        <>
+                          Pyth {r.external.key}/USD {price(r.external.price)}
+                          {r.external.conf ? <span className="faint"> ±{price(r.external.conf)}</span> : null}
+                        </>
+                      )}
                       {r.external.publishTime ? <span className="faint"> · published {when(r.external.publishTime)}</span> : null}
                       <div className="faint">{r.external.relation}{r.external.note ? ` · ${r.external.note}` : ''}</div>
                     </dd>

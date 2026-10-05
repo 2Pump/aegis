@@ -80,7 +80,7 @@ export interface AggregatorRead {
   /** unix ms of the last update (for an adapter: of its oldest underlying feed); null = not exposed */
   updatedAt: number | null;
   /** adapter only: the feeds underneath */
-  via?: Array<{ role: string; address: string; description: string | null; answer: number | null; updatedAt: number | null }>;
+  via?: Array<{ role: string; address: string; description: string | null; answer: number | null; updatedAt: number | null; under?: Array<{ role: string; address: string; description: string | null; updatedAt: number | null }> }>;
   /** the adapter reports its price cap as active (the protocol values the asset below its feed); null = not exposed */
   capped?: boolean | null;
   error: string | null;
@@ -148,7 +148,14 @@ async function readSources(client: PublicClient, addrs: string[], blockNumber: b
     for (const f of found) {
       const u = under.get(f.feed);
       const s = out.get(f.src)!;
-      (s.via ??= []).push({ role: f.role, address: f.feed, description: u?.description ?? null, answer: u?.answer ?? null, updatedAt: u?.updatedAt ?? null });
+      (s.via ??= []).push({
+        role: f.role,
+        address: f.feed,
+        description: u?.description ?? null,
+        answer: u?.answer ?? null,
+        updatedAt: u?.updatedAt ?? null,
+        ...(u?.via?.length ? { under: u.via.map((x) => ({ role: x.role, address: x.address, description: x.description, updatedAt: x.updatedAt })) } : {}),
+      });
     }
     for (const s of out.values()) {
       if (s.kind !== 'adapter' || s.updatedAt !== null) continue;

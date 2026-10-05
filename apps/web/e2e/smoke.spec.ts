@@ -225,6 +225,9 @@ test('ORACLES: every asset with its status; a depeg is an event; details show ch
   // the modelled impact (wallet counts) shows only when the well is on; otherwise it says it is locked
   await expect(page.getByText(/Approximate — not a prediction|locked with the well until the readings are verified \(no counts shown\)/).first()).toBeVisible();
   await expect(page.getByTestId('oracles-history').locator('svg')).toBeVisible();
+  // a reference that isn't compared shows its last price as history, never as a current price
+  await page.getByTestId('oracle-row-kBTC').getByRole('button').click();
+  await expect(page.getByTestId('oracle-ext-stale-kBTC')).toContainText('stale — not a current price');
   await expect(page.getByText(/guaranteed|AI-powered/i)).toHaveCount(0);
 });
 

@@ -67,7 +67,7 @@ export interface AssetRow {
   asset: string;
   symbol: string;
   usedBy: Array<'tydro' | 'nado'>;
-  tydro: { price: number | null; source: string | null; sourceDescription: string | null; sourceDecimals: number | null; sourceAnswer: number | null; sourceUpdatedAt: number | null; sourceKind?: string | null; via?: Array<{ role: string; address: string; description: string | null; updatedAt: number | null }>; capped?: boolean | null } | null;
+  tydro: { price: number | null; source: string | null; sourceDescription: string | null; sourceDecimals: number | null; sourceAnswer: number | null; sourceUpdatedAt: number | null; sourceKind?: string | null; via?: Array<{ role: string; address: string; description: string | null; updatedAt: number | null; under?: Array<{ role: string; address: string; description: string | null; updatedAt: number | null }> }>; capped?: boolean | null } | null;
   nado: { productId: number; price: number | null } | null;
   /** Nado perp on the same underlying — basis vs spot, information only (not an oracle error) */
   perp: { productId: number; symbol: string; price: number | null } | null;
@@ -224,7 +224,7 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
       asset: t.asset,
       symbol: t.symbol === 'USDT' ? 'USDT0' : t.symbol,
       usedBy,
-      tydro: { price: t.priceUsd, source: t.source?.address ?? null, sourceDescription: t.source?.description ?? null, sourceDecimals: t.source?.decimals ?? null, sourceAnswer: t.source?.answer ?? null, sourceUpdatedAt: t.source?.updatedAt ?? null, sourceKind: t.source?.kind ?? null, via: (t.source?.via ?? []).map((v) => ({ role: v.role, address: v.address, description: v.description, updatedAt: v.updatedAt })), capped: t.source?.capped ?? null },
+      tydro: { price: t.priceUsd, source: t.source?.address ?? null, sourceDescription: t.source?.description ?? null, sourceDecimals: t.source?.decimals ?? null, sourceAnswer: t.source?.answer ?? null, sourceUpdatedAt: t.source?.updatedAt ?? null, sourceKind: t.source?.kind ?? null, via: (t.source?.via ?? []).map((v) => ({ role: v.role, address: v.address, description: v.description, updatedAt: v.updatedAt, ...(v.under?.length ? { under: v.under } : {}) })), capped: t.source?.capped ?? null },
       nado: n ? { productId: n.productId, price: n.priceUsd } : null,
       perp: perpRaw ? { productId: perpRaw.productId, symbol: perpRaw.symbol ?? '', price: perpRaw.priceUsd } : null,
       external,
