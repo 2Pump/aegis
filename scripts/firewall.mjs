@@ -58,6 +58,7 @@ const RULES = [
 ];
 
 let work = '';
+let staged = false;
 function cleanup() {
   if (!work) return;
   try {
@@ -87,7 +88,6 @@ function run(sub) {
   const hide = (s) => `${s ?? ''}`.split(TOKEN).join('<token>');
   return { status: r.status, out: hide(r.stdout), err: hide(r.stderr) };
 }
-let staged = false;
 function fail(msg) {
   if (staged) {
     run(['firewall', 'discard', '--yes']);
