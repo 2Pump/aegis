@@ -77,8 +77,11 @@ export async function recordCarry(o: CarryOpts): Promise<CarryFile | null> {
     .filter((r) => r.between.toAt >= since);
   const pressure = o.pressure ?? (await o.store.get('pressure.json').then((p) => (isPressure(p) ? p : null)).catch(() => null));
   const gas = await readGas(o.client, BigInt(o.head)).catch(() => null);
+  const census = (await o.store.get('census.json').catch(() => null)) as { coverage?: { share?: Record<string, number | null> } } | null;
+  const share = census?.coverage?.share;
+  const oiCoverage = typeof share?.nadoOpenInterestLongs === 'number' && typeof share?.nadoOpenInterestShorts === 'number' ? Math.min(share.nadoOpenInterestLongs, share.nadoOpenInterestShorts) : null;
 
-  const file = buildCarry({ head, days: Object.values(days.points), pressure, oracle: isWatch(watchRaw) ? watchRaw : null, changes, gas, nowMs: o.nowMs ?? Date.now() });
+  const file = buildCarry({ head, days: Object.values(days.points), pressure, oracle: isWatch(watchRaw) ? watchRaw : null, changes, gas, oiCoverage, nowMs: o.nowMs ?? Date.now() });
   await o.store.put(CARRY_LATEST, file);
 
   const have = Object.keys(days.points).length;

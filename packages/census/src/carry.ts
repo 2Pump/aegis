@@ -226,6 +226,8 @@ export interface CarryInput {
   /** change records from the last 30 days */
   changes?: readonly ChangeRecord[];
   gas?: GasRead | null;
+  /** Nado open-interest coverage (min of longs/shorts) for the Ink Stress Level's confidence; null = not measured */
+  oiCoverage?: number | null;
   nowMs?: number;
 }
 
@@ -758,7 +760,7 @@ export function buildCarry(o: CarryInput): CarryFile {
       nearOrWorse: up.now.N + up.now.L,
       ifEthUp10: up.safeToNear + up.watchToNear,
       ifEthDown10: down.safeToNear + down.watchToNear,
-      stress: stressLevel(ps, { nowMs }).level,
+      stress: stressLevel(ps, { nowMs, oiCoverage: o.oiCoverage ?? null }).level,
       pressureBlock: ps.block,
       note: 'Wallets the rules classify as CARRY (a hedged position with debt or perps), from the last full Pressure Map — counts only, never who.',
     };

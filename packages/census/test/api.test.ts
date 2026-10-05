@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { classify, familyOf, type Book } from '@aegis/pose';
 import { API, RateLimiter, handle, type ApiDeps, type ApiRequest } from '../src/api/index.js';
-import { PressureAcc, encodeShip, emptyIndex, type AggPoint, type CensusSnapshot, type LedgerRecord } from '../src/index.js';
+import { PressureAcc, encodeShip, emptyIndex, stressLevel, type AggPoint, type CensusSnapshot, type LedgerRecord, type PressureSnapshot } from '../src/index.js';
 
 const NOW = Date.UTC(2026, 9, 5, 12);
 const A = '0x' + '1'.repeat(40);
@@ -190,6 +190,23 @@ describe('Public API · endpoints', () => {
     const o = (await call(req('/openapi.json'))).body as { openapi: string; paths: Record<string, unknown> };
     expect(o.openapi).toBe('3.1.0');
     expect(Object.keys(o.paths)).toContain('/wallets/{address}/scenario');
+  });
+
+  it('stress uses the same Nado coverage as the census and the Pressure page (confidence), and names the block hash', async () => {
+    const f = files();
+    const census = f['census.json'] as CensusSnapshot;
+    (census as unknown as { coverage: unknown }).coverage = { share: { nadoOpenInterestLongs: 0.997, nadoOpenInterestShorts: 0.999 } };
+    const ps = f['pressure.json'] as { block: number; at: string };
+    ps.block = 999;
+    ps.at = new Date(NOW - 3_600_000).toISOString();
+    const r = await call(req('/stress'), deps(f));
+    const want = stressLevel(f['pressure.json'] as PressureSnapshot, { nowMs: NOW, oiCoverage: 0.997 });
+    expect((r.b.data as { confidence: string }).confidence).toBe(want.confidence);
+    expect((r.b.data as { level: string }).level).toBe(want.level);
+    expect(r.b.meta.sourceBlockHash).toBe('0xh2');
+    // without coverage it says so (REDUCED) — never claims a coverage it didn't measure
+    const g = files();
+    expect(((await call(req('/stress'), deps(g))).b.data as { confidenceWhy: string[] }).confidenceWhy.join(' ')).toMatch(/coverage/i);
   });
 
   it('webhook management answers NOT_ENABLED until switched on, and limits body size', async () => {

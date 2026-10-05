@@ -303,10 +303,12 @@ const ROUTES: Route[] = [
     run: async (_q, _m, d) => {
       const p = await pressure(d);
       const c = (await d.get('census.json').catch(() => null)) as CensusSnapshot | null;
-      const s = stressLevel(p, { nowMs: d.now() });
+      // the same Nado open-interest coverage the census and the Pressure page use (else confidence would read REDUCED)
+      const s = stressLevel(p, { nowMs: d.now(), oiCoverage: c ? oiCoverage(c) : null });
+      const idx = await index(d);
       return {
         data: { level: s.level, confidence: s.confidence, confidenceWhy: s.confidenceWhy, why: s.why, inputs: { population: s.inputs.population, nearShare: s.inputs.near, near10Share: s.inputs.near10, liq10Share: s.inputs.liq10 } },
-        meta: meta({ source: 'pressure.json (last full scan)', generatedAt: p.at, freshH: API.FRESH_H.pressure, now: d.now(), sourceBlock: p.block, rulesVersion: p.rulesVersion, engineVersion: p.engine, dataVersion: s.version, approximate: p.population.approximate > 0, coverage: c ? coverageShares(c) : null }),
+        meta: meta({ source: 'pressure.json (last full scan)', generatedAt: p.at, freshH: API.FRESH_H.pressure, now: d.now(), sourceBlock: p.block, sourceBlockHash: await hashAt(d, idx, p.block, p.at), rulesVersion: p.rulesVersion, engineVersion: p.engine, dataVersion: s.version, approximate: p.population.approximate > 0, coverage: c ? coverageShares(c) : null }),
       };
     },
   },
@@ -566,6 +568,14 @@ const ROUTES: Route[] = [
     },
   },
 ];
+
+/** Nado open-interest coverage = the smaller of longs and shorts (as the census and the Pressure page compute it). */
+export function oiCoverage(c: CensusSnapshot): number | null {
+  const s = (c.coverage as unknown as { share?: Record<string, number | null> } | undefined)?.share;
+  const l = s?.nadoOpenInterestLongs;
+  const sh = s?.nadoOpenInterestShorts;
+  return typeof l === 'number' && typeof sh === 'number' ? Math.min(l, sh) : null;
+}
 
 function coverageShares(c: CensusSnapshot): Record<string, number> | null {
   const s = (c.coverage as unknown as { share?: Record<string, number> } | undefined)?.share;

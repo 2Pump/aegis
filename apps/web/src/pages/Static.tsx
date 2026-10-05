@@ -123,7 +123,8 @@ export function DevelopersPage() {
           The same readings as the site, as JSON. Every response carries its schema, rules / engine / data versions, source block, generated time, age, freshness, completeness, approximation and coverage, and the disclaimer. Full description:{' '}
           <a className="mono" href="/api/v1/openapi.json">/api/v1/openapi.json</a> (OpenAPI 3.1).
         </p>
-        <pre className="mono dev-pre" data-testid="dev-example">{`curl https://aegis-web-lake.vercel.app/api/v1/stress
+        <pre className="mono dev-pre" data-testid="dev-example">{`# example (values change every scan)
+curl https://aegis-web-lake.vercel.app/api/v1/stress
 
 { "schema": "aegis-api-1",
   "data": { "level": "CALM", "confidence": "NORMAL", … },
