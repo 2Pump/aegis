@@ -84,7 +84,7 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
   | webhook management | 30 |
   | everything else under `/api/v1` | 300 |
 
-  `scripts/firewall.mjs` creates or updates them (safe to re-run), and `--dry-run` shows the change without publishing. Run it with a short-lived token:
+  `scripts/firewall.mjs` creates or updates them through Vercel's REST API (safe to re-run). It edits the firewall draft, publishes it, then checks the rules are live. `--dry-run` shows the change and discards it. If the project already has unpublished firewall edits, it stops without changing anything. Run it with a short-lived token:
 
   ```
   $env:VERCEL_TOKEN="…"; pnpm firewall
