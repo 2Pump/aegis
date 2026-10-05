@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIRS = ['apps', 'packages', 'scripts'];
 const SKIP = new Set(['audit-writes.mjs', 'node_modules', 'dist', 'test-results', 'playwright-report']);
+// Generated bundles: like dist/, built only from the sources audited here plus library code (viem's ABI constants
+// contain the words "approve"/"transferFrom"). `pnpm --filter @aegis/web check:api` proves the bundle matches its sources.
+const SKIP_PATHS = new Set([join('apps', 'web', 'api', 'v1.js')]);
 const BANNED = [
   /\bapprove\s*\(/,
   /['"]approve['"]/,
@@ -30,6 +33,7 @@ const walk = (d) => {
   for (const f of readdirSync(d)) {
     if (SKIP.has(f)) continue;
     const p = join(d, f);
+    if (SKIP_PATHS.has(relative(root, p))) continue;
     if (statSync(p).isDirectory()) walk(p);
     else if (/\.(ts|tsx|js|mjs)$/.test(f)) {
       readFileSync(p, 'utf8').split('\n').forEach((line, i) => {

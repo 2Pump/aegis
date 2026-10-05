@@ -21,6 +21,9 @@ The site uses plain words. The code, `census.json`, share links and the rules ke
 | Checks | calibration | Whether readings were matched against the official apps. |
 | Test wallet | fixture | A made-up example account. |
 | Intel | intel | History, Liquidations, Oracles, Changes and Carry. |
+| Public API | /api/v1 (`api-1.0.0`) | Read-only JSON over the same readings; no wallet listing, no balances. docs/API.md · /developers |
+| Webhooks | /api/v1/webhooks (`webhooks-1.0.0`) | Signed event deliveries — built, OFF until the owner switches them on. docs/WEBHOOKS.md |
+| Ink events | `events-1.0.0` | The one Ink-wide event feed behind /protocol alerts, webhooks and /api/v1/events. |
 | Yield and Carry | intel?tab=carry (`carry-1.0.0`) | Estimated net rates, costs and risk factors of carry structures on Tydro + Nado, observed from the chain. Analysis only — nothing to trade with. docs/CARRY.md |
 | Oracle Watch | intel?tab=oracles (`oracle-1.0.0`) | The prices Tydro and Nado use, next to Tydro's source contract and Pyth where it exists on Ink; staleness, divergence, pegs, jumps. docs/ORACLES.md |
 | Protocol Change Monitor | intel?tab=changes (`changes-1.0.0`) | Risk parameters read hourly from the contracts; a difference is a change record, old → new between two blocks. |

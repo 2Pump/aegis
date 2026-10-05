@@ -6,6 +6,7 @@ import type { PublicClient } from 'viem';
 import { NADO_CONTRACTS, PYTH, TYDRO, TYDRO_RESERVES, readOracleSnapshot, type OracleSnapshot } from '@aegis/ink-io';
 import { classify, familyOf, type Book } from '@aegis/pose';
 import {
+  type LedgerRecord,
   ORACLE,
   PARAMS_LATEST,
   PressureAcc,
@@ -522,6 +523,31 @@ describe('Alerts · /protocol (Ink-wide events, opt-in)', () => {
     expect(tx.to('1').filter((t) => t.includes('USDe: DEPEG'))).toHaveLength(1);
     expect(tx.to('2').some((t) => t.includes('USDe'))).toBe(false);
     expect(tx.to('1').at(-1)).toMatch(/AEGIS is a camera/);
+  });
+});
+
+describe('Alerts · actual liquidation of a watched wallet (always on)', () => {
+  it('a chat watching the wallet is told once, urgently, with no balance; other chats and older liquidations are not', async () => {
+    const tx = new TestTransport();
+    let now = T0;
+    const W = '0x' + 'cd'.repeat(20);
+    const liqs: LedgerRecord[] = [];
+    const deps = { transport: tx, read: async () => null, now: () => now, fixtures: new Set<string>(), siteUrl: 'https://x', hashChat: (c: string) => c, liquidations: liqs };
+    let db = emptyDb(T0);
+    tx.say('1', '/start');
+    tx.say('1', `/watch ${W}`);
+    tx.say('2', '/start');
+    ({ db } = await runAlerts(db, deps));
+    const rec = (id: string, at: number) => ({ id, venue: 'tydro', tx: '0xt', block: 77, at, wallet: W, sizeBand: '10–100k', family: 'ETH', aegis: { before: { hullTemp: 'CRITICAL' } } }) as unknown as LedgerRecord;
+    liqs.push(rec('before-watch', T0 - H), rec('l1', T0 + 10 * 60_000));
+    now = T0 + H;
+    ({ db } = await runAlerts(db, deps));
+    ({ db } = await runAlerts(db, deps));
+    const got = tx.to('1').filter((t) => t.includes('LIQUIDATED'));
+    expect(got).toHaveLength(1);
+    expect(got[0]).toMatch(/size range 10–100k/);
+    expect(got[0]).not.toMatch(/\$\d|health factor|HF \d/i);
+    expect(tx.to('2').some((t) => t.includes('LIQUIDATED'))).toBe(false);
   });
 });
 

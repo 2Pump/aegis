@@ -341,3 +341,21 @@ export {
   type Component as CarryComponent,
   type Risk as CarryRisk,
 } from './carry.js';
+export {
+  EVENTS_VERSION,
+  INK_EVENT_TYPES,
+  WALLET_EVENT_TYPES,
+  inkEvents,
+  oracleEvents,
+  changeEvents,
+  stressEvents,
+  cascadeEvents,
+  verificationEvents,
+  liquidationEvents,
+  type InkEvent,
+  type EventType,
+  type InkEventType,
+  type WalletEventType,
+  type EventData,
+  type FeedInput,
+} from './events.js';

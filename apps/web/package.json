@@ -9,7 +9,9 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests --dir src",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "build:api": "node scripts/build-api.mjs",
+    "check:api": "node scripts/build-api.mjs --check"
   },
   "dependencies": {
     "@aegis/census": "workspace:*",
@@ -30,6 +32,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "esbuild": "0.28.2"
   }
 }

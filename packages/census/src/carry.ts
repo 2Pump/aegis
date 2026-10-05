@@ -626,53 +626,67 @@ export function buildCarry(o: CarryInput): CarryFile {
     );
   }
 
-  // 5 ── borrowed asset + hedge: supply X on Tydro, borrow USDT0 against it as Nado margin, short the perp
-  for (const sym of ['WETH', 'kBTC']) {
+  // 5 ── borrowed asset + hedge: supply X on Tydro, borrow a stablecoin against it, use it as Nado margin, short the
+  //      perp. The stablecoin is whichever one Tydro lets you borrow NOW (read each run) that Nado also takes as
+  //      margin (same token address) — USDT0 (Nado's quote) preferred, then USDC.
+  const borrowStable = (() => {
+    const cands = ['USDT', 'USDC']
+      .map((sym) => ({ sym, t: tyd(head, sym), n: head.nado?.spot.find((s) => s.token === tyd(head, sym)?.asset) ?? null }))
+      .filter((c): c is { sym: string; t: TydroMarket; n: NadoSpotMarket } => !!c.t && !!c.n);
+    return cands.find((c) => c.t.borrowingEnabled !== false && c.t.isActive !== false && !c.t.isFrozen) ?? cands[0] ?? null;
+  })();
+  for (const sym of borrowStable ? ['WETH', 'kBTC'] : []) {
     const h = HEDGE[sym]!;
     const t = tyd(head, sym);
-    const usdt = tyd(head, 'USDT');
     const p = perpBy(h.perp);
-    if (!t || !usdt || !p || !usdtQuote) continue;
+    const { sym: bs, n: bn } = borrowStable!;
+    const bl = ORACLE_SYMBOL(bs);
+    if (!t || !p) continue;
     const b = t.ltv !== null ? (t.ltv / 10_000) * CARRY.BORROW_SHARE_OF_LTV : null;
     if (b === null || !t.liquidationThreshold) continue;
     const lt = t.liquidationThreshold / 10_000;
     const legs: Leg[] = [
       { label: `${sym} supply rate on Tydro`, kind: 'yield', weight: 1, rate: RATE.tydroSupply(sym), current: (q) => tyd(q, sym)?.supplyApr ?? null, source: 'Tydro AaveProtocolDataProvider.getReserveData (liquidityRate, liquidityIndex)' },
-      { label: 'USDT0 borrow rate on Tydro', kind: 'cost', weight: b, rate: RATE.tydroBorrow('USDT'), current: (q) => tyd(q, 'USDT')?.borrowApr ?? null, source: 'Tydro AaveProtocolDataProvider.getReserveData (variableBorrowRate, variableBorrowIndex)' },
-      { label: 'USDT0 margin deposit rate on Nado', kind: 'yield', weight: b, rate: RATE.nadoDeposit(NADO_QUOTE), source: 'Nado FQuerier.getSubaccountInfo (USDT0 cumulativeDepositsMultiplierX18)' },
+      { label: `${bl} borrow rate on Tydro`, kind: 'cost', weight: b, rate: RATE.tydroBorrow(bs), current: (q) => tyd(q, bs)?.borrowApr ?? null, source: 'Tydro AaveProtocolDataProvider.getReserveData (variableBorrowRate, variableBorrowIndex)' },
+      { label: `${bl} margin deposit rate on Nado`, kind: 'yield', weight: b, rate: RATE.nadoDeposit(bn.productId), source: `Nado FQuerier.getSubaccountInfo (${bl} cumulativeDepositsMultiplierX18)` },
       { label: `${h.perp} funding received by a short`, kind: 'funding', weight: 1, rate: RATE.fundingShort(p.productId), source: 'Nado FQuerier.getSubaccountInfo (cumulativeFundingShortX18 ÷ oracle price)' },
     ];
+    const marginW = bn.longWeightMaintenance > 0 ? bn.longWeightMaintenance : 1;
     const down = (1 - b / lt) * 100;
-    const up = ((1 + b) / p.shortWeightMaintenance - 1) * 100;
+    const up = ((1 + b * marginW) / p.shortWeightMaintenance - 1) * 100;
     const supCap = tydroCapacity(sym, 'supply');
-    const borCap = tydroCapacity('USDT', 'borrow');
+    const borCap = tydroCapacity(bs, 'borrow');
     structures.push(
       buildStructure(
         {
           id: `bh-${sym}`,
           kind: 'borrowed-hedge',
-          title: `Supply ${sym} on Tydro, borrow USDT0 as Nado margin, short ${h.perp}`,
+          title: `Supply ${sym} on Tydro, borrow ${bl} as Nado margin, short ${h.perp}`,
           venues: ['tydro', 'nado'],
-          assets: [sym, 'USDT0', h.perp],
-          sizing: `per $1 of ${sym} supplied: borrow ${(b * 100).toFixed(0)}¢ of USDT0 (half of Tydro's ${(t.ltv! / 100).toFixed(0)}% LTV), deposit it on Nado, short $1 of ${h.perp}`,
+          assets: [sym, bl, h.perp],
+          sizing: `per $1 of ${sym} supplied: borrow ${(b * 100).toFixed(0)}¢ of ${bl} (half of Tydro's ${(t.ltv! / 100).toFixed(0)}% LTV), deposit it on Nado, short $1 of ${h.perp}`,
           sources: legs.map((l) => l.source),
-          assumptions: [`borrow ${(CARRY.BORROW_SHARE_OF_LTV * 100).toFixed(0)}% of the LTV allowance (assumed)`, 'no rebalancing: both liquidation distances are from the opening price'],
+          assumptions: [
+            `borrow ${(CARRY.BORROW_SHARE_OF_LTV * 100).toFixed(0)}% of the LTV allowance (assumed)`,
+            `${bl} is the stablecoin Tydro lets you borrow at this block that Nado also takes as margin (checked every run)`,
+            'no rebalancing: both liquidation distances are from the opening price',
+          ],
           notes: [h.relation, 'Two-sided: a fall threatens the Tydro loan, a rise threatens the Nado short — each side has to be watched on its own venue.'],
         },
         legs,
         ctx,
         {
-          fees: fees(9, [usdtQuote], true),
+          fees: fees(9, [bn], true),
           capacity: minCap([supCap, borCap], [1, b]),
           liquidity: [borCap.text, `${h.perp} open interest ≈ ${usd(p.openInterest * p.priceUsd)}`],
           liquidation: {
             pctUp: up,
             pctDown: down,
-            text: `Tydro loan liquidated if ${sym} falls about ${down.toFixed(0)}% (liquidation threshold ${(lt * 100).toFixed(0)}%); Nado short liquidated if it rises about ${up.toFixed(0)}% (margin ${(b * 100).toFixed(0)}%, short maintenance weight ${p.shortWeightMaintenance})`,
+            text: `Tydro loan liquidated if ${sym} falls about ${down.toFixed(0)}% (liquidation threshold ${(lt * 100).toFixed(0)}%); Nado short liquidated if it rises about ${up.toFixed(0)}% (${bl} margin ${(b * 100).toFixed(0)}% at maintenance weight ${marginW}, short maintenance weight ${p.shortWeightMaintenance})`,
           },
-          stables: ['USDT0'],
-          oracleAssets: [sym, 'USDT0'],
-          subjects: [sym, 'USDT', h.perp],
+          stables: [bl],
+          oracleAssets: [sym, bl],
+          subjects: [sym, bs, h.perp],
           blockers: [...supCap.blockers, ...borCap.blockers],
           missing: [],
         },
@@ -750,12 +764,12 @@ export function buildCarry(o: CarryInput): CarryFile {
     };
   }
 
-  const equityBases = new Set(['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'MSTR', 'COIN', 'AMZN', 'GOOGL', 'META', 'MSFT', 'HOOD', 'CRCL']);
-  const equityPerps = (head.nado?.perp ?? []).filter((p) => equityBases.has((p.symbol ?? '').replace('-PERP', ''))).map((p) => p.symbol);
-  const equitySpot = (head.nado?.spot ?? []).filter((s) => equityBases.has(s.symbol ?? ''));
-  const equities = equitySpot.length
-    ? `Tokenized-equity spot on Nado: ${equitySpot.map((s) => s.symbol).join(', ')} — not modelled in carry-1.0.0.`
-    : `No tokenized-equity collateral is listed on Tydro or as Nado spot at this block${equityPerps.length ? ` — equities trade on Nado only as perps (${equityPerps.join(', ')}); their funding is in the table below` : ''}.`;
+  // tokenized equities: Nado lists them as spot (wAAPLx …) and as perps; none is Tydro collateral
+  const equityBases = ['AAPL', 'TSLA', 'NVDA', 'SPY', 'QQQ', 'MSTR', 'COIN', 'AMZN', 'GOOGL', 'META', 'MSFT', 'HOOD', 'CRCL'];
+  const isEquity = (s: string | null) => !!s && equityBases.some((b) => s.replace('-PERP', '').replace(/^w(.+)x$/, '$1') === b);
+  const equityPerps = (head.nado?.perp ?? []).filter((p) => isEquity(p.symbol)).map((p) => p.symbol);
+  const equitySpot = (head.nado?.spot ?? []).filter((s) => isEquity(s.symbol)).map((s) => s.symbol);
+  const equities = `${equitySpot.length ? `Nado lists tokenized equities as spot (${equitySpot.join(', ')})` : 'Nado lists no tokenized-equity spot at this block'}${equityPerps.length ? ` and as perps (${equityPerps.join(', ')})` : ''}. None is Tydro collateral, so equity carry isn't modelled in ${CARRY.VERSION}; the equity spot rates and perp funding are in the tables below.`;
 
   return {
     v: 1,

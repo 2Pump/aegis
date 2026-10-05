@@ -8,6 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./alerts": "./src/alerts/index.ts",
+    "./api": "./src/api/index.ts",
+    "./webhooks": "./src/webhooks/index.ts",
     "./node": "./src/node/index.ts"
   },
   "scripts": {

@@ -277,6 +277,18 @@ test('CARRY: estimated net per structure, every leg and risk factor, nothing to 
   await expect(page.getByTestId('intel-carry').locator('a[href^="http"]')).toHaveCount(0);
 });
 
+test('Developers: the public API is documented (read-only, no wallet listing) and webhooks say NOT LIVE', async ({ page }) => {
+  await page.goto('/developers');
+  const d = page.getByTestId('developers-page');
+  await expect(d).toContainText('/api/v1');
+  await expect(d).toContainText('/wallets/{address}');
+  await expect(d.locator('a[href="/api/v1/openapi.json"]')).toHaveCount(1);
+  await expect(page.getByTestId('webhooks-not-live')).toContainText('NOT LIVE YET');
+  await expect(d.getByText(/ranks? them by closeness to liquidation/i).first()).toBeVisible(); // stated as something it never does
+  await page.goto('/watch');
+  await expect(page.getByTestId('alerts-page')).toContainText('actually liquidated');
+});
+
 test('wallet page: a HISTORY section that never invents history (no recording → says so)', async ({ page }) => {
   await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
   const h = page.getByTestId('wallet-history');

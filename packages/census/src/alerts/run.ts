@@ -12,6 +12,8 @@ import { formatAlert, short } from './format.js';
 import { ALERTS, audit, freshState, stateKey, type AlertsConfig, type AlertsDb, type Observation, type Watch } from './model.js';
 import type { AlertsTransport } from './transport.js';
 import { FOOTER_TEXT } from './text.js';
+import { liquidationEvents } from '../events.js';
+import type { LedgerRecord } from '../ledger.js';
 
 export interface RunDeps {
   transport: AlertsTransport;
@@ -23,8 +25,10 @@ export interface RunDeps {
   hashChat: (chatId: string) => string;
   cfg?: AlertsConfig;
   log?: (m: string) => void;
-  /** Ink-wide events (Oracle Watch, Protocol Change Monitor), already deduplicated with cooldowns at their source */
+  /** Ink-wide events (events.ts: oracle, parameter changes, stress level, cascades, failed checks) — /protocol on */
   protocolEvents?: ReadonlyArray<{ id: string; at: number; text: string; urgent?: boolean }>;
+  /** recent ledger records: a watched wallet that is actually liquidated is always told (urgent) */
+  liquidations?: readonly LedgerRecord[];
 }
 
 export interface RunReport {
@@ -199,6 +203,34 @@ export async function runAlerts(dbIn: AlertsDb, deps: RunDeps): Promise<{ db: Al
       }
     }
     if (db.chats[chat.id]) db.chats[chat.id]!.seenProtocol = [...seen].slice(-300);
+  }
+
+  /* 6 ── actual liquidations of watched wallets (from the ledger; always on — it's the wallet they asked about) */
+  if (deps.liquidations?.length) {
+    const watchedAll = new Set(Object.values(db.chats).flatMap((c) => c.watches.map((w) => w.address)));
+    const liqEv = liquidationEvents(deps.liquidations, watchedAll);
+    for (const chat of Object.values(db.chats)) {
+      if (chat.paused) continue;
+      const seen = new Set(chat.seenLiq ?? []);
+      for (const e of liqEv) {
+        const w = chat.watches.find((x) => x.address === e.data.wallet);
+        if (!w || seen.has(e.id) || e.at < w.createdAt) continue;
+        seen.add(e.id);
+        const now = deps.now();
+        if (!rateAllow(chat, now, true, cfg)) {
+          chat.held += 1;
+          rep.held += 1;
+          continue;
+        }
+        const text = [`AEGIS · LIQUIDATED`, `${e.text}.`, `It happened on-chain at block ${e.block ?? '—'} — what AEGIS had recorded before it is on the wallet page.`, '', `${deps.siteUrl.replace(/\/$/, '')}/hull/${String(e.data.wallet)}`, FOOTER_TEXT].join('\n');
+        if (await deliver(chat.id, text, 'alert')) {
+          rep.sent++;
+          chat.sentAt.push(now);
+          audit(db, { at: now, chat: deps.hashChat(chat.id), kind: 'alert', detail: `liquidated: ${short(String(e.data.wallet))}` }, cfg);
+        }
+      }
+      if (db.chats[chat.id]) db.chats[chat.id]!.seenLiq = [...seen].slice(-300);
+    }
   }
 
   // state for wallets no chat watches any more is dropped (nothing kept that isn't needed)

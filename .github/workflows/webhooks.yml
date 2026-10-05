@@ -1,0 +1,46 @@
+# AEGIS webhooks — OFF until the owner turns it on (docs/WEBHOOKS.md).
+# Every job is skipped unless the repository VARIABLE WEBHOOKS_ENABLED is 'true' (Settings → Secrets and variables →
+# Actions → Variables). Secrets it needs (Settings → Secrets → Actions):
+#   WEBHOOKS_STORE_KEY  32 random bytes, base64 — the SAME value as WEBHOOKS_STORE_KEY in Vercel (encrypts subscriptions)
+#   BLOB_READ_WRITE_TOKEN, INK_RPC (optional) — the same ones the census uses
+# Each run: reads the census files and watched wallets (read-only), queues new events, delivers signed POSTs that are
+# due, retries with backoff, dead-letters what keeps failing. Logs counts only.
+
+name: webhooks
+run-name: webhooks · ${{ github.event_name }}
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: webhooks
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  webhooks:
+    if: ${{ vars.WEBHOOKS_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - run: pnpm install --frozen-lockfile
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - name: Webhooks
+        run: pnpm webhooks
+        env:
+          WEBHOOKS_STORE_KEY: ${{ secrets.WEBHOOKS_STORE_KEY }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          INK_RPC: ${{ secrets.INK_RPC }}

@@ -13,8 +13,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INK_PUBLIC_RPCS, makeInkClient, splitRpcList } from '@aegis/ink-io';
 import { emptyDb, runAlerts } from '@aegis/census/alerts';
-import { ORACLE_LATEST, changesPath, paramLabel, type ChangesFile, type OracleWatch } from '@aegis/census';
-import { blobAlertsStore, blobStore, chatHasher, checkAlertsEnv, fileAlertsStore, fileStore, fixtureAddresses, makeAlertsReader, parseStoreKey, telegramTransport } from '@aegis/census/node';
+import { paramLabel } from '@aegis/census';
+import { blobAlertsStore, blobStore, chatHasher, checkAlertsEnv, fileAlertsStore, fileStore, fixtureAddresses, loadFeed, makeAlertsReader, parseStoreKey, telegramTransport } from '@aegis/census/node';
 
 const args = process.argv.slice(2);
 const flag = (k: string) => {
@@ -44,7 +44,7 @@ async function main() {
   const t0 = Date.now();
   const { db: next, report } = await runAlerts(db, {
     transport: telegramTransport({ token: process.env.TELEGRAM_BOT_TOKEN!.trim() }),
-    protocolEvents: await protocolEvents(storeKind),
+    ...(await feedFor(storeKind)),
     read: makeAlertsReader(client, census),
     now: () => Date.now(),
     fixtures: fixtureAddresses(root),
@@ -59,23 +59,26 @@ async function main() {
   if (report.failed) process.exitCode = 1;
 }
 
-/** Ink-wide events from the last day: Oracle Watch events and protocol parameter changes (balance-free). */
-async function protocolEvents(kind: 'blob' | 'file') {
+/** The canonical Ink-wide feed (events.ts) from the last day + recent ledger records — balance-free. */
+const LABEL: Record<string, string> = {
+  'oracle.divergence': 'Oracle divergence',
+  'oracle.depeg': 'Stablecoin depeg',
+  'oracle.stale': 'Oracle stale',
+  'oracle.jump': 'Price jump',
+  'oracle.invalid': 'Oracle invalid',
+  'oracle.resolved': 'Oracle resolved',
+  'protocol.parameter_changed': 'Parameter change',
+  'stress.level_changed': 'Ink Stress Level',
+  'cascade.detected': 'Liquidation cascade',
+  'verification.failed': 'Check failed',
+};
+async function feedFor(kind: 'blob' | 'file') {
   const cs = kind === 'blob' ? await blobStore() : fileStore(join(root, 'apps/web/public/census'));
-  const since = Date.now() - 86_400_000;
-  const out: Array<{ id: string; at: number; text: string; urgent?: boolean }> = [];
-  const w = (await cs.get(ORACLE_LATEST).catch(() => null)) as OracleWatch | null;
-  for (const e of w?.kind === 'aegis-oracle-watch' ? w.events : []) {
-    if (e.at < since) continue;
-    out.push({ id: `oracle:${e.id}`, at: e.at, text: `Oracle ${e.status === 'RESOLVED' ? 'resolved' : e.status}: ${e.text}`, urgent: e.status === 'DEPEG' || e.status === 'INVALID' });
-  }
-  const m = new Date().toISOString().slice(0, 7);
-  const c = (await cs.get(changesPath(m)).catch(() => null)) as ChangesFile | null;
-  for (const r of c?.kind === 'aegis-changes' ? c.records : []) {
-    if (r.between.toAt < since) continue;
-    out.push({ id: `change:${r.id}`, at: r.between.toAt, text: `${r.protocol === 'tydro' ? 'Tydro' : 'Nado'} parameter ${r.kind}: ${r.subject} · ${paramLabel(r.name)}: ${r.old ?? '—'} → ${r.new ?? '—'}` });
-  }
-  return out;
+  const { ink, liq } = await loadFeed(cs, Date.now() - 86_400_000);
+  return {
+    protocolEvents: ink.map((e) => ({ id: e.id, at: e.at, text: `${LABEL[e.type] ?? e.type}: ${e.type === 'protocol.parameter_changed' ? `${e.data.protocol === 'tydro' ? 'Tydro' : 'Nado'} ${e.data.subject} · ${paramLabel(String(e.data.parameter))}: ${e.data.old ?? '—'} → ${e.data.new ?? '—'}` : e.text}`, urgent: e.urgent })),
+    liquidations: liq.filter((r) => r.at >= Date.now() - 86_400_000),
+  };
 }
 
 main().catch((e: unknown) => {

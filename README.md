@@ -63,5 +63,6 @@ scripts           census · prove · verify-auto · alerts · make-fixtures · s
 - `/calibration`: proof status + the six fixture books. `/fixture/carry|naked|equity-margin|wounded|dark|empty`: calibration plates.
 - Rules: one drawer, opened from the header button, the footer, a wallet page, or any link with `?rules=1` (old `/rules` links redirect to it).
 - `/intel`: INTEL. HISTORY (ecosystem risk over time), LIQUIDATIONS (ledger, cascades, replay), ORACLES (Oracle Watch), CHANGES (Protocol Change Monitor) and CARRY (Yield and Carry, analysis only) are built (docs/HISTORY.md, docs/LEDGER.md, docs/ORACLES.md, docs/CARRY.md). The Checks page carries the track record and Pressure forecast scoring.
+- `/developers` and `/api/v1`: the read-only Public Risk API (docs/API.md); webhooks are built but OFF (docs/WEBHOOKS.md).
 - `/census`: pose mix of every account found, coverage, and snapshot and backfill status.
 - `/watch`: Telegram alerts — built and tested, labelled NOT LIVE until switched on (docs/ALERTS.md).

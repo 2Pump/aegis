@@ -15,13 +15,14 @@
     "test": "pnpm -r test",
     "e2e": "pnpm --filter @aegis/web e2e",
     "audit:writes": "node scripts/audit-writes.mjs",
-    "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && pnpm -r test && pnpm --filter @aegis/web build",
+    "check": "node scripts/audit-writes.mjs && tsc -p tsconfig.json && pnpm -r typecheck && tsc -p apps/web/api-src/tsconfig.json && pnpm -r test && pnpm --filter @aegis/web build && pnpm --filter @aegis/web check:api",
     "fixtures": "node scripts/make-fixtures.mjs",
     "sync:tydro": "node scripts/sync-tydro-registry.mjs",
     "prove": "tsx scripts/prove.ts",
     "census": "tsx scripts/census.ts",
     "verify:auto": "tsx scripts/verify-auto.ts",
-    "alerts": "tsx scripts/alerts.ts"
+    "alerts": "tsx scripts/alerts.ts",
+    "webhooks": "tsx scripts/webhooks.ts"
   },
   "devDependencies": {
     "@aegis/ink-io": "workspace:*",

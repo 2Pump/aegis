@@ -9,7 +9,7 @@ import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
 import { PressurePage } from './pages/Pressure';
 import { IntelPage } from './pages/Intel';
-import { CensusPage, NotFound, WatchPage } from './pages/Static';
+import { CensusPage, DevelopersPage, NotFound, WatchPage } from './pages/Static';
 import './styles.css';
 
 installStaleBuildReload();
@@ -29,6 +29,7 @@ const router = createBrowserRouter([
       { path: '/intel', element: <IntelPage /> },
       { path: '/census', element: <CensusPage /> },
       { path: '/watch', element: <WatchPage /> },
+      { path: '/developers', element: <DevelopersPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

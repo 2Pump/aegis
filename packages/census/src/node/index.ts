@@ -10,3 +10,4 @@ export { fixtureAddresses } from './fixtures.js';
 export { recordLiquidations, rescoreAccountability, type LedgerOpts, type LedgerResult } from './ledger-write.js';
 export { recordOracles, recordChanges, rescoreForecasts, type IntelOpts } from './intel-write.js';
 export { recordCarry, type CarryOpts } from './carry-write.js';
+export { memoryWebhookStore, blobWebhookStore, safeLookup, httpsSender, runWebhooks, loadFeed, type WebhookStoreAll, type Sender, type WebhookRunDeps, type WebhookRunReport } from './webhooks-node.js';

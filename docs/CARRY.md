@@ -37,7 +37,7 @@
 | Lending baseline | Lend each stablecoin on Tydro (USDT0, USDC, USDG, GHO, USDe, sUSDe, syrupUSDT); deposit USDT0 / USDC on Nado | $1 lent; sUSDe and syrupUSDT also appreciate against USDT0 |
 | Spot + short perp, one Nado account | WETH + short ETH-PERP; kBTC + short BTC-PERP | $1 spot deposited, $1 perp short; the spot is the margin |
 | Spot on Tydro + short perp on Nado | WETH, kBTC, SolvBTC, weETH, wrsETH, ezETH | ⅔ supplied on Tydro, the same amount shorted on Nado, ⅓ USDT0 as margin (margin = 50% of the hedge) |
-| Borrowed asset + hedge | Supply WETH / kBTC on Tydro, borrow USDT0 against it, deposit it on Nado as margin, short the perp | borrow half of what Tydro's LTV allows; two-sided liquidation risk |
+| Borrowed asset + hedge | Supply WETH / kBTC on Tydro, borrow **the stablecoin Tydro currently lets you borrow** that Nado also takes as margin (USDT0 preferred, then USDC; read from the contract every run), deposit it on Nado, short the perp | borrow half of what Tydro's LTV allows; margin counted at Nado's own maintenance weight; two-sided liquidation risk. If no stablecoin is borrowable, the structure stays listed, HIGH, with the reason |
 
 Hedges are mapped explicitly, never by ticker:
 - WETH, weETH, wrsETH and ezETH → ETH-PERP.
@@ -45,7 +45,7 @@ Hedges are mapped explicitly, never by ticker:
 
 Each structure says what its hedge does **not** cover: a wrapper losing its peg, or an LST's ETH ratio falling.
 
-For tokenized equities, Nado lists equities only as perps, and no tokenized-equity collateral exists on Tydro or as Nado spot. The page says so, and the equity perps' funding is in the funding table.
+Nado lists tokenized equities both as spot (wQQQx, wSPYx, wAAPLx …) and as perps. None of them is Tydro collateral, so equity carry isn't modelled in `carry-1.0.0`. The page says so, and the equity spot rates and perp funding are in the market tables.
 
 ## Shown for every structure
 

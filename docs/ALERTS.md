@@ -35,7 +35,16 @@ position sizes.**
 ## Commands
 `/start` `/watch <addr> [tydro|nado]` `/unwatch <addr>` `/list` `/pause` `/resume` `/status [addr]` `/protocol on|off`
 
-`/protocol on` also sends Ink-wide Oracle Watch events and Tydro/Nado parameter changes (docs/ORACLES.md), from the moment it's turned on, once each, inside the same rate limit. Off by default.
+`/protocol on` also sends the Ink-wide event feed (`events-1.0.0`, `packages/census/src/events.ts` — the same feed webhooks and `/api/v1/events` use):
+- oracle problems (divergence, depeg, stale, jump, invalid, resolved);
+- Tydro and Nado parameter changes;
+- Ink Stress Level changes;
+- liquidation cascades;
+- failed automatic checks.
+
+They're sent from the moment it's turned on, once each, inside the same rate limit. Off by default.
+
+**Actual liquidations** of a watched wallet, from the Liquidation Ledger, are always sent, marked urgent, once each, and only for liquidations after the watch was set. The message gives the size as a range and never a balance.
 `/hf <addr> <1.0–5|off>` `/buffer <addr> <1–90|off>` `/scenario <addr> <DIR> <±pct|off>` `/help` `/delete`
 
 Nothing is stored before `/start`. Private chats only (groups are ignored). Rejected: malformed addresses, the zero

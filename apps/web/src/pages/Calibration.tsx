@@ -26,6 +26,8 @@ export function CalibrationPage() {
 
       <ForecastTrack />
 
+      <div className="faint mono" style={{ fontSize: 11 }}>The same checks, scores and readings are available as JSON: <Link to="/developers">developers → Public Risk API</Link>.</div>
+
       <Panel title="Matched against the official apps — by hand" rail={VERIFIED ? 'var(--cyan)' : VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? 'var(--amber)' : 'var(--red)'} testId="proof-panel">
         {VERIFIED || VENUE_VERIFIED.tydro || VENUE_VERIFIED.nado ? (
           <div className="stack" style={{ gap: 8 }}>

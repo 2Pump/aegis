@@ -82,6 +82,8 @@ export interface Chat {
   seenProtocol?: string[];
   /** only protocol events from this time on (no backlog when someone opts in) */
   protocolSince?: number;
+  /** ids of liquidation events already sent to this chat (its own watched wallets) */
+  seenLiq?: string[];
 }
 
 /** Risk level used by alerts — the same ladder as the well and the Pressure Map. */

@@ -6,8 +6,29 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|robots.txt|favicon.svg).*)",
+      "source": "/api/v1/(.*)",
+      "destination": "/api/v1?__path=$1"
+    },
+    {
+      "source": "/((?!assets/|api/|robots.txt|favicon.svg).*)",
       "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/v1.js": {
+      "maxDuration": 20,
+      "memory": 1024
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
     }
   ]
 }

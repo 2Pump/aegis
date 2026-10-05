@@ -67,6 +67,39 @@ describe('Carry structures', () => {
     expect(s.net).toBeCloseTo(0.02 + 0.04 * b - 0.07 * b + 0.1, 3);
   });
 
+  it('borrowed hedge uses the stablecoin Tydro lets you borrow now (USDT0 off → USDC) with Nado’s own margin weight', () => {
+    const mk = (d: number) => {
+      const p = point(d);
+      p.tydro.find((t) => t.symbol === 'USDT')!.borrowingEnabled = false;
+      const usdc = p.tydro.find((t) => t.symbol === 'USDC')!;
+      p.nado!.spot.push({ productId: 5, symbol: 'USDC', token: usdc.asset, priceUsd: 1, depositMultiplier: 1 + 0.01 * (d / 365), borrowMultiplier: 1 + 0.03 * (d / 365), deposits: 4e6, borrows: 1e6, withdrawFee: 1, longWeightMaintenance: 0.98, shortWeightMaintenance: 1.02 });
+      return p;
+    };
+    const f = buildCarry({ head: mk(30), days: Array.from({ length: 30 }, (_, i) => mk(i)), oracle: okWatch, nowMs: T0 + 30 * D });
+    const s = S(f, 'bh-WETH');
+    expect(s.title).toBe('Supply WETH on Tydro, borrow USDC as Nado margin, short ETH-PERP');
+    expect(s.borrowCost).toBeCloseTo(0.065 * 0.4, 6);
+    expect(s.liquidation.pctUp).toBeCloseTo(((1 + 0.4 * 0.98) / 1.05 - 1) * 100, 6);
+    expect(factor(f, 'bh-WETH', 'protocol-change').risk).not.toBe('HIGH');
+    // nothing borrowable at all → the structure stays, flagged HIGH with the reason
+    const none = (d: number) => {
+      const p = mk(d);
+      p.tydro.find((t) => t.symbol === 'USDC')!.borrowingEnabled = false;
+      return p;
+    };
+    const g = buildCarry({ head: none(30), days: Array.from({ length: 30 }, (_, i) => none(i)), oracle: okWatch, nowMs: T0 + 30 * D });
+    expect(factor(g, 'bh-WETH', 'protocol-change').text).toMatch(/borrowing USDT is disabled on Tydro/);
+    expect(S(g, 'bh-WETH').risk).toBe('HIGH');
+  });
+
+  it('tokenized equities: Nado spot and perps are named, and the note says they are not Tydro collateral', () => {
+    const p = point(30);
+    p.nado!.spot.push({ productId: 40, symbol: 'wAAPLx', token: '0x' + 'a'.repeat(40), priceUsd: 230, depositMultiplier: 1, borrowMultiplier: 1, deposits: 100, borrows: 0, withdrawFee: 0.003, longWeightMaintenance: 0.8, shortWeightMaintenance: 1.2 });
+    p.nado!.perp.push({ productId: 41, symbol: 'AAPL-PERP', priceUsd: 230, cumFundingLong: 0, cumFundingShort: 0, openInterest: 10, longWeightMaintenance: 0.9, shortWeightMaintenance: 1.1 });
+    const f = buildCarry({ head: p, days: history(30), nowMs: T0 + 30 * D });
+    expect(f.equities).toMatch(/spot \(wAAPLx\) and as perps \(AAPL-PERP\)\. None is Tydro collateral/);
+  });
+
   it('utilization and available liquidity are reported per Tydro market', () => {
     const f = buildCarry({ head: point(30), days: history(30), nowMs: T0 + 30 * D });
     const usdt = f.markets.tydro.find((m) => m.symbol === 'USDT0')!;
