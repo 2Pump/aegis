@@ -22,7 +22,8 @@
     "census": "tsx scripts/census.ts",
     "verify:auto": "tsx scripts/verify-auto.ts",
     "alerts": "tsx scripts/alerts.ts",
-    "webhooks": "tsx scripts/webhooks.ts"
+    "webhooks": "tsx scripts/webhooks.ts",
+    "firewall": "node scripts/firewall.mjs"
   },
   "devDependencies": {
     "@aegis/ink-io": "workspace:*",

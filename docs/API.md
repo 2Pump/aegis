@@ -76,7 +76,21 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
 
 - **Headers:** every response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Policy`. A 429 carries `Retry-After`.
 - **Edge cache:** aggregate and wallet responses are cached for 60 s (`s-maxage=60`), so most requests never reach the function. The live scenario is `no-store`.
-- **Limits are per function instance**, so they're best effort. For a hard global limit, add a Vercel Firewall rate-limit rule on `/api/v1/*`, if your plan includes custom rules.
+- **Limits are per function instance**, so on their own they're best effort. A global backstop runs at Vercel's edge, before the function: three Vercel Firewall rate-limit rules, per client IP per minute, answering 429 when exceeded.
+
+  | Rule | Limit |
+  |---|---|
+  | live wallet scenario | 15 |
+  | webhook management | 30 |
+  | everything else under `/api/v1` | 300 |
+
+  `scripts/firewall.mjs` creates or updates them (safe to re-run), and `--dry-run` shows the change without publishing. Run it with a short-lived token:
+
+  ```
+  $env:VERCEL_TOKEN="…"; pnpm firewall
+  ```
+
+  The rules only cover `/api/v1`; the site isn't affected. On Pro, rate-limit checks are billed by usage, which is negligible at current traffic. To remove them, delete the three "AEGIS API - …" rules under Vercel → Firewall.
 
 ## Privacy and abuse prevention
 
