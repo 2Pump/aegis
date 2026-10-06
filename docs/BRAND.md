@@ -47,14 +47,14 @@ At 16 px the full mark turns to mush. So the tab icon is a dark disc with thicke
 
 ## Legacy identifiers (intentionally still `aegis`)
 
+The public API schema (`phrourax-api-1`) and the webhook schema and headers (`phrourax-webhook-1`, `Phrourax-Signature` / `-Delivery` / `-Event`, `Phrourax-Webhooks` user agent) were renamed on 2026-10-06, before either had users.
+
 These are data contracts and infrastructure names, not branding. None of them is shown to people using the site. Renaming any of them would break stored data, saved preferences, the published API or the build — so they stay, and new code keeps using them.
 
 | Identifier | Where | Why it stays |
 |---|---|---|
 | `@aegis/pose`, `@aegis/ink-io`, `@aegis/glyphs`, `@aegis/census`, `@aegis/web`; root package `aegis` | package names, imports, `pnpm --filter` commands, `vercel.json` build command | Workspace wiring; renaming touches every import and the Vercel build command for no visible gain. |
 | Data `kind`s: `aegis-history-agg`, `aegis-history-index`, `aegis-history-wallets`, `aegis-oracle-watch`, `aegis-changes`, `aegis-params`, `aegis-prices`, `aegis-forecasts`, `aegis-forecast-score`, `aegis-liquidations`, `aegis-warnings`, `aegis-accountability`, `aegis-carry`, `aegis-carry-days`, … | files the hourly census writes to Vercel Blob, and the readers that check them | Every file already published carries these values, and the readers reject a file whose `kind` doesn't match. |
-| API schema `aegis-api-1` | every `/api/v1` response | Public API contract. Changing it needs a new version (`/api/v2`), per API.md. |
-| Webhook payload schema `aegis-webhook-1`, headers `AEGIS-Signature`, `AEGIS-Delivery`, `AEGIS-Event`, user agent `AEGIS-Webhooks/<version>` | `webhooks-1.0.0` | Part of the signed webhook contract receivers verify. Change only with a new webhooks version. |
 | Ledger field `record.aegis` (`before`, `nearSince`, `watchSince`, `evaluable`, `why`) and verification field `aegis` | ledger and verification records, API `/liquidations`, `/verification` | Field names in historical records and the API. |
 | Text inside historical records (e.g. a parameter change's `txNote`, a ledger record's `unavailable` / `why`, a check's `source` or `failureReason`) | records written before 2026-10-05 | Historical records are never rewritten. Every published JSON file the site reads (history, intel, ledger, checks, Pressure Map) goes through `readJson()` (`apps/web/src/lib/brandJson.ts`), which shows legacy wording as PHROURAX / Phrourax: only string values, only the whole words `AEGIS` and `Aegis` — never keys, never lowercase identifiers. The API returns records as recorded. |
 | Browser storage: `aegis-my-wallet` (localStorage), `aegis.recent.v1` (localStorage), `aegis-stale-reload-at` (sessionStorage) | `apps/web/src/lib/myWallet.ts`, `recent.ts`, `staleBuild.ts` | Keeps visitors' saved "My wallet" and recent addresses. Never shown. |

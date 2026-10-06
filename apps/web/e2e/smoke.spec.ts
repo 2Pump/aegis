@@ -292,6 +292,8 @@ test('Developers: the public API is documented (read-only, no wallet listing) an
   await expect(d).toContainText('/wallets/{address}');
   await expect(d.locator('a[href="/api/v1/openapi.json"]')).toHaveCount(1);
   await expect(page.getByTestId('webhooks-not-live')).toContainText('NOT LIVE YET');
+  await expect(page.getByTestId('dev-example')).toContainText('"schema": "phrourax-api-1"');
+  await expect(page.locator('body')).not.toContainText('aegis');
   await expect(d.getByText(/ranks? them by closeness to liquidation/i).first()).toBeVisible(); // stated as something it never does
   await page.goto('/watch');
   await expect(page.getByTestId('alerts-page')).toContainText('actually liquidated');

@@ -3,7 +3,7 @@
  * takes the name, URL and disclaimer from here.
  *
  * Internal identifiers that still say `aegis` (package names `@aegis/*`, data `kind`s such as `aegis-history-agg`,
- * the API schema `aegis-api-1`, the ledger field `record.aegis`, storage keys, Blob paths, webhook header names)
+ * the ledger field `record.aegis`, storage keys, Blob paths)
  * are data contracts, not branding — see docs/BRAND.md "Legacy identifiers" before renaming any of them.
  */
 export const BRAND = {

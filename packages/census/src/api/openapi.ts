@@ -81,7 +81,7 @@ export function openapi() {
         Envelope: {
           type: 'object',
           required: ['schema', 'data', 'meta'],
-          properties: { schema: { const: 'aegis-api-1' }, data: {}, meta: { $ref: '#/components/schemas/Meta' } },
+          properties: { schema: { const: 'phrourax-api-1' }, data: {}, meta: { $ref: '#/components/schemas/Meta' } },
         },
         Meta: {
           type: 'object',
@@ -111,7 +111,7 @@ export function openapi() {
         Error: {
           type: 'object',
           properties: {
-            schema: { const: 'aegis-api-1' },
+            schema: { const: 'phrourax-api-1' },
             error: {
               type: 'object',
               properties: {

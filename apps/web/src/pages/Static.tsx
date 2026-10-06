@@ -126,7 +126,7 @@ export function DevelopersPage() {
         <pre className="mono dev-pre" data-testid="dev-example">{`# example (values change every scan)
 curl https://phrourax.com/api/v1/stress
 
-{ "schema": "aegis-api-1",
+{ "schema": "phrourax-api-1",
   "data": { "level": "CALM", "confidence": "NORMAL", … },
   "meta": { "sourceBlock": 57725110, "freshness": "FRESH", "ageSeconds": 1840,
             "completeness": "COMPLETE", "rulesVersion": "v1.2.0", … } }`}</pre>

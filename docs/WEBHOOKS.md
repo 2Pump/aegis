@@ -19,11 +19,11 @@ Webhooks are signed HTTPS POSTs of Phrourax events to an endpoint you control. T
 
 The Pressure state is covered by `stress.level_changed`. Test wallets (fixtures) are refused at subscription and never delivered.
 
-## Payload (`aegis-webhook-1`): balance-free by schema
+## Payload (`phrourax-webhook-1`): balance-free by schema
 
 ```json
 {
-  "schema": "aegis-webhook-1", "version": "webhooks-1.0.0",
+  "schema": "phrourax-webhook-1", "version": "webhooks-1.0.0",
   "deliveryId": "dlv_…", "sentAt": "2026-10-05T18:05:11.000Z",
   "event": { "id": "oracle|…", "type": "oracle.depeg", "at": "…", "block": 57725110, "subject": "USDe",
              "text": "USDe: Tydro: $0.9750 (−2.50% from $1)", "data": { "symbol": "USDe", "status": "DEPEG", "…": "…" } },
@@ -38,11 +38,11 @@ The Pressure state is covered by `stress.level_changed`. Test wallets (fixtures)
 
 | Header | |
 |---|---|
-| `AEGIS-Signature` | `t=<unix seconds>,v1=<hex>` — HMAC-SHA256 with your secret over `` `${t}.${rawBody}` ``. During a secret rotation there's one `v1` per live secret. |
-| `AEGIS-Delivery` | unique per delivery attempt chain: dedupe on it |
-| `AEGIS-Event` | the event type |
+| `Phrourax-Signature` | `t=<unix seconds>,v1=<hex>` — HMAC-SHA256 with your secret over `` `${t}.${rawBody}` ``. During a secret rotation there's one `v1` per live secret. |
+| `Phrourax-Delivery` | unique per delivery attempt chain: dedupe on it |
+| `Phrourax-Event` | the event type |
 
-The header names (and the `aegis-webhook-1` schema) predate the rename to Phrourax and are part of the signed `webhooks-1.0.0` contract, so they keep the `AEGIS-` prefix.
+The header names and schema were renamed from `AEGIS-…` / `aegis-webhook-1` on 2026-10-06, before webhooks were ever switched on, so no receiver used the old names.
 | `Idempotency-Key` | the event id; every retry of one event carries the same key |
 
 ### Verifying (receiver)
@@ -58,7 +58,7 @@ function verify(secret: string, header: string, rawBody: string, nowMs = Date.no
 }
 ```
 
-Replay protection takes two steps on the receiver: reject timestamps outside 5 minutes, and remember `AEGIS-Delivery` ids for at least that long.
+Replay protection takes two steps on the receiver: reject timestamps outside 5 minutes, and remember `Phrourax-Delivery` ids for at least that long.
 
 ## Delivery
 

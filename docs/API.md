@@ -29,9 +29,11 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
 
 ## Response envelope
 
+The schema is `phrourax-api-1`. Before public launch (2026-10-06) it was briefly `aegis-api-1`; it was renamed with the product while no one was using the API, so there's no compatibility period.
+
 ```json
 {
-  "schema": "aegis-api-1",
+  "schema": "phrourax-api-1",
   "data": {},
   "page": { "total": 120, "limit": 50, "returned": 50, "nextCursor": "eyJvIjo1MH0" },
   "meta": {
@@ -52,7 +54,7 @@ Every list takes `limit` (1–100, default 50) and `cursor` (the previous respon
 ## Errors
 
 ```json
-{ "schema": "aegis-api-1", "error": { "code": "INVALID_RANGE", "status": 400, "message": "a range can span at most 90 days", "details": { "maxDays": 90 } }, "disclaimer": "…" }
+{ "schema": "phrourax-api-1", "error": { "code": "INVALID_RANGE", "status": 400, "message": "a range can span at most 90 days", "details": { "maxDays": 90 } }, "disclaimer": "…" }
 ```
 
 | Status | Codes |

@@ -24,7 +24,7 @@ import { BRAND } from '@aegis/glyphs';
 
 export const API = {
   VERSION: 'api-1.0.0',
-  SCHEMA: 'aegis-api-1',
+  SCHEMA: 'phrourax-api-1',
   PREFIX: '/api/v1',
   MAX_LIMIT: 100,
   DEFAULT_LIMIT: 50,

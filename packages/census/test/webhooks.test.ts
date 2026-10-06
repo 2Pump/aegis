@@ -123,7 +123,7 @@ describe('Webhooks · delivery run', () => {
     const files = { 'history/oracle/latest.json': oracleFile([{ id: 'old', at: T - 60_000, status: 'DEPEG' }]) };
     const r1 = receiver({ echo: false });
     await runWebhooks({ store: s.store, census: census(files), send: r1.send, now: () => T });
-    expect(r1.got.map((g) => g.headers['AEGIS-Event'])).toEqual(['webhook.verification']);
+    expect(r1.got.map((g) => g.headers['Phrourax-Event'])).toEqual(['webhook.verification']);
     expect((await s.store.get(s.created.id))!.status).toBe('pending-verification'); // 2xx without the challenge isn't enough
     const r2 = receiver();
     await runWebhooks({ store: s.store, census: census(files), send: r2.send, now: () => T + 61_000 });
@@ -134,8 +134,8 @@ describe('Webhooks · delivery run', () => {
     await runWebhooks({ store: s.store, census: census({ 'history/oracle/latest.json': oracleFile([{ id: 'new', at: T + 120_000, status: 'DEPEG' }, { id: 'old', at: T - 60_000, status: 'DEPEG' }]) }), send: r3.send, now: () => T + 180_000 });
     expect(r3.got).toHaveLength(1);
     const body = JSON.parse(r3.got[0]!.body) as { schema: string; event: { type: string; id: string } };
-    expect(body).toMatchObject({ schema: 'aegis-webhook-1', event: { type: 'oracle.depeg' } });
-    expect(verifySignature(s.created.secret, r3.got[0]!.headers['AEGIS-Signature'], r3.got[0]!.body, T + 180_000).ok).toBe(true);
+    expect(body).toMatchObject({ schema: 'phrourax-webhook-1', event: { type: 'oracle.depeg' } });
+    expect(verifySignature(s.created.secret, r3.got[0]!.headers['Phrourax-Signature'], r3.got[0]!.body, T + 180_000).ok).toBe(true);
     expect(r3.got[0]!.headers['Idempotency-Key']).toBe(body.event.id);
   });
 

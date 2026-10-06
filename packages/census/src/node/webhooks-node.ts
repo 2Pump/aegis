@@ -253,10 +253,10 @@ export async function runWebhooks(d: WebhookRunDeps): Promise<WebhookRunReport> 
       const body = dl.body;
       const r = await d.send(s.url, body, {
         'Content-Type': 'application/json',
-        'User-Agent': `AEGIS-Webhooks/${WEBHOOKS.VERSION}`,
-        'AEGIS-Signature': signatureHeader(s.secrets, body, now),
-        'AEGIS-Delivery': dl.deliveryId,
-        'AEGIS-Event': dl.type,
+        'User-Agent': `Phrourax-Webhooks/${WEBHOOKS.VERSION}`,
+        'Phrourax-Signature': signatureHeader(s.secrets, body, now),
+        'Phrourax-Delivery': dl.deliveryId,
+        'Phrourax-Event': dl.type,
         'Idempotency-Key': dl.eventId,
       });
       const wasPending = s.status === 'pending-verification';

@@ -3,9 +3,9 @@
  *
  * Events come from the same places as Telegram alerts: wallet events from the alerts transition engine
  * (alerts/engine.ts → toWalletEvents), Ink-wide events from events.ts. Each delivery is:
- *   - signed:     AEGIS-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, `${t}.${body}`)>  (one v1 per live
+ *   - signed:     Phrourax-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, `${t}.${body}`)>  (one v1 per live
  *                 secret during a rotation, so a receiver can switch secrets without missing anything)
- *   - replay-safe: receivers reject t older than 5 minutes (verifySignature does) and dedupe on AEGIS-Delivery
+ *   - replay-safe: receivers reject t older than 5 minutes (verifySignature does) and dedupe on Phrourax-Delivery
  *   - idempotent:  Idempotency-Key = the event id — retries of one event carry the same key
  *   - retried:     1 min, 5 min, 30 min, 2 h, 6 h (exponential), then dead-lettered (kept, visible, never silently lost)
  * Endpoints must pass verification (echo a challenge) before any event is sent. Payloads are balance-free by schema.
@@ -17,7 +17,7 @@ import { BRAND } from '@aegis/glyphs';
 
 export const WEBHOOKS = {
   VERSION: 'webhooks-1.0.0',
-  SCHEMA: 'aegis-webhook-1',
+  SCHEMA: 'phrourax-webhook-1',
   SIG_TOLERANCE_S: 300,
   RETRY_S: [60, 300, 1_800, 7_200, 21_600],
   /** first attempt + retries */
