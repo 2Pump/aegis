@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CensusShip, CensusSnapshot } from '@aegis/census';
-import { fullCensusInProgress, liveBadge, snapshotGap, wellPhase, SCAN_STALE_H } from './wellState';
+import { displayPhase, fullCensusInProgress, liveBadge, snapshotGap, wellPhase, SCAN_STALE_H } from './wellState';
 import type { CensusState } from './census';
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
@@ -43,5 +43,16 @@ describe('census status — only from authoritative snapshot metadata', () => {
     expect(snapshotGap(57_728_710, 57_740_274)).toEqual({ blocks: 11_564, text: '11,564 BLOCKS (~3.2 H)' });
     expect(snapshotGap(100, 130)!.text).toBe('30 BLOCKS');
     expect(snapshotGap(100, null)).toBeNull();
+  });
+});
+
+describe('display phase — a loaded scan the live layer does not hold yet is still loading (no flash of 0)', () => {
+  const okPhase = { kind: 'ok', ageH: 0.2, stale: false, lastGood: false, refreshError: null } as const;
+  it('scan loaded, live layer not seeded → loading', () => expect(displayPhase(okPhase, false)).toEqual({ kind: 'loading' }));
+  it('scan loaded and seeded → shown', () => expect(displayPhase(okPhase, true)).toBe(okPhase));
+  it('an empty scan waits for the live layer too', () => expect(displayPhase({ kind: 'empty' }, false)).toEqual({ kind: 'loading' }));
+  it('loading and unavailable pass through', () => {
+    expect(displayPhase({ kind: 'loading' }, false)).toEqual({ kind: 'loading' });
+    expect(displayPhase({ kind: 'unavailable', message: 'x' }, true)).toEqual({ kind: 'unavailable', message: 'x' });
   });
 });

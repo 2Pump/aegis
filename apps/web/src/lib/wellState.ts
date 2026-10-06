@@ -52,3 +52,11 @@ export function snapshotGap(snapBlock: number, liveBlock: number | null): { bloc
   const h = blocks / 3600;
   return { blocks, text: `${blocks.toLocaleString('en-US')} BLOCKS${blocks >= 90 ? ` (~${h >= 1.5 ? `${h.toFixed(1)} H` : `${Math.round(blocks / 60)} MIN`})` : ''}` };
 }
+
+/**
+ * What the page may show: a scan that has loaded but isn't in the live layer yet is still LOADING — the counts,
+ * filters and near-liquidation list read the live layer, so showing them before it holds the scan would show zeroes.
+ */
+export function displayPhase(phase: WellPhase, seeded: boolean): WellPhase {
+  return (phase.kind === 'ok' || phase.kind === 'empty') && !seeded ? { kind: 'loading' } : phase;
+}

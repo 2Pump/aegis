@@ -18,6 +18,11 @@ export interface LiveWell {
   flashes: Map<string, number>;
   /** the tab is visible (a hidden tab pauses live reads) */
   visible: boolean;
+  /**
+   * the live layer has taken in a scan (its wallets are in `ships`). False only before the FIRST scan is loaded —
+   * a refresh to a newer scan never flips it back, so a page never blanks during a background refresh.
+   */
+  seeded: boolean;
 }
 
 /**
@@ -38,9 +43,13 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
   const flashes = useRef(new Map<string, number>());
   const lastSeenAt = useRef(0);
 
-  // snapshot in
+  // snapshot in — and re-render at once (not on the throttled tick), so counts never show the empty pre-load list
+  const [seeded, setSeeded] = useState(false);
   useEffect(() => {
-    if (census.status === 'ok') engine.load(census.ships, census.snap.block);
+    if (census.status !== 'ok') return;
+    engine.load(census.ships, census.snap.block);
+    setSeeded(true);
+    bump();
   }, [census, engine]);
 
   // re-render on engine updates (throttled to ~2/s), record flashes
@@ -91,6 +100,7 @@ export function useLiveWell(census: CensusState, enabled = true): LiveWell {
     setLive,
     flashes: flashes.current,
     visible,
+    seeded,
   };
 }
 

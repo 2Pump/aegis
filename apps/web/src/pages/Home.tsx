@@ -24,7 +24,7 @@ import { WELL_ON, WELL_PREVIEW, useCensus } from '../lib/census';
 import { verificationText } from '../lib/verification';
 import { useHullCache } from '../lib/hulls';
 import { useLiveWell } from '../lib/live';
-import { wellPhase } from '../lib/wellState';
+import { wellPhase, displayPhase } from '../lib/wellState';
 import { useNow } from '../lib/hulls';
 import { fmtAge } from '../lib/fmt';
 
@@ -36,7 +36,8 @@ export function Home() {
   const snap = census.status === 'ok' ? census.snap : null;
   const head = lw.stats.head ?? snap?.block ?? null;
   const now = useNow(60_000);
-  const phase = wellPhase(census, now);
+  // the counts read the live layer: until it holds the scan, the page stays in its loading state (never a flash of 0)
+  const phase = displayPhase(wellPhase(census, now), lw.seeded);
   const ready = phase.kind === 'ok' || phase.kind === 'empty';
 
   // the head moves every block; ships must not be rebuilt for that (18k objects → re-filter → re-seat), so the
