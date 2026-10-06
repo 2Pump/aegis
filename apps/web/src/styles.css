@@ -610,3 +610,9 @@ button.pm-bar:hover { border-color: var(--hair); }
   .kv { grid-template-columns: minmax(0, 58%) minmax(0, 1fr); }
   .kv dt { overflow-wrap: anywhere; }
 }
+
+/* track record: label lists stack (label above value) so long labels never crush the numbers */
+.kv.stacked { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.kv.stacked dd { margin-bottom: 8px; }
+/* the window tables keep readable columns; on phones they scroll inside their own box */
+table.t.track-win { min-width: 560px; }

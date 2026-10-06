@@ -322,23 +322,37 @@ test('Checks: the track record never shows a rate it cannot back (not scored yet
 /* ───────── refinement pass (2026-10-05) ───────── */
 
 const rate = (num: number, den: number) => ({ num, den, rate: den ? num / den : null, lowSample: den < 30 });
+/** report files as each scoring method wrote them (old ones must stay readable) */
 function accountability(version: string, over: Record<string, unknown> = {}) {
-  const win = (hours: number) => ({ hours, precision: rate(1, 3), pending: 0, leadAtLeast: rate(0, 30) });
+  const legacyWin = (hours: number) => ({ hours, precision: rate(0, 0), pending: 0, leadAtLeast: rate(0, 32) });
+  const curWin: Record<number, unknown> = {
+    1: { hours: 1, precision: rate(1, 3), pending: 0, leadAtLeast: rate(10, 25), insufficientHistory: 7 },
+    6: { hours: 6, precision: rate(1, 3), pending: 0, leadAtLeast: rate(4, 20), insufficientHistory: 12 },
+    24: { hours: 24, precision: rate(0, 0), pending: 3, leadAtLeast: rate(0, 6), insufficientHistory: 26 },
+    168: { hours: 168, precision: rate(0, 0), pending: 3, leadAtLeast: rate(0, 0), insufficientHistory: 32 },
+  };
+  const current = version === 'acct-1.2.0';
   return {
     v: 1,
     kind: 'aegis-accountability',
     version,
     generatedAt: new Date().toISOString(),
-    recordingStart: '2026-10-02T00:00:00Z',
+    recordingStart: '2026-10-04T00:00:00Z',
     definitions: { warning: 'x' },
-    liquidations: { total: 139, evaluable: 30, beforeRecording: 109, notSeen: 2, partial: 137 },
-    warnings: { total: 54657, atRecordingStart: 54654, ...(version === 'acct-1.1.0' ? { afterRecordingStart: 3 } : {}) },
-    recall: rate(1, 30),
-    watchOnly: rate(0, 30),
-    missed: rate(29, 30),
+    liquidations: { total: 139, evaluable: 32, beforeRecording: 107, notSeen: 2, partial: 137 },
+    warnings: { total: 59865, atRecordingStart: 59865, ...(version !== 'acct-1.0.0' ? { afterRecordingStart: current ? 3 : 0 } : {}) },
+    ...(current
+      ? {
+          baseline: { uniqueWallets: 2612, rows: 2612, firstAt: '2026-10-04T00:05:00Z', repeatedRows: 57253, repeatedRuns: 22 },
+          transitions: { reliableSince: '2026-10-05T02:05:00Z', counted: 3, excluded: 0, available: true },
+        }
+      : {}),
+    recall: rate(1, 32),
+    watchOnly: rate(0, 32),
+    missed: rate(31, 32),
     leadHoursMedian: null,
-    windows: [1, 6, 24, 168].map(win),
-    byVenue: [{ key: 'tydro', recall: rate(1, 30), precision24: rate(1, 3) }],
+    windows: [1, 6, 24, 168].map((h) => (current ? curWin[h] : legacyWin(h))),
+    byVenue: [{ key: 'tydro', recall: rate(1, 32), precision24: rate(0, 0) }],
     bySize: [],
     byType: [],
     byFamily: [],
@@ -355,33 +369,67 @@ async function serveAccountability(page: Page, body: unknown) {
   });
 }
 
-test('Track record: baseline risk states are not warnings; separate labelled rows; early-period notice', async ({ page }) => {
-  await serveAccountability(page, accountability('acct-1.1.0'));
+test('Track record (current method): one version label, windows with their own eligible denominators, unique-wallet baseline', async ({ page }) => {
+  await serveAccountability(page, accountability('acct-1.2.0'));
   await page.goto('/calibration');
   const t = page.getByTestId('track-record');
-  await expect(t.getByTestId('track-baseline')).toContainText('54,654');
+  await expect(t.getByTestId('track-version')).toHaveText('scoring method acct-1.2.0');
+  await expect(t.getByText('scoring method acct-1.2.0.')).toBeVisible();
+  await expect(t.getByTestId('track-method-note')).toHaveCount(0);
+  await expect(t.getByText(/acct-1\.[01]\.0/)).toHaveCount(0);
+  // baseline: unique wallets, repeats explained, never scored
+  await expect(t.getByText('Unique wallets already NEAR LIQUIDATION at recording start')).toBeVisible();
+  await expect(t.getByTestId('track-baseline')).toContainText('2,612');
+  await expect(t.getByTestId('track-baseline-explain')).toContainText('57,253 baseline rows');
+  await expect(t.getByTestId('track-baseline-explain')).toContainText('WATCH is not included');
   await expect(t.getByTestId('track-new-warnings')).toContainText('3');
-  await expect(t.getByText('Baseline risk states imported at recording start')).toBeVisible();
-  const liq = t.getByTestId('track-liquidations');
-  const rows: Array<[string, string]> = [['Total liquidation records', '139'], ['Before Phrourax recording began', '109'], ['Evaluable since recording began', '30'], ['Records with one or more unavailable fields', '137']];
-  for (const [k, v] of rows) {
-    await expect(liq.locator('dt', { hasText: k })).toBeVisible();
-    await expect(liq).toContainText(v);
-  }
+  // looking back: each window its own denominator; 7 days → not enough history; never "0 of 32 (0%)"
+  const back = t.getByTestId('track-lookback');
+  await expect(back.locator('tr', { hasText: '7 days' })).toContainText('Not enough recording history');
+  await expect(back.locator('tr', { hasText: '7 days' })).toContainText('32');
+  await expect(back.locator('tr', { hasText: '1 h' })).toContainText('10 of 25 eligible liquidations');
+  await expect(back.locator('tr', { hasText: '24 h' })).toContainText('0 of 6 eligible liquidations');
+  await expect(back).not.toContainText('0 of 32'); // the lookback never uses all 32 when only some had a complete lookback
+  await expect(back).not.toContainText('(0%)');
+  // "any time before" figures span everything since recording began — a complete window — so a zero there is genuine
+  await expect(t.getByText('0 of 32 (0%)')).toBeVisible();
+  // looking forward: judged vs awaiting outcome; no percentage on a tiny sample
+  const fwd = t.getByTestId('track-windows');
+  await expect(fwd.locator('tr', { hasText: '1 h' })).toContainText('1 of 3 judged warnings · too few cases to judge');
+  await expect(fwd.locator('tr', { hasText: '7 days' })).toContainText('No warnings have completed this window yet');
+  await expect(fwd).not.toContainText('%');
   await expect(t.getByTestId('track-early')).toContainText('EARLY RECORDING PERIOD — performance statistics are not yet representative.');
-  await expect(t.getByText(/54,654 warnings|54654 warnings/)).toHaveCount(0);
-  await expect(t.getByTestId('track-windows')).toContainText('1 of 3');
-  await expect(t).toContainText('1 of 30 (3.3%)'); // a small non-zero share is never rounded to 0%
+  // separate liquidation rows stay
+  const liq = t.getByTestId('track-liquidations');
+  for (const k of ['Total liquidation records', 'Before Phrourax recording began', 'Evaluable since recording began', 'Records with one or more unavailable fields']) await expect(liq.locator('dt', { hasText: k })).toBeVisible();
+  await expect(t).not.toContainText(/success rate|accuracy|predicted/i);
 });
 
-test('Track record: a score file made under the old method shows its warning rates as unavailable, never mixed with baseline', async ({ page }) => {
-  await serveAccountability(page, accountability('acct-1.0.0'));
+test('Track record (report from an older method): its own version shown and explained; changed figures await rescoring; still readable', async ({ page }) => {
+  for (const v of ['acct-1.0.0', 'acct-1.1.0']) {
+    await serveAccountability(page, accountability(v));
+    await page.goto('/calibration');
+    const t = page.getByTestId('track-record');
+    await expect(t.getByTestId('track-version')).toHaveText(`scoring method ${v}`);
+    await expect(t.getByTestId('track-method-note')).toContainText(`This report was produced under scoring method ${v}. The site now uses acct-1.2.0`);
+    await expect(t.getByText('Baseline rows imported (not a wallet count)')).toBeVisible();
+    await expect(t.getByTestId('track-baseline')).toContainText('59,865');
+    await expect(t.getByTestId('track-new-warnings')).toContainText('New warning transitions not available yet');
+    await expect(t.getByTestId('track-lookback')).toContainText('awaiting rescoring');
+    await expect(t.getByTestId('track-windows')).toContainText('Awaiting rescoring under acct-1.2.0');
+    await expect(t).not.toContainText('0 of 32 eligible');
+    await expect(t.getByTestId('track-lookback')).not.toContainText('0 of 32');
+    await expect(t.getByText('1 of 32').first()).toBeVisible(); // figures defined the same way under every method stay
+    await page.unroute('**/census/history/**');
+  }
+});
+
+test('Track record: right after a repeated baseline import, new warnings say "not available yet" — never a false zero', async ({ page }) => {
+  await serveAccountability(page, accountability('acct-1.2.0', { transitions: { reliableSince: new Date().toISOString(), counted: 0, excluded: 0, available: false }, warnings: { total: 59865, atRecordingStart: 59865, afterRecordingStart: 0 } }));
   await page.goto('/calibration');
   const t = page.getByTestId('track-record');
-  await expect(t.getByTestId('track-baseline')).toContainText('54,654');
-  await expect(t.getByTestId('track-new-warnings')).toContainText('3');
-  await expect(t.getByTestId('track-windows')).toContainText('unavailable — rescored on the next hourly run');
-  await expect(t.getByTestId('track-windows')).not.toContainText('1 of 3');
+  await expect(t.getByTestId('track-new-warnings')).toHaveText('New warning transitions not available yet');
+  await expect(t.getByTestId('track-windows')).toContainText('New warning transitions not available yet');
 });
 
 test('Legacy AEGIS wording inside stored files is shown as PHROURAX on every page that reads them', async ({ page }) => {

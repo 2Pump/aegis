@@ -19,6 +19,7 @@ import {
   readWarnings,
   scoreAccountability,
   shardOf,
+  warningKind,
   walletPath,
   type CensusShip,
   type HistoryIndex,
@@ -181,7 +182,7 @@ describe('cascades (cascade-1.0.0)', () => {
   });
 });
 
-describe('accountability (acct-1.1.0)', () => {
+describe('accountability (scoring method LEDGER.ACCOUNT_VERSION)', () => {
   const now = 30 * 24 * H;
   const w = (wallet: string, at: number, over: Partial<Warning> = {}): Warning => ({ wallet, block: at, at, kind: 'T', primary: TAGS.indexOf('CARRY'), band: 2, venues: { tydro: true, nado: false }, rulesVersion: 'v1.2.0', ...over });
   it('true positive, false positive, false negative — every rate with its denominator', () => {
@@ -236,11 +237,15 @@ describe('accountability (acct-1.1.0)', () => {
       recordingStart: 'x',
       tags: TAGS,
     });
-    expect(a.version).toBe('acct-1.1.0');
+    expect(a.version).toBe(LEDGER.ACCOUNT_VERSION);
     expect(a.warnings).toEqual({ total: 502, atRecordingStart: 500, afterRecordingStart: 2 });
     for (const win of a.windows) expect(win.precision.den + win.pending).toBe(2); // the 500 baseline rows never count
     expect(a.windows.find((x) => x.hours === 6)!.precision).toMatchObject({ num: 1, den: 2 });
     expect(a.byVenue.reduce((n, b) => n + b.precision24.den, 0)).toBe(2);
+  });
+  it('one scoring-method version everywhere: the report carries the constant', () => {
+    expect(LEDGER.ACCOUNT_VERSION).toBe('acct-1.2.0');
+    expect(scoreAccountability({ warnings: [], liquidations: [], nowMs: now, recordingStart: null, tags: TAGS }).version).toBe(LEDGER.ACCOUNT_VERSION);
   });
   it('warnings file: idempotent, keeps the rules version', () => {
     let f = appendWarnings(null, '2026-10', [{ ...w(U1, H), at: H }]);
@@ -345,5 +350,117 @@ describe('ledger writer (fake chain; nothing real is touched)', () => {
     const r = await recordLiquidations({ store, client, head: 30_000_000, budgetMs: 60_000 });
     expect(calls.getLogs).toBe(0);
     expect(r.notes.join(' ')).toMatch(/ledger starts once history is recording/);
+  });
+});
+
+/* ───────── time windows: eligibility (acct-1.2.0) ───────── */
+
+describe('track record windows — every window has its own eligible denominator', () => {
+  const T0 = Date.parse('2026-10-04T00:00:00Z');
+  const START = new Date(T0).toISOString();
+  const near = (since: number | null) => ({ ...rec('x', 0).aegis, nearSince: since, watchSince: since });
+  const score = (o: { liqs?: LedgerRecord[]; warns?: Warning[]; nowMs: number }) =>
+    scoreAccountability({ warnings: o.warns ?? [], liquidations: o.liqs ?? [], nowMs: o.nowMs, recordingStart: START, tags: TAGS });
+  const win = (a: ReturnType<typeof score>, h: number) => a.windows.find((w) => w.hours === h)!;
+
+  it('7 days asked, under 7 days recorded: nothing is eligible — not enough history, never 0 of N', () => {
+    const liqs = Array.from({ length: 32 }, (_, i) => rec(`l${i}`, T0 + (10 + i) * H, { aegis: near(null) }));
+    const a = score({ liqs, nowMs: T0 + 2 * 24 * H });
+    expect(win(a, 168).leadAtLeast).toMatchObject({ num: 0, den: 0, rate: null });
+    expect(win(a, 168).insufficientHistory).toBe(32);
+    expect(a.recall.den).toBe(32); // still evaluable for "anything recorded before"
+  });
+  it('24 h: only liquidations with a complete 24-hour lookback count', () => {
+    const liqs = [
+      rec('a', T0 + 10 * H, { aegis: near(T0 + 1 * H) }), // only 10 h after recording began → not eligible
+      rec('b', T0 + 30 * H, { aegis: near(T0 + 2 * H) }), // eligible, NEAR 28 h before → counts
+      rec('c', T0 + 40 * H, { aegis: near(T0 + 39 * H) }), // eligible, NEAR only 1 h before → not at least 24 h
+    ];
+    const a = score({ liqs, nowMs: T0 + 50 * H });
+    expect(win(a, 24).leadAtLeast).toMatchObject({ num: 1, den: 2 });
+    expect(win(a, 24).insufficientHistory).toBe(1);
+    expect(win(a, 1).leadAtLeast).toMatchObject({ num: 3, den: 3 });
+  });
+  it('a genuine zero: full lookback existed and no NEAR was recorded', () => {
+    const a = score({ liqs: [rec('a', T0 + 30 * H, { aegis: near(null) })], nowMs: T0 + 40 * H });
+    expect(win(a, 24).leadAtLeast).toMatchObject({ num: 0, den: 1, rate: 0 });
+    expect(win(a, 24).insufficientHistory).toBe(0);
+  });
+  const w = (wallet: string, at: number, kind: 'T' | 'B' = 'T'): Warning => ({ wallet, block: at / 1000, at, kind, primary: 0, band: 2, venues: { tydro: true, nado: false }, rulesVersion: 'v1.2.0' });
+  it('forward: a warning whose follow-up window is still open is awaiting outcome, not a miss', () => {
+    const a = score({ warns: [w(U1, T0 + 5 * H, 'B'), w(U2, T0 + 20 * H)], nowMs: T0 + 30 * H });
+    expect(win(a, 24)).toMatchObject({ pending: 1, precision: { num: 0, den: 0, rate: null } });
+    expect(win(a, 6)).toMatchObject({ pending: 0, precision: { den: 1 } });
+  });
+  it('forward: completed windows with and without a later liquidation', () => {
+    const W3 = '0x3333333333333333333333333333333333333333';
+    const a = score({
+      warns: [w(U1, T0 + 5 * H, 'B'), w(U2, T0 + 10 * H), w(W3, T0 + 10 * H)],
+      liqs: [rec('z', T0 + 15 * H, { wallet: U2, aegis: near(T0 + 10 * H) })],
+      nowMs: T0 + 60 * H,
+    });
+    expect(win(a, 24).precision).toMatchObject({ num: 1, den: 2 }); // U2 followed, W3 not; the baseline row never counts
+    expect(win(a, 1).precision).toMatchObject({ num: 0, den: 2 }); // liquidated 5 h later: not within 1 h
+  });
+});
+
+/* ───────── what counts as a new warning ───────── */
+
+describe('new warnings — the recording rule (warningKind)', () => {
+  const st = (hullTemp: 'NOMINAL' | 'ELEVATED' | 'CRITICAL', primary: string | null = 'CARRY') => ({ hullTemp, primary });
+  const later = { firstRun: false, havePrevScan: true };
+  it('baseline NEAR states are baseline rows, never new warnings', () => {
+    expect(warningKind(st('CRITICAL'), undefined, { firstRun: true, havePrevScan: false })).toBe('B');
+    expect(warningKind(st('CRITICAL'), st('CRITICAL'), { firstRun: true, havePrevScan: true })).toBe('B');
+  });
+  it('SAFE or WATCH → NEAR is a new warning', () => {
+    expect(warningKind(st('CRITICAL'), st('NOMINAL'), later)).toBe('T');
+    expect(warningKind(st('CRITICAL'), st('ELEVATED'), later)).toBe('T');
+    expect(warningKind(st('CRITICAL'), st('NOMINAL', 'EMPTY'), later)).toBe('T');
+  });
+  it('staying NEAR is not counted again; a wallet first seen already NEAR is not a transition', () => {
+    expect(warningKind(st('CRITICAL'), st('CRITICAL'), later)).toBeNull();
+    expect(warningKind(st('CRITICAL'), undefined, later)).toBeNull();
+    expect(warningKind(st('CRITICAL'), st('NOMINAL'), { firstRun: false, havePrevScan: false })).toBeNull();
+    expect(warningKind(st('ELEVATED'), st('NOMINAL'), later)).toBeNull();
+    expect(warningKind(st('CRITICAL', 'EMPTY'), st('NOMINAL'), later)).toBeNull();
+  });
+  it('recovery and a later re-entry into NEAR: one new warning per entry', () => {
+    const path = [st('NOMINAL'), st('CRITICAL'), st('CRITICAL'), st('ELEVATED'), st('CRITICAL'), st('CRITICAL')];
+    const kinds = path.slice(1).map((cur, i) => warningKind(cur, path[i], later));
+    expect(kinds).toEqual(['T', null, null, 'T', null]);
+  });
+});
+
+/* ───────── the baseline figure, and repeated imports ───────── */
+
+describe('baseline unit — unique wallets from the first import; repeated imports never counted as wallets or warnings', () => {
+  const T0 = Date.parse('2026-10-04T00:00:00Z');
+  const W = (n: number) => `0x${String(n).padStart(40, '0')}`;
+  const row = (wallet: string, atH: number, kind: 'B' | 'T'): Warning => ({ wallet, block: 1000 + atH, at: T0 + atH * H, kind, primary: 0, band: 2, venues: { tydro: true, nado: false }, rulesVersion: 'v1.2.0' });
+  // run 0 imported 2 wallets; runs 1 and 2 re-imported (marker lost): 3 + 3 repeated rows; then runs record transitions
+  const warnings = [
+    row(W(1), 0, 'B'), row(W(2), 0, 'B'),
+    row(W(1), 1, 'B'), row(W(2), 1, 'B'), row(W(3), 1, 'B'),
+    row(W(1), 2, 'B'), row(W(2), 2, 'B'), row(W(3), 2, 'B'),
+    row(W(9), 1.5, 'T'), // a transition recorded in between: before transitions were reliable → excluded
+    row(W(4), 4, 'T'), // after the last repeated import → a real new warning
+  ];
+  it('counts unique wallets in the first import, and the repeats separately', () => {
+    const a = scoreAccountability({ warnings, liquidations: [], nowMs: T0 + 10 * H, recordingStart: new Date(T0).toISOString(), tags: TAGS });
+    expect(a.baseline).toEqual({ uniqueWallets: 2, rows: 2, firstAt: new Date(T0).toISOString(), repeatedRows: 6, repeatedRuns: 2 });
+    expect(a.transitions).toMatchObject({ reliableSince: new Date(T0 + 2 * H).toISOString(), counted: 1, excluded: 1, available: true });
+    expect(a.warnings.afterRecordingStart).toBe(1);
+    expect(a.windows.find((x) => x.hours === 1)!.precision.den).toBe(1); // only the reliable new warning is judged
+  });
+  it('right after a repeated import there is no complete run yet: no new-warning count (never a false zero)', () => {
+    const a = scoreAccountability({ warnings: warnings.filter((x) => x.kind === 'B'), liquidations: [], nowMs: T0 + 2 * H + 10 * 60_000, recordingStart: new Date(T0).toISOString(), tags: TAGS });
+    expect(a.transitions).toMatchObject({ available: false, counted: 0 });
+    for (const win of a.windows) expect(win.precision.den + win.pending).toBe(0);
+  });
+  it('one clean import (no repeats): the whole baseline is unique wallets and transitions count from it', () => {
+    const a = scoreAccountability({ warnings: [row(W(1), 0, 'B'), row(W(2), 0, 'B'), row(W(5), 3, 'T')], liquidations: [], nowMs: T0 + 5 * H, recordingStart: new Date(T0).toISOString(), tags: TAGS });
+    expect(a.baseline).toMatchObject({ uniqueWallets: 2, repeatedRows: 0, repeatedRuns: 0 });
+    expect(a.transitions).toMatchObject({ counted: 1, excluded: 0, available: true });
   });
 });

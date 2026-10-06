@@ -1,6 +1,6 @@
 # Liquidation Ledger, Cascades, Track record (Release 2)
 
-Versions: ledger `ledger-1.0.0` · cascades `cascade-1.0.0` · scoring `acct-1.1.0`.
+Versions: ledger `ledger-1.0.0` · cascades `cascade-1.0.0` · scoring `acct-1.2.0`.
 
 ## Sources (on-chain, read-only `eth_getLogs`)
 
@@ -75,15 +75,28 @@ Cascades without a dominant family, or spanning both venues, are labelled **unce
 
 Where something wasn't recorded, the step says so.
 
-## Track record (`acct-1.1.0`, on the Checks page)
+## Track record (`acct-1.2.0`, on the Checks page)
 
-- **Warnings:** recorded by the hourly census in `history/warn/<YYYY-MM>.json` each time a wallet enters NEAR LIQUIDATION (`T` rows). The first run that records warnings also stores the wallets already NEAR as **baseline risk states** (`B` rows).
-- **Baseline risk states are not warnings** (`acct-1.1.0`, 2026-10-05). They're counted and shown on their own row, but left out of every warning rate: a baseline import is not a prediction Phrourax made. Under `acct-1.0.0` they were in the denominators; the page shows those rates as unavailable until the next hourly run republishes the score under `acct-1.1.0`. The stored warning rows are unchanged.
-- **Scored:** each run, from every warning and liquidation since recording began (at most 13 months), into `history/accountability.json`:
-  - Liquidations Phrourax could judge: warned NEAR before, WATCH only, missed, and never seen.
-  - For windows of 1 h, 6 h, 24 h and 7 days: warnings followed by that wallet's liquidation within the window (warnings younger than the window count as *pending*, not misses), and liquidations warned at least that long before.
-  - Breakdowns by venue, size range, position type at the time, asset family and **rules version, never pooled**.
-- **Every rate** is shown as *n of N*. Under 30 cases it's marked "too few to judge".
+**One version concept: the scoring method** (`LEDGER.ACCOUNT_VERSION` in `packages/census/src/ledger.ts`). It's written into `history/accountability.json`, returned by `/api/v1/performance`, and shown on the page. The page shows the method the report on screen was scored under. If the site already has a newer method, it says so and marks the figures defined differently as *awaiting rescoring*; the census republishes the report on its next hourly run.
+
+| Method | What changed |
+|---|---|
+| `acct-1.0.0` | First method. Baseline rows were counted as warnings. |
+| `acct-1.1.0` (2026-10-05) | Baseline rows left out of warning denominators. |
+| `acct-1.2.0` (2026-10-05) | Each window has its own eligible denominator; the baseline is unique wallets from the first import; new warnings count only from reliably recorded transitions. |
+
+- **Warning rows** (`history/warn/<YYYY-MM>.json`, never rewritten), one rule in `warningKind()`:
+  - **Baseline (`B`):** on the first recording run, every wallet in NEAR LIQUIDATION (WATCH is not included).
+  - **New warning (`T`):** afterwards, a wallet entering NEAR LIQUIDATION from a recorded state below NEAR (or EMPTY). Staying near adds nothing; a wallet first seen already near adds nothing; recovering and re-entering adds a new row.
+- **Repeated baseline imports (fixed 2026-10-05).** The "recording began" marker in `history/index.json` could be lost: a later step in the same run read the index through Blob's CDN cache, got the previous copy, and wrote it back. Every following run then behaved like the first, re-importing every NEAR wallet as baseline and recording no transitions. That's why the live page showed 59,865 "baseline states", more than the wallets the census covers. Two fixes:
+  - The Blob store returns its own writes within a run.
+  - The recording step treats an existing warnings file as proof that recording began, and restores the marker.
+  
+  The stored rows stay as they are. The scorer counts the baseline as unique wallets from the first import, counts the repeats separately (never as wallets or warnings), and counts new warnings only after the last repeated import, once a complete hourly run has passed (`transitions.reliableSince`, `available`).
+- **Looking back from each liquidation** (evaluable = after recording began). For a window W, a liquidation is **eligible** only if `recordingStart ≤ liquidation time − W`, so a complete W-long lookback was watched. Shown per window: eligible liquidations with NEAR recorded at least W before, those without, and **not enough recording history** (never counted as a miss). A zero means a complete lookback existed and no NEAR was recorded.
+- **Looking forward from each new warning** (baseline never). A warning is **judged** for window W only once W has fully passed. Shown: followed by that wallet's liquidation within W, not followed, and **still awaiting outcome** (never a miss). If none has completed W: "No warnings have completed this window yet".
+- **Breakdowns** by venue, size range, position type at the time, asset family and **rules version, never pooled**.
+- **Every figure** is *n of N*. Under 30 cases there's no percentage and it's marked "too few cases to judge"; a small non-zero share is never rounded to 0%.
 - **No false-alarm %:** a warning that wasn't followed by a liquidation may simply have been acted on (the owner added collateral), so the page shows counts instead.
 - **Forecasts:** every full scan records the Pressure Map's scenario results (`history/forecast/<YYYY-MM>.json`: crypto, ETH, BTC and stablecoins at −10% and −20%, for all sizes and for ≥ $1k). Since Release 3 they are scored against recorded prices in `history/forecast-score.json` (see [ORACLES.md](ORACLES.md#pressure-forecast-scoring-forecast-score-100)); forecasts made before prices were recorded can't be judged.
 

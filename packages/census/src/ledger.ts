@@ -18,12 +18,21 @@ import { type WalletState } from './history.js';
 export const LEDGER = {
   VERSION: 'ledger-1.0.0',
   CASCADE_VERSION: 'cascade-1.0.0',
-  /** acct-1.1.0: warning precision counts only warnings that started after recording began (baseline 'B' rows excluded) */
-  ACCOUNT_VERSION: 'acct-1.1.0',
+  /**
+   * The scoring method of the track record (one version, used in the report file, the page, the API and the docs).
+   *  acct-1.0.0  first method: baseline rows were counted as warnings.
+   *  acct-1.1.0  baseline ('B') rows excluded from warning denominators.
+   *  acct-1.2.0  every time window has its own eligible denominator (complete lookback / completed follow-up only);
+   *              the baseline is unique wallets from the FIRST import; repeated imports and transitions recorded
+   *              before recording was reliable are counted but never scored.
+   */
+  ACCOUNT_VERSION: 'acct-1.2.0',
   /** evaluation windows (hours) */
   WINDOWS_H: [1, 6, 24, 168] as const,
   /** below this many cases a rate is shown with its counts and marked "too few to judge" */
   MIN_SAMPLE: 30,
+  /** after the last repeated baseline import, new-warning counts wait one full hourly run (plus slack) */
+  TRANSITION_SETTLE_MS: 75 * 60_000,
   /** cascade rule: consecutive liquidations no more than this far apart belong to one cluster … */
   CASCADE_GAP_MIN: 30,
   /** … and a cluster needs at least this many liquidations to be called a cascade */
@@ -171,6 +180,25 @@ export interface Warning {
   band: number;
   venues: { tydro: boolean; nado: boolean };
   rulesVersion: string;
+}
+
+/**
+ * The warning rule, in one place (used by the census when it records, and by the tests):
+ *  - only a wallet in NEAR LIQUIDATION now (and not EMPTY) can produce a row;
+ *  - on the first recording run it is a BASELINE row ('B'): already near, not predicted;
+ *  - afterwards it is a NEW WARNING ('T') only when the wallet has a RECORDED prior state below NEAR (or was EMPTY):
+ *    a wallet seen for the first time already near, or one that stays near, produces nothing;
+ *  - recovering and later re-entering NEAR is a new warning again (each entry is one row).
+ */
+export function warningKind(
+  cur: { primary: string | null; hullTemp: HullTemp },
+  prev: { primary: string | null; hullTemp: HullTemp } | undefined,
+  o: { firstRun: boolean; havePrevScan: boolean },
+): 'B' | 'T' | null {
+  if (cur.primary === 'EMPTY' || cur.hullTemp !== 'CRITICAL') return null;
+  if (o.firstRun) return 'B';
+  if (!o.havePrevScan || !prev) return null;
+  return prev.hullTemp !== 'CRITICAL' || prev.primary === 'EMPTY' ? 'T' : null;
 }
 
 export function appendWarnings(file: unknown, month: string, add: ReadonlyArray<Omit<Warning, 'rulesVersion'> & { rulesVersion: string }>): WarnFile {
@@ -321,12 +349,17 @@ export function cascades(recs: readonly LedgerRecord[], o: Partial<typeof LEDGER
 
 export interface WindowScore {
   hours: number;
-  /** warnings old enough to judge at this window, and how many were followed by that wallet's liquidation */
+  /** FORWARD: new warnings whose whole follow-up window has passed (den), and how many were followed by that wallet's liquidation (num) */
   precision: Rate;
-  /** warnings younger than the window — not yet judged */
+  /** FORWARD: new warnings whose follow-up window is still open — awaiting outcome, never a miss */
   pending: number;
-  /** evaluable liquidations where Phrourax had recorded NEAR for at least this long before */
+  /**
+   * BACKWARD: liquidations with a complete lookback (recording began at least this long before them) — den — and how
+   * many had NEAR recorded at least this long before (num). acct-1.2.0+: den is the eligible count, not all evaluable.
+   */
   leadAtLeast: Rate;
+  /** acct-1.2.0+: evaluable liquidations WITHOUT a complete lookback for this window (not judged, never a miss) */
+  insufficientHistory?: number;
 }
 
 export interface Breakdown {
@@ -351,6 +384,18 @@ export interface Accountability {
    * transitions into NEAR after recording began ('T' rows) — the only rows scored (acct-1.1.0+; absent before).
    */
   warnings: { total: number; atRecordingStart: number; afterRecordingStart?: number };
+  /**
+   * acct-1.2.0+: what the baseline is, precisely. uniqueWallets = distinct wallets in NEAR LIQUIDATION (WATCH is not
+   * included) in the FIRST baseline import. repeatedRows = 'B' rows written by later runs (the "recording began" marker
+   * wasn't kept between runs before 2026-10-05) — repeated observations, never scored, never counted as wallets.
+   */
+  baseline?: { uniqueWallets: number; rows: number; firstAt: string | null; repeatedRows: number; repeatedRuns: number };
+  /**
+   * acct-1.2.0+: new warnings are counted only from `reliableSince` (after the last repeated baseline import, when
+   * transitions were being recorded run to run). `excluded` = transition rows recorded before then. `counted` = the
+   * transitions scored. available=false: no complete run since `reliableSince` yet — no count is shown.
+   */
+  transitions?: { reliableSince: string | null; counted: number; excluded: number; available: boolean };
   /** liquidations with NEAR recorded before / evaluable liquidations */
   recall: Rate;
   /** liquidations with only WATCH (no NEAR) before */
@@ -385,23 +430,38 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
   const followed = (w: Warning, hours: number) => (liqByWallet.get(w.wallet) ?? []).some((t) => t > w.at && t <= w.at + hours * 3_600_000);
   const judged = (w: Warning, hours: number) => o.nowMs - w.at >= hours * 3_600_000;
   const warnedNear = (r: LedgerRecord) => r.aegis.nearSince !== null;
-  // only genuine transitions are warnings; baseline states imported at recording start are never scored
-  const scored = o.warnings.filter((w) => w.kind === 'T');
+  // baseline: the FIRST import only (later 'B' rows are repeated imports — the marker wasn't kept between runs)
+  const base = o.warnings.filter((w) => w.kind === 'B');
+  const firstBlock = base.length ? Math.min(...base.map((w) => w.block)) : null;
+  const firstBase = base.filter((w) => w.block === firstBlock);
+  const repeated = base.filter((w) => w.block !== firstBlock);
+  const lastRepeatAt = repeated.length ? Math.max(...repeated.map((w) => w.at)) : null;
+  // transitions are reliable only after the last repeated import (before it, each run re-imported instead of comparing)
+  const reliableFrom = lastRepeatAt ?? (firstBase.length ? firstBase[0]!.at : null);
+  const transitions = o.warnings.filter((w) => w.kind === 'T');
+  const scored = transitions.filter((w) => reliableFrom === null || w.at > reliableFrom);
+  // a count needs at least one full hourly run after the point it became reliable
+  const available = lastRepeatAt === null || o.nowMs - lastRepeatAt >= LEDGER.TRANSITION_SETTLE_MS;
+  const startMs = o.recordingStart ? Date.parse(o.recordingStart) : NaN;
+  // BACKWARD: a liquidation can be judged for window h only if recording began at least h before it
+  const eligibleFor = (h: number) => ev.filter((r) => Number.isFinite(startMs) && r.at - h * 3_600_000 >= startMs);
 
   const windows: WindowScore[] = LEDGER.WINDOWS_H.map((h) => {
-    const j = scored.filter((w) => judged(w, h));
+    const j = available ? scored.filter((w) => judged(w, h)) : [];
+    const el = eligibleFor(h);
     return {
       hours: h,
       precision: rate(j.filter((w) => followed(w, h)).length, j.length, min),
-      pending: scored.length - j.length,
-      leadAtLeast: rate(ev.filter((r) => (leadHours(r) ?? -1) >= h).length, ev.length, min),
+      pending: available ? scored.length - j.length : 0,
+      leadAtLeast: rate(el.filter((r) => (leadHours(r) ?? -1) >= h).length, el.length, min),
+      insufficientHistory: ev.length - el.length,
     };
   });
   const breakdown = <K extends string>(keyL: (r: LedgerRecord) => K, keyW: (w: Warning) => K): Breakdown[] => {
     const keys = new Set<string>([...ev.map(keyL), ...scored.map(keyW)]);
     return [...keys].sort().map((k) => {
       const l = ev.filter((r) => keyL(r) === k);
-      const w = scored.filter((x) => keyW(x) === k && judged(x, 24));
+      const w = available ? scored.filter((x) => keyW(x) === k && judged(x, 24)) : [];
       return { key: k, recall: rate(l.filter(warnedNear).length, l.length, min), precision24: rate(w.filter((x) => followed(x, 24)).length, w.length, min) };
     });
   };
@@ -414,15 +474,25 @@ export function scoreAccountability(o: { warnings: readonly Warning[]; liquidati
     generatedAt: new Date(o.nowMs).toISOString(),
     recordingStart: o.recordingStart,
     definitions: {
-      warning: 'The hourly scan recorded the wallet entering NEAR LIQUIDATION after recording began.',
-      'baseline risk state': 'A wallet already NEAR LIQUIDATION when recording began. Counted and shown, but not a warning: it is left out of every warning rate.',
+      warning: 'The hourly scan recorded the wallet entering NEAR LIQUIDATION after recording began, from a recorded state below NEAR. Staying near is not a new warning; recovering and re-entering is.',
+      'baseline risk state': 'A wallet already NEAR LIQUIDATION when recording began (unique wallets in the first import; WATCH not included). Counted and shown, never scored as a warning.',
+      'eligible liquidation (window W)': 'A liquidation at least W after recording began, so Phrourax had a complete W-long lookback. Others are "not enough recording history", never a miss.',
+      'judged warning (window W)': 'A new warning whose whole W-long follow-up has passed. Younger ones are awaiting outcome, never a miss.',
       'followed within W': 'That wallet was liquidated within W hours after the warning.',
       'warned before': "Phrourax's last recorded state before the liquidation block was NEAR LIQUIDATION.",
       evaluable: 'A liquidation after Phrourax began recording. Earlier ones are counted but excluded from every rate.',
       'lead time': 'From the start of the uninterrupted NEAR streak to the liquidation.',
     },
     liquidations: { total: liqs.length, evaluable: ev.length, beforeRecording: liqs.length - ev.length, notSeen: ev.filter((r) => r.aegis.before === null).length, partial: liqs.filter((r) => r.completeness === 'PARTIAL').length },
-    warnings: { total: o.warnings.length, atRecordingStart: o.warnings.length - scored.length, afterRecordingStart: scored.length },
+    warnings: { total: o.warnings.length, atRecordingStart: base.length, afterRecordingStart: available ? scored.length : 0 },
+    baseline: {
+      uniqueWallets: new Set(firstBase.map((w) => w.wallet)).size,
+      rows: firstBase.length,
+      firstAt: firstBase.length ? new Date(firstBase[0]!.at).toISOString() : null,
+      repeatedRows: repeated.length,
+      repeatedRuns: new Set(repeated.map((w) => w.block)).size,
+    },
+    transitions: { reliableSince: reliableFrom === null ? null : new Date(reliableFrom).toISOString(), counted: available ? scored.length : 0, excluded: transitions.length - scored.length, available },
     recall: rate(ev.filter(warnedNear).length, ev.length, min),
     watchOnly: rate(ev.filter((r) => !warnedNear(r) && r.aegis.watchSince !== null).length, ev.length, min),
     missed: rate(ev.filter((r) => !warnedNear(r) && r.aegis.watchSince === null).length, ev.length, min),

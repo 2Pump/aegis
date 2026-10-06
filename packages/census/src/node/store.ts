@@ -46,9 +46,15 @@ export async function blobStore(prefix = 'census'): Promise<CensusStore> {
     const hit = blobs.find((b) => b.pathname === `${prefix}/${name}`);
     return hit ? hit.url : null;
   };
+  // read-your-writes within one run: Blob's public URLs sit behind a CDN (cacheControlMaxAge 60), so a read soon
+  // after a write can return the previous copy — and a step that read-modify-writes (e.g. the history index) would
+  // then silently drop what an earlier step just wrote. What this process wrote is returned as written.
+  const written = new Map<string, string>();
   return {
     describe: `vercel-blob:${prefix}/`,
     async get(name) {
+      const mine = written.get(name);
+      if (mine !== undefined) return JSON.parse(mine);
       const url = await urlOf(name);
       if (!url) return null;
       const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
@@ -56,7 +62,8 @@ export async function blobStore(prefix = 'census'): Promise<CensusStore> {
       return res.json();
     },
     async put(name, body) {
-      const r = await put(`${prefix}/${name}`, JSON.stringify(body), {
+      const text = JSON.stringify(body);
+      const r = await put(`${prefix}/${name}`, text, {
         access: 'public',
         token,
         contentType: 'application/json',
@@ -64,6 +71,7 @@ export async function blobStore(prefix = 'census'): Promise<CensusStore> {
         allowOverwrite: true,
         cacheControlMaxAge: 60,
       });
+      written.set(name, text);
       return r.url;
     },
   };

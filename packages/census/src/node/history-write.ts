@@ -13,7 +13,7 @@ import type { PublicClient } from 'viem';
 import { PRICE_SOURCE_VERSION, READER_VERSION } from '@aegis/ink-io';
 import { RULES, SCENARIO_ENGINE_VERSION } from '@aegis/pose';
 import { encodeShip, type CensusShip } from '../index.js';
-import { appendWarnings, isWarnFile, warnPath } from '../ledger.js';
+import { appendWarnings, isWarnFile, warningKind, warnPath } from '../ledger.js';
 import {
   HISTORY,
   INDEX_PATH,
@@ -198,14 +198,25 @@ export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteRe
 
   /* ── Phrourax's own warnings (for the track record): wallets entering NEAR LIQUIDATION ── */
   try {
-    // the first run that records warnings marks every wallet already NEAR as a starting warning ('B')
-    const firstRun = !index.warningsSince;
+    // the first run that records warnings marks every wallet already NEAR as a baseline row ('B'). The index marker
+    // alone isn't enough (a lost marker made every run re-import the baseline until 2026-10-05): a warnings file that
+    // already holds rows also means recording began earlier — and restores the marker.
+    let firstRun = !index.warningsSince;
+    if (firstRun) {
+      for (const m of [...new Set([...index.months, month])].sort()) {
+        const f = await o.store.get(warnPath(m)).catch(() => null);
+        if (isWarnFile(f) && f.rows.length) {
+          firstRun = false;
+          index.warningsSince = new Date(Math.min(...f.rows.map((r) => r[2])) * 1000).toISOString();
+          log(`history: warnings already recorded since ${index.warningsSince} — recording marker restored (no baseline re-import)`);
+          break;
+        }
+      }
+    }
     const warns: Array<{ ship: CensusShip; kind: 'T' | 'B' }> = [];
     for (const s of ships) {
-      if (s.primary === 'EMPTY' || s.hullTemp !== 'CRITICAL') continue;
-      const p = o.prev.get(s.address);
-      if (firstRun) warns.push({ ship: s, kind: 'B' }); // already near when recording began
-      else if (o.prev.size > 0 && (!p || p.hullTemp !== 'CRITICAL' || p.primary === 'EMPTY')) warns.push({ ship: s, kind: 'T' });
+      const kind = warningKind(s, o.prev.get(s.address), { firstRun, havePrevScan: o.prev.size > 0 });
+      if (kind) warns.push({ ship: s, kind });
     }
     if (warns.length) {
       const raw = await o.store.get(warnPath(month));

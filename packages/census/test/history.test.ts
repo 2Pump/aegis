@@ -233,3 +233,28 @@ describe('Flight Recorder · writer', () => {
     expect(await store.get('census.json')).not.toBeNull();
   });
 });
+
+describe('warnings recording — the "recording began" marker can be lost; the baseline is never re-imported', () => {
+  const base = (store: CensusStore, block: number, ships: CensusShip[], prev: Map<string, CensusShip>, at: string) =>
+    recordHistory({ store, client, block, at, sweep: 'incremental', complete: true, ships, prev, known: ships.length, stress: null, exclude: new Set([FIX]) });
+  const near = (a: string) => ship(a, { hullTemp: 'CRITICAL' });
+  const warnRows = async (store: CensusStore) => ((await store.get('history/warn/2026-10.json')) as { rows: Array<[string, number, number, 'B' | 'T']> }).rows;
+
+  it('first run: baseline rows; later: only real transitions — even when the index lost its marker', async () => {
+    const store = tmpStore();
+    await base(store, 100, [near(A), ship(B)], new Map(), '2026-10-04T12:00:00Z');
+    expect((await warnRows(store)).map((r) => [r[0], r[3]])).toEqual([[A, 'B']]);
+
+    // simulate the lost marker (a stale read-modify-write of the index elsewhere)
+    const idx = (await store.get(INDEX_PATH)) as HistoryIndex & { warningsSince?: string };
+    delete idx.warningsSince;
+    await store.put(INDEX_PATH, idx);
+
+    // next run: A stays near (nothing), B enters near (one T) — no B rows re-imported
+    await base(store, 200, [near(A), near(B)], new Map([[A, near(A)], [B, ship(B)]]), '2026-10-04T13:00:00Z');
+    const rows = await warnRows(store);
+    expect(rows.filter((r) => r[3] === 'B')).toHaveLength(1);
+    expect(rows.filter((r) => r[3] === 'T').map((r) => r[0])).toEqual([B]);
+    expect(((await store.get(INDEX_PATH)) as HistoryIndex & { warningsSince?: string }).warningsSince).toBe('2026-10-04T12:00:00.000Z');
+  });
+});

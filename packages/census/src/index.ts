@@ -263,6 +263,7 @@ export {
   isWarnFile,
   appendLedger,
   appendWarnings,
+  warningKind,
   appendForecast,
   readWarnings,
   priorState,
