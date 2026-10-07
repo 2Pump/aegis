@@ -104,3 +104,11 @@ export function reasonParts(r: string): { label: string | null; tag: string | nu
 export function darkReasonText(r: string): string {
   return r.replace(/^TYDRO_SENSOR: /, "Tydro couldn't be read: ").replace(/^NADO_SENSOR: /, "Nado couldn't be read: ");
 }
+
+/** One line under the risk level on the wallet page (and on the share card). */
+export const HULL_COPY: Readonly<Record<HullTemp, string>> = {
+  NOMINAL: 'Below every warning line.',
+  ELEVATED: 'Inside a warning band.',
+  CRITICAL: 'In liquidation range on at least one venue.',
+  UNKNOWN: "A data source couldn't be read.",
+};

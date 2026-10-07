@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Book, NadoBook, Pose, TydroBook } from '@aegis/pose';
-import { COPY, HULL_COPY, RISK_LABEL, TAG_LABEL, darkReasonText, reasonParts, summaryText } from '@aegis/glyphs';
+import { BRAND, COPY, HULL_COPY, RISK_LABEL, SHARE, TAG_LABEL, darkReasonText, reasonParts, shareText, shareTextNoUrl, shareUrl, shortAddress, type ShareFacts } from '@aegis/glyphs';
 import { INK_EXPLORER, parseAddress, TYDRO_FETCHED } from '@aegis/ink-io';
 import { fmtAge, fmtAmt, fmtPct, fmtUsd } from '../lib/fmt';
 import { Lamp, Panel, TEMP_RAIL, Usd } from './bits';
@@ -391,27 +391,68 @@ function SubaccountTable({ n }: { n: NadoBook }) {
 
 function Share({ book, pose, checksum }: { book: Book; pose: Pose; checksum: string }) {
   const [copied, setCopied] = useState<string | null>(null);
-  const url = typeof window !== 'undefined' ? `${window.location.origin}/hull/${checksum}` : `/hull/${checksum}`;
-  const text = summaryText(checksum, pose, { tydro: book.tydro.status === 'OK', nado: book.nado.status === 'OK' }, url);
+  const [cardOk, setCardOk] = useState(true);
+  const isFixture = book.source === 'FIXTURE';
+  const facts: ShareFacts = { address: checksum, tags: pose.tags, hullTemp: pose.hullTemp, venues: { tydro: book.tydro.status === 'OK', nado: book.nado.status === 'OK' } };
+  // The public share link (/s/…) carries the preview card for X / Telegram / Discord and forwards to this page.
+  const url = shareUrl(checksum);
+  const text = isFixture ? shareTextNoUrl(facts) : shareText(facts, url);
+  // Same-origin card (the function on phrourax.com; on a local dev build it doesn't exist and the preview hides).
+  const card = `${SHARE.IMAGE_PATH}${checksum}.png`;
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const flash = (s: string) => {
+    setCopied(s);
+    setTimeout(() => setCopied(null), 2000);
+  };
   const copy = async (what: string, s: string) => {
     try {
       await navigator.clipboard.writeText(s);
-      setCopied(what);
+      flash(`copied ${what}`);
     } catch {
-      setCopied('clipboard blocked — select the text below');
+      flash('clipboard blocked — select the text above');
     }
-    setTimeout(() => setCopied(null), 2000);
+  };
+  const intent = `https://x.com/intent/tweet?text=${encodeURIComponent(shareTextNoUrl(facts))}&url=${encodeURIComponent(url)}`;
+  const nativeShare = async () => {
+    try {
+      await navigator.share({ title: `${BRAND.display} · ${shortAddress(checksum)}`, text: shareTextNoUrl(facts), url });
+    } catch {
+      /* cancelled */
+    }
   };
   return (
     <Panel idx="08" title="Share" rail="var(--amber)">
-      <div className="stack" style={{ gap: 8 }}>
-        <pre className="log" style={{ maxHeight: 'none', margin: 0 }} data-testid="share-text">{text}</pre>
-        <div className="row">
-          <button className="pill-btn" onClick={() => void copy('link', url)} disabled={book.source === 'FIXTURE'}>Copy link</button>
-          <button className="pill-btn" onClick={() => void copy('summary', text)}>Copy summary for X</button>
-          {copied ? <span className="mono dim" style={{ fontSize: 12 }}>{copied === 'link' || copied === 'summary' ? `copied ${copied}` : copied}</span> : null}
+      <div className="share" data-testid="share-panel">
+        {!isFixture && cardOk ? (
+          <a className="share-card" href={card} target="_blank" rel="noopener noreferrer" data-testid="share-card">
+            <img src={card} alt={`${BRAND.display} card for ${shortAddress(checksum)}: position types and risk level, no amounts`} width={1200} height={630} loading="lazy" onError={() => setCardOk(false)} />
+          </a>
+        ) : null}
+        <div className="stack" style={{ gap: 8, minWidth: 0 }}>
+          <pre className="log share-text" style={{ maxHeight: 'none', margin: 0 }} data-testid="share-text">{text}</pre>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+            {isFixture ? (
+              <button className="pill-btn amber" disabled data-testid="share-x">Post on X</button>
+            ) : (
+              <a className="pill-btn amber" href={intent} target="_blank" rel="noopener noreferrer" data-testid="share-x">Post on X</a>
+            )}
+            <button className="pill-btn" onClick={() => void copy('text', text)} data-testid="share-copy-text">Copy text</button>
+            <button className="pill-btn" onClick={() => void copy('link', url)} disabled={isFixture} data-testid="share-copy-link">Copy link</button>
+            {!isFixture && cardOk ? (
+              <a className="pill-btn" href={card} download={`phrourax-${checksum.slice(0, 10)}.png`} data-testid="share-download">Download card</a>
+            ) : null}
+            {!isFixture && canNativeShare ? (
+              <button className="pill-btn" onClick={() => void nativeShare()} data-testid="share-native">Share…</button>
+            ) : null}
+            {copied ? <span className="mono dim" style={{ fontSize: 12 }} data-testid="share-status">{copied}</span> : null}
+          </div>
+          {isFixture ? (
+            <div className="faint mono" style={{ fontSize: 11 }}>Test wallet — there is nothing to link to or post.</div>
+          ) : (
+            <div className="faint mono" style={{ fontSize: 11 }}>The link opens this wallet page with a preview card. The card is re-read at most about once an hour.</div>
+          )}
+          <div className="faint mono" style={{ fontSize: 11 }}>{COPY.share} Share text and card never include balances, health factor or liquidation prices.</div>
         </div>
-        <div className="faint mono" style={{ fontSize: 11 }}>{COPY.share} Share text never includes balances.</div>
       </div>
     </Panel>
   );

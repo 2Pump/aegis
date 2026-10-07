@@ -616,3 +616,12 @@ button.pm-bar:hover { border-color: var(--hair); }
 .kv.stacked dd { margin-bottom: 8px; }
 /* the window tables keep readable columns; on phones they scroll inside their own box */
 table.t.track-win { min-width: 560px; }
+
+/* wallet page — share panel: card preview beside the post text, stacked on phones */
+.share { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.share:not(:has(.share-card)) { grid-template-columns: minmax(0, 1fr); }
+.share-card { display: block; border: 1px solid var(--hair-2); background: #020406; line-height: 0; }
+.share-card img { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; }
+.share-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+a.pill-btn { display: inline-block; }
+@media (max-width: 700px) { .share { grid-template-columns: minmax(0, 1fr); } }

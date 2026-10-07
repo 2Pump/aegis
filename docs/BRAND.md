@@ -35,6 +35,7 @@ An aperture: an outer ring, a hexagonal opening and six blade edges. It watches 
 | Browser tab | `apps/web/public/favicon.svg` (modern browsers) and `favicon.ico` (16/32/48, for older ones) |
 | Phone home screen | `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png`, `site.webmanifest` |
 | Link previews (X, Telegram, Discord…) | `og.png` (1200×630, PHROURAX wordmark + tagline); `og:image` / `twitter:image` in `apps/web/index.html` point at `https://phrourax.com/og.png` |
+| Shared wallet links | `/s/<address>` (preview page, noindex, forwards to the wallet page) and `/og/<address>.png` (per-wallet card), drawn by `shareCardSvg` in `packages/glyphs/src/share.ts`; the post text is `shareText` in the same file. Types and risk only — never amounts. Details: docs/API.md "Share link and card". |
 | Search engines | `robots.txt` (keeps `/hull/` out, declares the sitemap), `sitemap.xml` (the public pages only — no wallet pages, no queries). `index.html` carries `https://phrourax.com/` as canonical; the shell sets each page's own canonical and `og:url` (path only) as you navigate. |
 
 ## Small-size rule

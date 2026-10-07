@@ -8,6 +8,8 @@ export * from './glass.js';
 export * from './sphere.js';
 export * from './labels.js';
 export * from './brand.js';
+export * from './share.js';
+import { shareText } from './share.js';
 
 /* ───────────────────────── size bands (privacy default) ───────────────────────── */
 
@@ -315,14 +317,6 @@ ${ticks}
 
 /* ───────────────────────── copy deck ───────────────────────── */
 
-/** One line under the risk level on the wallet page. */
-export const HULL_COPY: Record<HullTemp, string> = {
-  NOMINAL: 'Below every warning line.',
-  ELEVATED: 'Inside a warning band.',
-  CRITICAL: 'In liquidation range on at least one venue.',
-  UNKNOWN: "A data source couldn't be read.",
-};
-
 export const COPY = {
   footer: BRAND.disclaimer,
   wellEmpty: 'No wallets yet. Paste an address to read the first one.',
@@ -333,11 +327,7 @@ export const COPY = {
   oneLiner: BRAND.tagline,
 } as const;
 
-/** Share text — no balances, ever. */
+/** Share text — no balances, ever. (Kept for callers that have a Pose; the format lives in share.ts.) */
 export function summaryText(address: string, pose: Pose, sensors: { tydro: boolean; nado: boolean }, url: string): string {
-  const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const types = pose.tags.length ? pose.tags.map((t) => TAG_LABEL[t]).join(' + ') : NO_TYPE_LABEL;
-  const data =
-    sensors.tydro && sensors.nado ? 'data Tydro+Nado OK' : sensors.tydro ? "data Tydro OK, Nado couldn't be read" : sensors.nado ? "data Nado OK, Tydro couldn't be read" : "data couldn't be read";
-  return `${BRAND.display} wallet ${short}  ${types}  risk: ${RISK_LABEL[pose.hullTemp]}  ${data}\n${url}`;
+  return shareText({ address, tags: pose.tags, hullTemp: pose.hullTemp, venues: sensors }, url);
 }

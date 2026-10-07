@@ -28,7 +28,8 @@ const fixtures = new Set();
 for (const f of readdirSync(join(root, 'fixtures')).filter((x) => x.endsWith('.json'))) for (const m of readFileSync(join(root, 'fixtures', f), 'utf8').matchAll(/0x[0-9a-fA-F]{40}\b/g)) fixtures.add(m[0].toLowerCase());
 const fixtureList = [...fixtures].sort();
 
-const OPTIONS = { bundle: true, platform: 'node', format: 'esm', target: 'node20', minify: false, legalComments: 'none', sourcemap: false };
+// @resvg/resvg-js stays external: a native module Vercel installs (and traces) from node_modules, loaded only when a share card is drawn
+const OPTIONS = { bundle: true, platform: 'node', format: 'esm', target: 'node20', minify: false, legalComments: 'none', sourcemap: false, external: ['@resvg/resvg-js'] };
 
 const res = await build({
   ...OPTIONS,

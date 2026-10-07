@@ -451,3 +451,39 @@ test('Homepage: the value sentence under the address field; the address field st
   );
   await expect(page.getByTestId('paste-input')).toBeVisible();
 });
+
+test('Share: post text in short lines, Post on X / Copy text / Copy link / Download card, link via /s/, never amounts', async ({ page }) => {
+  const addr = '0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560';
+  const checksum = '0x8D7d64d6cF1D4F018Dd101482Ac71Ad49e30c560';
+  await page.goto(`/hull/${addr}`);
+  const p = page.getByTestId('share-panel');
+  await expect(p).toBeVisible({ timeout: 30_000 });
+  const text = (await p.getByTestId('share-text').textContent()) ?? '';
+  const lines = text.split('\n');
+  expect(lines[0]).toBe(`Phrourax · Ink wallet ${checksum.slice(0, 6)}…${checksum.slice(-4)}`);
+  expect(lines[1]).toMatch(/^Position: /);
+  expect(lines[2]).toMatch(/^Risk: /);
+  expect(lines[3]).toBe(`https://phrourax.com/s/${checksum}`);
+  expect(text).not.toMatch(/\$|health factor|HF /i);
+  const x = p.getByTestId('share-x');
+  const href = (await x.getAttribute('href')) ?? '';
+  expect(href).toMatch(/^https:\/\/x\.com\/intent\/tweet\?text=/);
+  expect(decodeURIComponent(href)).toContain(`url=https://phrourax.com/s/${checksum}`);
+  expect(await x.getAttribute('target')).toBe('_blank');
+  await expect(p.getByTestId('share-copy-text')).toBeEnabled();
+  await expect(p.getByTestId('share-copy-link')).toBeEnabled();
+  // the card only exists where the share function runs (not on a local build): the panel hides it rather than show a broken image
+  await expect(p.getByTestId('share-card')).toHaveCount(0);
+});
+
+test('Share on a test wallet: text only — no card, no link, nothing to post', async ({ page }) => {
+  await page.goto('/fixture/carry');
+  const p = page.getByTestId('share-panel');
+  await expect(p).toBeVisible();
+  await expect(p.getByTestId('share-text')).toContainText('Position: Hedged');
+  await expect(p.getByTestId('share-text')).not.toContainText('phrourax.com/s/');
+  await expect(p.getByTestId('share-card')).toHaveCount(0);
+  await expect(p.getByTestId('share-download')).toHaveCount(0);
+  await expect(p.getByTestId('share-copy-link')).toBeDisabled();
+  await expect(p.getByTestId('share-x')).toBeDisabled();
+});

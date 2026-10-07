@@ -6,10 +6,13 @@
  * Environment (Vercel → Settings → Environment Variables), all optional:
  *   CENSUS_URL or VITE_CENSUS_URL  the public census.json URL (the site already has VITE_CENSUS_URL)
  *   INK_RPC                        RPC URL(s) for the one live endpoint; default: Ink's public RPCs
+ * Also serves the share link and its card (vercel.json rewrites /s/<address> and /og/<address>.png here):
+ * the page and the PNG come from @aegis/census/api's share handler; this file only renders SVG → PNG with resvg.
  * Webhook management stays NOT_ENABLED until WEBHOOKS_ENABLED=1 and its secrets exist (docs/WEBHOOKS.md).
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { API, RateLimiter, handle, type ApiDeps } from '@aegis/census/api';
+import { fileURLToPath } from 'node:url';
+import { API, RateLimiter, handle, makeShareHandler, type ApiDeps } from '@aegis/census/api';
 import { decodeShip, type CensusSnapshot } from '@aegis/census';
 import { INK_PUBLIC_RPCS, makeInkClient, readBook, splitRpcList } from '@aegis/ink-io';
 import { makeWebhookHandler } from './webhooks';
@@ -62,6 +65,17 @@ const deps: ApiDeps = {
   webhooks: makeWebhookHandler(),
 };
 
+/* ── share card renderer: resvg + the bundled IBM Plex TTFs (apps/web/api-assets/fonts, OFL) ── */
+const FONT_FILES = ['IBMPlexMono-Regular.ttf', 'IBMPlexMono-Medium.ttf', 'IBMPlexMono-SemiBold.ttf', 'IBMPlexSans-Regular.ttf'];
+let resvg: Promise<typeof import('@resvg/resvg-js')> | null = null;
+async function renderPng(svg: string): Promise<Uint8Array> {
+  resvg ??= import('@resvg/resvg-js');
+  const { Resvg } = await resvg;
+  const fontFiles = FONT_FILES.map((f) => fileURLToPath(new URL(`../api-assets/fonts/${f}`, import.meta.url)));
+  return new Resvg(svg, { font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'IBM Plex Mono' } }).render().asPng();
+}
+const share = makeShareHandler({ readWallet: (a) => deps.readWallet!(a), render: renderPng, now: () => Date.now(), fixtures });
+
 function clientIp(req: IncomingMessage): string {
   const xf = String(req.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim();
   return xf || String(req.headers['x-real-ip'] ?? '') || req.socket.remoteAddress || 'unknown';
@@ -81,6 +95,16 @@ async function readBody(req: IncomingMessage): Promise<string | undefined> {
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://x');
+  // /s/<address> and /og/<address>.png (vercel.json) — the share page and card, not part of the JSON API
+  const shareParam = url.searchParams.get('__share');
+  const ogParam = url.searchParams.get('__og');
+  if (shareParam !== null || ogParam !== null) {
+    const out = await share({ kind: shareParam !== null ? 'page' : 'image', param: shareParam ?? ogParam ?? '', ip: clientIp(req) });
+    res.statusCode = out.status;
+    for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
+    res.end(req.method === 'HEAD' || out.body === null ? undefined : typeof out.body === 'string' ? out.body : Buffer.from(out.body));
+    return;
+  }
   const forced = url.searchParams.get('__path');
   url.searchParams.delete('__path');
   const path = forced !== null ? `/${forced}` : url.pathname.replace(/^\/api\/v1/, '') || '/';

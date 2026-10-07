@@ -122,10 +122,41 @@ Free and best effort, with no uptime promise. It's not advice, and the data can 
   ```
   pnpm --filter @aegis/web build:api
   ```
-- **Routing:** `vercel.json` rewrites `/api/v1/*` to the function, before the site's own catch-all.
+- **Routing:** `vercel.json` rewrites `/api/v1/*`, `/s/*` and `/og/*` to the function, before the site's own catch-all.
 - **Environment (Vercel, all optional):**
   - `CENSUS_URL`: falls back to the site's existing `VITE_CENSUS_URL`.
   - `INK_RPC`: for the live endpoint; defaults to Ink's public RPCs.
 - **Rollback:**
   - Delete `apps/web/api/` and the first rewrite in `vercel.json`, then push.
   - Or revert the commit. The site is unaffected either way.
+
+## Share link and card (`/s/<address>`, `/og/<address>.png`)
+
+Served by the same function, but not part of the versioned API: no envelope, no schema.
+
+- **What they are:**
+  - `/s/<address>` is a tiny page with Open Graph and Twitter tags. It forwards people to `/hull/<address>` straight away.
+  - `/og/<address>.png` is a 1200×630 card for that wallet.
+  - The wallet page's Share panel links to `/s/…`, never to `/hull/…`. robots.txt disallows `/hull/`, and X's crawler obeys robots.txt, so a `/hull/` link would post with no card.
+- **What the card shows:** the shortened address, position types, the risk level with its sentence, which venues were read, and the block and time. It never shows balances, health factor or liquidation prices. The post text follows the same rule.
+- **Bottom-left corner:** kept clear, because X draws the domain over it.
+- **One read serves both:** a single live read per address feeds the page and the image. It is held in memory for 10 minutes; a failed read is retried after 60 s.
+- **Caching:**
+
+  | Response | Cache |
+  |---|---|
+  | Card | `s-maxage=3600, stale-while-revalidate=86400` |
+  | Page | `s-maxage=600`, or 60 when the read failed |
+
+  The page's `og:image` URL carries `?h=<hour>`, so feeds pick up a fresh card at most hourly.
+- **Fallbacks:** an invalid address or a test wallet redirects to `/` (page) or `/og.png` (card). A read or render failure redirects the card to the site's own `/og.png`, so a share never shows a broken image.
+- **Limits:** per IP per function instance: 60 pages and 30 cards a minute, then 429.
+- **Crawling:** both paths send `X-Robots-Tag: noindex`. robots.txt leaves them crawlable on purpose, since link-preview bots must fetch them.
+- **Rendering:**
+  - SVG → PNG with `@resvg/resvg-js`, a native module kept outside the esbuild bundle and loaded only for cards.
+  - IBM Plex fonts (OFL) ship from `apps/web/api-assets/fonts` via `includeFiles` in `vercel.json`.
+  - A card takes about 50 ms.
+- **After a deploy, check:**
+  - `https://phrourax.com/og/<address>.png` shows the wallet's card. If it shows the generic site card, the native module or fonts didn't ship, and the function logs say which.
+  - Pasting `https://phrourax.com/s/<address>` into X's compose box shows the card.
+- **Deferred:** an X handle (`twitter:site`, "via @…") is added once the account exists.

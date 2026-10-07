@@ -620,3 +620,4 @@ export async function handle(req: ApiRequest, d: ApiDeps): Promise<ApiResponse> 
 }
 
 export const ROUTE_PATTERNS = ROUTES.map((r) => ({ pattern: r.pattern.source, cls: r.cls }));
+export { makeShareHandler, factsFromBook, SHARE_API, type ShareDeps, type ShareResponse } from './share.js';

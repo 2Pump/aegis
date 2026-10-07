@@ -38,7 +38,7 @@ describe('glyphs', () => {
   it('share text carries no dollar figures', () => {
     const s = summaryText(carry.address, pc, { tydro: true, nado: true }, 'https://x/hull/0x');
     expect(s).toContain('Hedged');
-    expect(s).toContain('risk: Safe');
+    expect(s).toContain('Risk: Safe');
     expect(s).not.toMatch(/\$/);
   });
   it('grid hit-test finds the right ship among 20,000, fast', () => {
@@ -73,5 +73,51 @@ describe('legacy brand text (display only)', () => {
     expect(raw.aegis.why).toBe('before AEGIS began recording'); // the source object is not mutated
     expect(hasLegacyBrand(JSON.stringify({ kind: 'aegis-changes', aegis: 1 }))).toBe(false);
     expect(hasLegacyBrand('"source": "AEGIS reads FQuerier"')).toBe(true);
+  });
+});
+
+describe('sharing a wallet (text, card, share page)', () => {
+  const A = '0x7BFEe91193d9Df2Ac0bFe90191D40F23c773C060';
+  const f = { address: A, tags: ['EQUITY-MARGIN', 'NAKED'] as const, hullTemp: 'NOMINAL' as const, venues: { tydro: true, nado: true }, block: 57812440, at: Date.parse('2026-10-07T14:05:00Z') };
+  it('post text: short lines, the link last, no dollar figures', async () => {
+    const { shareText } = await import('../src/share');
+    expect(shareText({ ...f, tags: [...f.tags] }, 'https://phrourax.com/s/' + A)).toBe(
+      ['Phrourax · Ink wallet 0x7BFE…C060', 'Position: Stocks as collateral + Unhedged bet', 'Risk: Safe · Tydro and Nado read OK', 'https://phrourax.com/s/' + A].join('\n'),
+    );
+  });
+  it('near liquidation is the risk line — as a type it only shows when it is the only one', async () => {
+    const { shareTypeText } = await import('../src/share');
+    expect(shareTypeText(['NAKED', 'WOUNDED'])).toBe('Unhedged bet');
+    expect(shareTypeText(['WOUNDED'])).toBe('Near liquidation');
+    expect(shareTypeText([])).toBe('Unclassified');
+  });
+  it('venue wording never claims a read that failed', async () => {
+    const { shareVenueText } = await import('../src/share');
+    expect(shareVenueText({ tydro: true, nado: false })).toBe("Tydro read OK · Nado couldn't be read");
+    expect(shareVenueText({ tydro: false, nado: false })).toBe("Tydro and Nado couldn't be read");
+  });
+  it('card: 1200×630 SVG with the type, risk, venues and block — no amounts', async () => {
+    const { shareCardSvg } = await import('../src/share');
+    const svg = shareCardSvg({ ...f, tags: [...f.tags] });
+    expect(svg).toMatch(/^<svg[^>]+width="1200" height="630"/);
+    for (const t of ['0x7BFE…C060', 'STOCKS AS COLLATERAL', 'UNHEDGED BET', 'SAFE', 'TYDRO', 'NADO', '57,812,440', '2026-10-07 14:05 UTC', 'Read-only · not financial advice']) expect(svg).toContain(t);
+    expect(svg).not.toMatch(/\$|health factor|HF /i);
+    const unknown = shareCardSvg({ ...f, tags: ['LOCKED'], hullTemp: 'UNKNOWN', venues: { tydro: true, nado: false } });
+    expect(unknown).toContain("NADO — couldn't read");
+    expect(unknown).toContain('stroke-dasharray');
+    expect(shareCardSvg({ ...f, tags: ['LEVERED'], hullTemp: 'CRITICAL' })).toContain('#FF4D4D');
+  });
+  it('share page: preview tags for crawlers, noindex, and straight on to the wallet page', async () => {
+    const { sharePageHtml } = await import('../src/share');
+    const h = sharePageHtml({ address: A, facts: { ...f, tags: [...f.tags] }, imageBucket: 7 });
+    expect(h).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    expect(h).toContain(`<meta property="og:image" content="https://phrourax.com/og/${A}.png?h=7" />`);
+    expect(h).toContain('<meta name="robots" content="noindex" />');
+    expect(h).toContain(`url=https://phrourax.com/hull/${A}`);
+    expect(h).toContain('Risk: Safe');
+    // unreadable right now → the site's own card, still forwards
+    const g = sharePageHtml({ address: A, facts: null });
+    expect(g).toContain('<meta property="og:image" content="https://phrourax.com/og.png" />');
+    expect(g).toContain(`/hull/${A}`);
   });
 });

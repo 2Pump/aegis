@@ -18,6 +18,7 @@
     "@aegis/glyphs": "workspace:*",
     "@aegis/ink-io": "workspace:*",
     "@aegis/pose": "workspace:*",
+    "@resvg/resvg-js": "2.6.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",
@@ -30,9 +31,9 @@
     "@types/react-dom": "19.3.0",
     "@types/three": "0.180.0",
     "@vitejs/plugin-react": "5.2.0",
+    "esbuild": "0.28.2",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vitest": "3.2.7",
-    "esbuild": "0.28.2"
+    "vitest": "3.2.7"
   }
 }
