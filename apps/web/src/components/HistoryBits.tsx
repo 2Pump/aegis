@@ -149,3 +149,86 @@ export function RiskLegend() {
     </div>
   );
 }
+
+type GapLike = { from: number; to: number; next?: { sweep: 'full' | 'incremental'; complete: boolean; at: number; startedAt: number | null } | null };
+type ScanLike = { at: string; startedAt?: string; sweep: 'full' | 'incremental' };
+
+const hm = (ms: number) => new Date(ms).toISOString().slice(11, 16);
+const dur = (ms: number) => {
+  const m = Math.round(ms / 60_000);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+};
+
+function endedBy(g: GapLike): string {
+  const n = g.next;
+  if (n === undefined) return '—';
+  if (n === null) return 'nothing yet: no scan has started since';
+  const kind = n.sweep === 'full' ? (n.complete ? 'a full re-read' : 'part of a full re-read') : 'an hourly scan';
+  if (n.startedAt === null) {
+    return n.sweep === 'full'
+      ? `${kind} that finished ${hm(n.at)} UTC. Its start time wasn't recorded (before 8 Oct), so the time it spent running counts as part of the gap.`
+      : `${kind} that finished ${hm(n.at)} UTC (start time not recorded)`;
+  }
+  return `${kind} that started ${hm(n.startedAt)} UTC and ran ${dur(n.at - n.startedAt)}. Nothing was running before it.`;
+}
+
+/**
+ * Why each gap is there, from what the scans themselves recorded. Lets a screenshot answer "why the gap?":
+ * a long full re-read (old points) vs. no scan running at all (the hourly start didn't fire).
+ */
+export function ScanGaps({ gaps, points }: { gaps: readonly GapLike[]; points: readonly ScanLike[] }) {
+  const timed = points
+    .filter((p) => p.startedAt)
+    .map((p) => ({ sweep: p.sweep, ms: Date.parse(p.at) - Date.parse(p.startedAt!) }))
+    .filter((x) => Number.isFinite(x.ms) && x.ms >= 0);
+  const longest = (k: 'full' | 'incremental') => {
+    const xs = timed.filter((x) => x.sweep === k).map((x) => x.ms);
+    return xs.length ? { n: xs.length, max: Math.max(...xs), med: [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! } : null;
+  };
+  const full = longest('full');
+  const inc = longest('incremental');
+  const legacyFull = gaps.filter((g) => g.next && g.next.startedAt === null && g.next.sweep === 'full').length;
+  const idle = gaps.filter((g) => g.next === null || (g.next && g.next.startedAt !== null)).length;
+  if (!gaps.length && !timed.length) return null;
+  return (
+    <details className="scan-gaps" data-testid="scan-gaps">
+      <summary className="mono">
+        Scan timing{gaps.length ? ` · why the ${gaps.length} gap${gaps.length === 1 ? '' : 's'}?` : ' · no gaps'}
+      </summary>
+      <div className="note-text" style={{ marginTop: 6 }}>
+        {timed.length ? (
+          <>
+            Recorded run times in this range: {full ? `full re-reads ${full.n}, typically ${dur(full.med)}, longest ${dur(full.max)}` : 'no full re-read yet'}
+            {inc ? `; hourly scans ${inc.n}, typically ${dur(inc.med)}, longest ${dur(inc.max)}` : ''}.{' '}
+          </>
+        ) : (
+          <>No run times recorded in this range yet (scans record their start time from 8 Oct 2026). </>
+        )}
+        A gap means no scan was running for over 2 hours.
+        {legacyFull
+          ? legacyFull === 1
+            ? ' 1 gap ended with a full re-read recorded before start times existed, so it includes the time that re-read spent running.'
+            : ` ${legacyFull} gaps ended with a full re-read recorded before start times existed, so they include the time those re-reads spent running.`
+          : ''}
+        {idle ? ` ${idle === 1 ? '1 gap had' : `${idle} gaps had`} no scan running at all: the hourly start didn't fire, or GitHub didn't run it.` : ''}
+      </div>
+      {gaps.length ? (
+        <div className="table-wrap" style={{ marginTop: 6 }}>
+          <table className="t" data-testid="scan-gaps-table">
+            <thead><tr><th>From</th><th>To</th><th>Length</th><th>Ended by</th></tr></thead>
+            <tbody>
+              {[...gaps].reverse().map((g) => (
+                <tr key={g.from}>
+                  <td className="mono">{when(g.from)}</td>
+                  <td className="mono">{g.next === null ? 'now' : when(g.to)}</td>
+                  <td className="num">{dur(g.to - g.from)}</td>
+                  <td style={{ whiteSpace: 'normal' }}>{endedBy(g)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </details>
+  );
+}

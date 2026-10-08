@@ -52,7 +52,14 @@ export const INDEX_PATH = 'history/index.json' as const;
 export type RiskCounts = [nominal: number, elevated: number, critical: number, unknown: number];
 
 export interface AggPoint {
+  /** when the run finished reading (the point is published then) */
   at: string;
+  /**
+   * when the run took its block, i.e. started reading. Every wallet in the point is read AT that block, so this is
+   * when the reading describes. A full re-read can take over an hour, so `at` alone would make the hour it was
+   * running look like "no scan". Points recorded before 2026-10-08 don't have it.
+   */
+  startedAt?: string;
   block: number;
   /** block hash at `block`; null = couldn't be read (the point is still kept, marked) */
   hash: string | null;
@@ -96,6 +103,7 @@ export function aggPoint(o: {
   ships: readonly CensusShip[];
   known: number;
   at: string;
+  startedAt?: string;
   block: number;
   hash: string | null;
   sweep: 'full' | 'incremental';
@@ -108,6 +116,7 @@ export function aggPoint(o: {
   for (const s of drawn) mix[s.primary ?? 'NONE'] = (mix[s.primary ?? 'NONE'] ?? 0) + 1;
   return {
     at: o.at,
+    ...(o.startedAt ? { startedAt: o.startedAt } : {}),
     block: o.block,
     hash: o.hash,
     sweep: o.sweep,
@@ -167,17 +176,42 @@ export function compactAgg(points: readonly AggPoint[], keepFromMs: number, ever
   return out;
 }
 
-/** Spans with no census point for longer than `maxGapH` hours — shown as gaps, never interpolated. */
-export function dataGaps(points: readonly { at: string }[], fromMs: number, toMs: number, maxGapH: number = HISTORY.GAP_H): Array<{ from: number; to: number }> {
-  const ts = points.map((p) => Date.parse(p.at)).filter((t) => t >= fromMs - maxGapH * 3_600_000 && t <= toMs).sort((a, b) => a - b);
-  const gaps: Array<{ from: number; to: number }> = [];
-  let prev = fromMs;
+/** A span with no scan running. `next` is the scan that ended it (null = none since), so the page can say why. */
+export interface DataGap {
+  from: number;
+  to: number;
+  next: { sweep: 'full' | 'incremental'; complete: boolean; at: number; startedAt: number | null } | null;
+}
+
+/**
+ * Spans longer than `maxGapH` hours with no scan running — shown as gaps, never interpolated.
+ * A scan counts from when it started reading (`startedAt`), not when it finished: a full re-read that runs for over an
+ * hour was a scan in progress, not a missing one. Points without `startedAt` (recorded before 2026-10-08) can only be
+ * measured from when they finished.
+ */
+export function dataGaps(
+  points: readonly { at: string; startedAt?: string; sweep?: 'full' | 'incremental'; complete?: boolean }[],
+  fromMs: number,
+  toMs: number,
+  maxGapH: number = HISTORY.GAP_H,
+): DataGap[] {
   const lim = maxGapH * 3_600_000;
-  for (const t of ts) {
-    if (t - prev > lim) gaps.push({ from: prev, to: t });
-    prev = Math.max(prev, t);
+  const ps = points
+    .map((p) => {
+      const at = Date.parse(p.at);
+      const st = p.startedAt ? Date.parse(p.startedAt) : NaN;
+      return { at, startedAt: Number.isFinite(st) && st <= at ? st : null, sweep: p.sweep ?? 'incremental', complete: p.complete !== false };
+    })
+    .filter((p) => p.at >= fromMs - lim && p.at <= toMs)
+    .sort((a, b) => a.at - b.at);
+  const gaps: DataGap[] = [];
+  let prev = fromMs;
+  for (const p of ps) {
+    const began = p.startedAt ?? p.at;
+    if (began - prev > lim) gaps.push({ from: prev, to: began, next: p });
+    prev = Math.max(prev, p.at);
   }
-  if (toMs - prev > lim) gaps.push({ from: prev, to: toMs });
+  if (toMs - prev > lim) gaps.push({ from: prev, to: toMs, next: null });
   return gaps;
 }
 

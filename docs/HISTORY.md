@@ -44,7 +44,15 @@ If the RPC no longer holds that block's state (that needs an archive node), the 
 
 ## Data gaps
 
-If no census point exists for more than 2 hours, that's a gap. Charts hatch or shade it and the line breaks; nothing is interpolated. Gaps are listed in text and counted under the chart.
+If no scan was running for more than 2 hours, that's a gap. Charts hatch or shade it and the line breaks; nothing is interpolated. Gaps are listed in text and counted under the chart.
+
+- **Measured from when a scan started.** Each aggregate point carries `startedAt`: the moment the run took its block, which is the block every wallet in the point is read at. A gap runs from one point's finish to the next point's `startedAt`.
+  - Why: a full re-read can run for over an hour. Measured by finish times alone, the hourly point before it and the re-read's own point end up more than 2 hours apart, and the time it spent running showed as "no scan". Five of the first six gaps (4–8 Oct 2026) ended exactly at a full re-read.
+  - **Older points:** points recorded before 2026-10-08 have no `startedAt`, so they are still measured from their finish time.
+- **"Scan timing" under INTEL → HISTORY:**
+  - It lists every gap with what ended it: a full re-read whose start wasn't recorded, a scan that started after nothing had been running, or nothing since.
+  - It also gives the typical and longest recorded run time for full re-reads and hourly scans.
+  - A gap with a recorded start means the hourly start didn't fire or GitHub didn't run it; check the timer and the Actions tab.
 
 ## Blob operations (Pro plan)
 

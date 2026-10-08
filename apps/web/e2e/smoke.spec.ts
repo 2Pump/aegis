@@ -487,3 +487,65 @@ test('Share on a test wallet: text only — no card, no link, nothing to post', 
   await expect(p.getByTestId('share-copy-link')).toBeDisabled();
   await expect(p.getByTestId('share-x')).toBeDisabled();
 });
+
+test('Ecosystem history: a long full re-read is not a gap; each gap says what ended it (from what the scans recorded)', async ({ page }) => {
+  const H = 3_600_000;
+  const now = Date.now();
+  const hourStart = Math.floor(now / H) * H;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const pt = (finish: number, o: { startedAt?: number; sweep?: 'full' | 'incremental' } = {}) => ({
+    at: iso(finish),
+    ...(o.startedAt !== undefined ? { startedAt: iso(o.startedAt) } : {}),
+    block: Math.floor(finish / 1000),
+    hash: null,
+    sweep: o.sweep ?? 'incremental',
+    complete: true,
+    v: { rules: 'r', engine: 'e', reader: 'x', prices: 'p', history: 'hist-1.0.0' },
+    risk: { all: [10, 2, 1, 0], '1k': [10, 2, 1, 0], '10k': [5, 1, 1, 0], '100k': [1, 0, 0, 0] },
+    mix: { CARRY: 3 },
+    venues: { tydro: 5, nado: 9, both: 1 },
+    known: 20,
+    drawn: 13,
+    dark: 0,
+    stress: null,
+  });
+  const hourly = (h: number) => pt(hourStart - h * H + 5 * 60_000, { startedAt: hourStart - h * H });
+  const points = [
+    // hourly, then a full re-read recorded before start times existed (finished 2 h 15 after the last point): a gap
+    ...[40, 39, 38, 37].map(hourly),
+    pt(hourStart - 35 * H + 20 * 60_000, { sweep: 'full' }),
+    // hourly, then a full re-read that started on the hour and ran 80 minutes — a scan in progress, not a gap
+    ...[34, 33, 32, 31, 30, 29].map(hourly),
+    pt(hourStart - 28 * H + 80 * 60_000, { sweep: 'full', startedAt: hourStart - 28 * H }),
+    hourly(26),
+    // then nothing started for almost 3 hours: a real gap
+    ...Array.from({ length: 23 }, (_, i) => 23 - i).map(hourly).filter((p) => Date.parse(p.at) < now),
+  ];
+  const months = [...new Set(points.map((p) => p.at.slice(0, 7)))];
+  const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  await page.route('**/census/history/**', (route) => {
+    const u = new URL(route.request().url()).pathname;
+    if (u.endsWith('/history/index.json'))
+      return route.fulfill(json({ v: 1, kind: 'aegis-history-index', version: 'hist-1.0.0', shards: 64, months, baselined: [], compacted: [], firstAt: points[0]!.at, firstBlock: points[0]!.block, changeMonths: [] }));
+    const m = u.match(/\/history\/agg\/(\d{4}-\d{2})\.json$/);
+    if (m) return route.fulfill(json({ v: 1, kind: 'aegis-history-agg', chainId: 57073, month: m[1], points: points.filter((p) => p.at.startsWith(m[1]!)) }));
+    return route.fulfill({ status: 404, body: '' });
+  });
+  await page.goto('/intel');
+  // a locked build (well not yet verified) shows no history at all — run with VITE_WELL_PREVIEW=1 to cover this
+  await expect(page.getByTestId('intel-history').or(page.getByText('Locked with the well until the readings are verified against the official apps.'))).toBeVisible();
+  test.skip((await page.getByTestId('intel-history').count()) === 0, 'history is locked in this build');
+  const h = page.getByTestId('intel-history');
+  await expect(h.getByText(/no scan \(2\)/)).toBeVisible({ timeout: 15_000 });
+  const d = h.getByTestId('scan-gaps');
+  await d.locator('summary').click();
+  await expect(d).toContainText('why the 2 gaps?');
+  const rows = d.getByTestId('scan-gaps-table').locator('tbody tr');
+  await expect(rows).toHaveCount(2);
+  // newest first: the real outage (nothing running), then the old full re-read without a start time
+  await expect(rows.nth(0)).toContainText('an hourly scan that started');
+  await expect(rows.nth(0)).toContainText('Nothing was running before it.');
+  await expect(rows.nth(1)).toContainText("start time wasn't recorded");
+  await expect(d).toContainText('longest 1 h 20 min');
+  if (process.env.SHOT) await h.screenshot({ path: process.env.SHOT });
+});

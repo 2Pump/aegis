@@ -233,6 +233,7 @@ export {
   appendAgg,
   compactAgg,
   dataGaps,
+  type DataGap,
   riskCounts,
   walletChanges,
   appendWalletRows,

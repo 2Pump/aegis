@@ -41,6 +41,8 @@ export interface HistoryWriteOpts {
   client: PublicClient;
   block: number;
   at: string;
+  /** when the run took its block (started reading) */
+  startedAt?: string;
   sweep: 'full' | 'incremental';
   complete: boolean;
   /** every wallet read or carried this run, EMPTY included */
@@ -120,6 +122,7 @@ export async function recordHistory(o: HistoryWriteOpts): Promise<HistoryWriteRe
       ships,
       known: o.known,
       at: o.at,
+      startedAt: o.startedAt,
       block: o.block,
       hash,
       sweep: o.sweep,

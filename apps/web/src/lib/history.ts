@@ -37,6 +37,7 @@ import {
   walletPath,
   walletTimeline,
   type AggPoint,
+  type DataGap,
   type HistoryIndex,
   type WalletFile,
   type WalletState,
@@ -98,8 +99,8 @@ export function useHistoryIndex(): Loaded<{ index: HistoryIndex }> {
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 /** Aggregate points within [from, now], plus the data gaps in that span. */
-export function useAggHistory(range: Range, index: HistoryIndex | null): Loaded<{ points: AggPoint[]; gaps: Array<{ from: number; to: number }>; from: number; to: number }> {
-  type S = Loaded<{ points: AggPoint[]; gaps: Array<{ from: number; to: number }>; from: number; to: number }>;
+export function useAggHistory(range: Range, index: HistoryIndex | null): Loaded<{ points: AggPoint[]; gaps: DataGap[]; from: number; to: number }> {
+  type S = Loaded<{ points: AggPoint[]; gaps: DataGap[]; from: number; to: number }>;
   const [s, set] = useState<S>({ status: 'loading' });
   useEffect(() => {
     if (!index) return;

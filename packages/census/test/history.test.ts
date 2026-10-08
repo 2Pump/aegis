@@ -95,7 +95,25 @@ describe('Flight Recorder · aggregate points', () => {
   it('gaps longer than 2 h are shown as gaps, never interpolated', () => {
     const t = (h: number) => new Date(Date.UTC(2026, 9, 4, h)).toISOString();
     const g = dataGaps([{ at: t(0) }, { at: t(1) }, { at: t(5) }], Date.UTC(2026, 9, 4, 0), Date.UTC(2026, 9, 4, 6));
-    expect(g).toEqual([{ from: Date.UTC(2026, 9, 4, 1), to: Date.UTC(2026, 9, 4, 5) }]);
+    expect(g).toEqual([{ from: Date.UTC(2026, 9, 4, 1), to: Date.UTC(2026, 9, 4, 5), next: { sweep: 'incremental', complete: true, at: Date.UTC(2026, 9, 4, 5), startedAt: null } }]);
+  });
+
+  it('a long full re-read is a scan in progress, not a gap: gaps are measured to when a scan STARTED reading', () => {
+    const t = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
+    const span = [Date.UTC(2026, 9, 4, 0), Date.UTC(2026, 9, 4, 4)] as const;
+    // hourly point at 0:05; a full re-read starts 1:00 and finishes 2:20 (over 2 h after the last point)
+    const long = [{ at: t(0, 5) }, { at: t(2, 20), startedAt: t(1, 0), sweep: 'full' as const }, { at: t(3, 5) }];
+    expect(dataGaps(long, ...span)).toEqual([]);
+    // the same point recorded before start times existed: still a gap, and it says a full re-read ended it
+    const legacy = [{ at: t(0, 5) }, { at: t(2, 20), sweep: 'full' as const }, { at: t(3, 5) }];
+    const g = dataGaps(legacy, ...span);
+    expect(g).toHaveLength(1);
+    expect(g[0]!.next).toMatchObject({ sweep: 'full', startedAt: null });
+    // a real outage: nothing started for 3 h — a gap up to the moment the next scan started
+    const out = dataGaps([{ at: t(0, 5) }, { at: t(3, 10), startedAt: t(3, 0) }], ...span);
+    expect(out).toEqual([{ from: Date.parse(t(0, 5)), to: Date.parse(t(3, 0)), next: { sweep: 'incremental', complete: true, at: Date.parse(t(3, 10)), startedAt: Date.parse(t(3, 0)) } }]);
+    // nothing since: open-ended gap with no next scan
+    expect(dataGaps([{ at: t(0, 5) }], span[0], Date.UTC(2026, 9, 4, 3))[0]!.next).toBeNull();
   });
 
   it('months between two dates, bounded', () => {

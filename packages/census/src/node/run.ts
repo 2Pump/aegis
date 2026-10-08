@@ -204,6 +204,8 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
   }
 
   const head = Number(await client.getBlockNumber()) - (o.confirmations ?? 2);
+  /** the moment this run's reading block was taken — what the history point describes */
+  const headAt = new Date().toISOString();
   const floor = o.sinceBlocks ? Math.max(0, head - o.sinceBlocks) : 0;
   log(`head ${head} · store ${o.store.describe} · known tydro ${Object.keys(state.tydro.users).length} · known nado owners ${Object.keys(state.nado.subs).length}`);
 
@@ -737,6 +739,7 @@ export async function runCensus(o: RunOpts): Promise<CensusSnapshot> {
         client,
         block: head,
         at: snap.generatedAt,
+        startedAt: headAt,
         sweep: snap.sweep.kind,
         complete: snap.sweep.complete !== false,
         ships: all,

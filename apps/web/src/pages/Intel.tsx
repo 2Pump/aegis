@@ -8,7 +8,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MATERIAL, MATERIAL_LABEL, type AggPoint, type Material } from '@aegis/census';
+import { MATERIAL, MATERIAL_LABEL, type AggPoint, type DataGap, type Material } from '@aegis/census';
 import { NO_TYPE_LABEL, TAG_LABEL, primaryTypeLabel } from '@aegis/glyphs';
 import type { Tag } from '@aegis/pose';
 import { Panel } from '../components/bits';
@@ -16,7 +16,7 @@ import { LiquidationsPanel } from '../components/Liquidations';
 import { OraclesPanel } from '../components/Oracles';
 import { ChangesPanel } from '../components/Changes';
 import { CarryPanel } from '../components/Carry';
-import { CountChart, RangePicker, RiskStrip, when } from '../components/HistoryBits';
+import { CountChart, RangePicker, RiskStrip, ScanGaps, when } from '../components/HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useAggHistory, useHistoryIndex, type Range } from '../lib/history';
 
@@ -125,7 +125,7 @@ function Charts({
   onTable,
 }: {
   points: AggPoint[];
-  gaps: Array<{ from: number; to: number }>;
+  gaps: DataGap[];
   from: number;
   to: number;
   floor: Material;
@@ -163,6 +163,7 @@ function Charts({
           Now: <b>{last.risk[floor][2].toLocaleString('en-US')}</b> near liquidation, <b>{last.risk[floor][1].toLocaleString('en-US')}</b> watch, {last.risk[floor][0].toLocaleString('en-US')} safe,{' '}
           {last.risk[floor][3].toLocaleString('en-US')} couldn't be read · of {(last.risk[floor].reduce((a, b) => a + b, 0)).toLocaleString('en-US')} wallets {MATERIAL_LABEL[floor].toLowerCase()}.
         </div>
+        <ScanGaps gaps={gaps} points={points} />
       </div>
 
       <div>
