@@ -10,7 +10,8 @@
     "./alerts": "./src/alerts/index.ts",
     "./api": "./src/api/index.ts",
     "./webhooks": "./src/webhooks/index.ts",
-    "./node": "./src/node/index.ts"
+    "./node": "./src/node/index.ts",
+    "./accounts": "./src/accounts/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

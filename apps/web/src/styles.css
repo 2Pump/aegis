@@ -628,3 +628,15 @@ a.pill-btn { display: inline-block; }
 .scan-gaps { margin-top: 8px; }
 .scan-gaps summary { cursor: pointer; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
 .scan-gaps summary:hover { color: var(--ink); }
+
+/* accounts — sign in by emailed link */
+.auth-page { max-width: 620px; }
+.auth-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.auth-form input { flex: 1 1 260px; min-width: 0; background: #020406; border: 1px solid var(--hair); color: var(--ink); font: 14px var(--mono); padding: 10px 12px; border-radius: 2px; }
+.auth-form input:focus { outline: none; border-color: var(--cyan); }
+.auth-error { flex-basis: 100%; color: var(--amber); font-size: 13px; }
+.pill-btn.solid { background: var(--cyan); color: var(--void); border-color: var(--cyan); font-weight: 600; }
+.pill-btn.solid:hover { border-color: var(--cyan); filter: brightness(1.08); }
+.linkish { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; font: inherit; }
+.linkish:hover { text-decoration: underline; text-underline-offset: 3px; }
+.account-kv { max-width: 460px; }

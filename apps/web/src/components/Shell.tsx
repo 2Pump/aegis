@@ -8,6 +8,7 @@ import { fmtAge } from '../lib/fmt';
 import { useChainHead, useNow } from '../lib/hulls';
 import { ENV } from '../lib/env';
 import { RulesContent } from './RulesContent';
+import { AccountButton } from '../pages/Account';
 
 /**
  * The rules live in ONE place: the drawer. It opens over whatever page you are on and is part of the address
@@ -71,6 +72,7 @@ export function Shell() {
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>
         </nav>
         <MyWalletButton />
+        <AccountButton />
       </header>
       <main>
         <Outlet />

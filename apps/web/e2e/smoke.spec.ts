@@ -549,3 +549,65 @@ test('Ecosystem history: a long full re-read is not a gap; each gap says what en
   await expect(d).toContainText('longest 1 h 20 min');
   if (process.env.SHOT) await h.screenshot({ path: process.env.SHOT });
 });
+
+test('Accounts off (no function / not set up): no sign-in anywhere, and the pages say so', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('footer')).toBeVisible();
+  await expect(page.getByTestId('nav-signin')).toHaveCount(0);
+  await page.goto('/signin');
+  await expect(page.getByTestId('accounts-off')).toBeVisible();
+});
+
+test('Accounts: sign in by emailed link — no password, no wallet; the link is used by a button, then the account shows', async ({ page }) => {
+  let signedIn = false;
+  const posts: Array<{ path: string; body: unknown }> = [];
+  await page.route('**/api/v1/auth/**', async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v1/auth/', '');
+    const json = (status: number, body: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    if (path === 'me') return json(200, signedIn ? { configured: true, signedIn: true, access: 'free', email: 'trader@example.com', plan: null, paidUntil: null, since: '2026-10-09T00:00:00Z' } : { configured: true, signedIn: false, access: 'free' });
+    posts.push({ path, body: req.postDataJSON() });
+    if (path === 'start') return json(200, { sent: true });
+    if (path === 'verify') {
+      signedIn = true;
+      return json(200, { signedIn: true, next: '/account' });
+    }
+    if (path === 'signout') {
+      signedIn = false;
+      return json(200, { signedIn: false });
+    }
+    return json(404, {});
+  });
+  await page.goto('/');
+  await page.getByTestId('nav-signin').click();
+  await expect(page).toHaveURL(/\/signin$/);
+  await page.getByTestId('signin-email').fill('trader@example.com');
+  await page.getByTestId('signin-send').click();
+  await expect(page.getByTestId('signin-sent')).toContainText('trader@example.com');
+  expect(posts[0]).toEqual({ path: 'start', body: { email: 'trader@example.com' } });
+  // the emailed link: token in the fragment; it is taken out of the address bar and used only by the button
+  const token = 'A'.repeat(43);
+  await page.goto(`/auth/verify#t=${token}`);
+  await expect(page).toHaveURL(/\/auth\/verify$/);
+  expect(posts.filter((p) => p.path === 'verify')).toHaveLength(0);
+  await page.getByTestId('verify-go').click();
+  await expect(page).toHaveURL(/\/account$/);
+  expect(posts.find((p) => p.path === 'verify')?.body).toEqual({ token });
+  await expect(page.getByTestId('account-email')).toHaveText('trader@example.com');
+  await expect(page.getByTestId('account-plan')).toContainText('Free');
+  await expect(page.getByTestId('nav-account')).toContainText('Free');
+  await page.getByTestId('signout').click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('nav-signin')).toBeVisible();
+});
+
+test('Accounts: a used or expired link says so and offers a new one', async ({ page }) => {
+  await page.route('**/api/v1/auth/**', (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, signedIn: false, access: 'free' }) });
+    return route.fulfill({ status: 410, contentType: 'application/json', body: JSON.stringify({ error: { code: 'LINK_USED_OR_EXPIRED', message: 'This sign-in link was already used or has expired. Ask for a new one.' } }) });
+  });
+  await page.goto(`/auth/verify#t=${'B'.repeat(43)}`);
+  await page.getByTestId('verify-go').click();
+  await expect(page.getByTestId('verify-error')).toContainText('already used or has expired');
+});

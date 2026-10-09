@@ -9,6 +9,7 @@
  * Also serves the share link and its card (vercel.json rewrites /s/<address> and /og/<address>.png here):
  * the page and the PNG come from @aegis/census/api's share handler; this file only renders SVG → PNG with resvg.
  * Webhook management stays NOT_ENABLED until WEBHOOKS_ENABLED=1 and its secrets exist (docs/WEBHOOKS.md).
+ * Accounts (/api/v1/auth/*) stay off until their four settings exist (./accounts.ts, docs/ACCOUNTS.md).
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ import { API, RateLimiter, handle, makeShareHandler, type ApiDeps } from '@aegis
 import { decodeShip, type CensusSnapshot } from '@aegis/census';
 import { INK_PUBLIC_RPCS, makeInkClient, readBook, splitRpcList } from '@aegis/ink-io';
 import { makeWebhookHandler } from './webhooks';
+import { makeAccounts } from './accounts';
 
 declare const __FIXTURES__: string[];
 
@@ -74,6 +76,7 @@ async function renderPng(svg: string): Promise<Uint8Array> {
   const fontFiles = FONT_FILES.map((f) => fileURLToPath(new URL(`../api-assets/fonts/${f}`, import.meta.url)));
   return new Resvg(svg, { font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'IBM Plex Mono' } }).render().asPng();
 }
+const accounts = makeAccounts();
 const share = makeShareHandler({ readWallet: (a) => deps.readWallet!(a), render: renderPng, now: () => Date.now(), fixtures });
 
 function clientIp(req: IncomingMessage): string {
@@ -108,6 +111,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const forced = url.searchParams.get('__path');
   url.searchParams.delete('__path');
   const path = forced !== null ? `/${forced}` : url.pathname.replace(/^\/api\/v1/, '') || '/';
+  // accounts: sign-in links and the session cookie (not part of the data API's envelope)
+  if (path.startsWith('/auth/')) {
+    const out = await accounts.handler({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req) });
+    res.statusCode = out.status;
+    for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
+    res.end(JSON.stringify(out.body));
+    return;
+  }
   const query: Record<string, string> = {};
   for (const [k, v] of url.searchParams) if (!(k in query)) query[k] = v;
   const out = await handle(
