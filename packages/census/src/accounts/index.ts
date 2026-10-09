@@ -2,3 +2,4 @@ export * from './core.js';
 export * from './kv.js';
 export * from './mail.js';
 export * from './api.js';
+export * from './paywall.js';

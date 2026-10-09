@@ -1,0 +1,43 @@
+# Phrourax census storage — one deliberate step after moving to the private store (docs/PAYWALL.md).
+# Deletes the census files from the PUBLIC Blob store so the old public URLs stop working. It refuses unless the
+# private store already holds every file. Type DELETE PUBLIC to confirm; anything else only reports.
+
+name: census storage
+run-name: census storage · ${{ inputs.confirm == 'DELETE PUBLIC' && 'delete public copies' || 'dry run' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DELETE PUBLIC to delete the public copies (anything else = dry run)'
+        type: string
+        default: ''
+
+concurrency:
+  group: census
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - run: pnpm install --frozen-lockfile
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      - name: Delete public census copies
+        run: pnpm census:delete-public ${{ inputs.confirm == 'DELETE PUBLIC' && '--yes' || '' }}
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          CENSUS_BLOB_TOKEN: ${{ secrets.CENSUS_BLOB_TOKEN }}

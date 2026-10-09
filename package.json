@@ -2,7 +2,7 @@
   "name": "aegis",
   "private": true,
   "version": "0.1.0",
-  "description": "PHROURAX — on-chain risk intelligence for Ink (Tydro and Nado). Read-only.",
+  "description": "PHROURAX \u2014 on-chain risk intelligence for Ink (Tydro and Nado). Read-only.",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=20"
@@ -23,7 +23,8 @@
     "verify:auto": "tsx scripts/verify-auto.ts",
     "alerts": "tsx scripts/alerts.ts",
     "webhooks": "tsx scripts/webhooks.ts",
-    "firewall": "node scripts/firewall.mjs"
+    "firewall": "node scripts/firewall.mjs",
+    "census:delete-public": "tsx scripts/census-delete-public.ts"
   },
   "devDependencies": {
     "@aegis/ink-io": "workspace:*",

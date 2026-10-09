@@ -640,3 +640,19 @@ a.pill-btn { display: inline-block; }
 .linkish { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; font: inherit; }
 .linkish:hover { text-decoration: underline; text-underline-offset: 3px; }
 .account-kv { max-width: 460px; }
+
+/* paywall — locked parts and plans */
+.locked { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 18px 8px 8px; }
+.locked-k { font: 600 10.5px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); display: flex; align-items: center; gap: 7px; }
+.locked-blurb { margin: 0; max-width: 460px; color: var(--ink-dim); font-size: 14px; line-height: 1.55; }
+.lock-icon { display: inline-block; vertical-align: -1px; }
+.nav .lock-icon { margin-left: 6px; color: var(--ink-faint); }
+.grid.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.plan .body { display: flex; flex-direction: column; gap: 6px; height: 100%; }
+.plan-price { font: 600 34px var(--mono); margin-top: 4px; }
+.plan-price small { font: 400 13px var(--mono); color: var(--ink-dim); }
+.plan-list { margin: 6px 0 12px; padding-left: 18px; line-height: 1.7; font-size: 14px; flex: 1; }
+.plan-list li::marker { color: var(--ink-faint); }
+.plan-on { outline: 1px solid var(--rail); }
+.plan-current { font-size: 12px; color: var(--cyan); letter-spacing: 0.08em; }
+@media (max-width: 860px) { .grid.three { grid-template-columns: minmax(0, 1fr); } }

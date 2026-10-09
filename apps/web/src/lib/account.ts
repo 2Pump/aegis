@@ -8,7 +8,11 @@ import { useEffect, useState } from 'react';
 export type Access = 'free' | 'pro' | 'desk';
 export interface Me {
   configured: boolean;
+  /** PAYWALL=1 on the server: paid pages need a plan */
+  paywall?: boolean;
   signedIn: boolean;
+  /** complimentary access (counts as Desk) */
+  comp?: boolean;
   access: Access;
   email?: string;
   plan?: 'pro' | 'desk' | null;
@@ -17,7 +21,7 @@ export interface Me {
 }
 export type MeState = { status: 'loading' } | { status: 'ok'; me: Me };
 
-const OFF: Me = { configured: false, signedIn: false, access: 'free' };
+const OFF: Me = { configured: false, paywall: false, signedIn: false, access: 'free' };
 let current: MeState = { status: 'loading' };
 let inflight: Promise<void> | null = null;
 const subs = new Set<(s: MeState) => void>();
@@ -66,3 +70,15 @@ export async function authPost<T>(path: string, body: unknown): Promise<{ ok: tr
 
 export const PLAN_LABEL: Record<Access, string> = { free: 'Free', pro: 'Pro', desk: 'Desk' };
 export const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/**
+ * May this visitor see the paid parts? 'loading' until /auth/me answers (paid parts render nothing meanwhile — never a
+ * flash of data then a lock, or a lock then data). With the paywall off, everything is open, as before.
+ */
+export type Gate = 'loading' | 'open' | 'locked';
+export function gateOf(s: MeState): Gate {
+  if (s.status === 'loading') return 'loading';
+  if (!s.me.paywall) return 'open';
+  return s.me.access === 'pro' || s.me.access === 'desk' ? 'open' : 'locked';
+}
+export const usePlanGate = (): Gate => gateOf(useMe());

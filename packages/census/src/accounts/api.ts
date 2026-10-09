@@ -14,7 +14,6 @@
 import { BRAND } from '@aegis/glyphs';
 import {
   ACCOUNTS,
-  access,
   clearedCookie,
   isLinkToken,
   linkKey,
@@ -30,6 +29,7 @@ import {
   type User,
 } from './core.js';
 import type { Kv } from './kv.js';
+import { effectiveAccess } from './paywall.js';
 import { signInMail, type Mailer } from './mail.js';
 
 export interface AccountsDeps {
@@ -39,6 +39,10 @@ export interface AccountsDeps {
   now: () => number;
   site?: string;
   log?: (m: string) => void;
+  /** complimentary accounts (count as Desk) */
+  comp?: ReadonlySet<string>;
+  /** PAYWALL=1: the site shows locks to accounts without a plan */
+  paywall?: boolean;
 }
 
 export interface AuthRequest {
@@ -84,15 +88,25 @@ export async function sessionUser(d: Pick<AccountsDeps, 'kv' | 'secret' | 'now'>
   return u && u.sv === claims.v ? u : null;
 }
 
-export const meBody = (u: User | null, nowMs: number) =>
+export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<string>; paywall?: boolean } = {}) =>
   u
-    ? { configured: true, signedIn: true, email: u.email, access: access(u, nowMs), plan: u.plan, paidUntil: u.paidUntil, since: u.createdAt }
-    : { configured: true, signedIn: false, access: 'free' as const };
+    ? {
+        configured: true,
+        paywall: o.paywall === true,
+        signedIn: true,
+        email: u.email,
+        access: effectiveAccess(u, nowMs, o.comp),
+        comp: o.comp?.has(u.email) === true,
+        plan: u.plan,
+        paidUntil: u.paidUntil,
+        since: u.createdAt,
+      }
+    : { configured: true, paywall: o.paywall === true, signedIn: false, access: 'free' as const };
 
 /** For when accounts aren't set up (no secret / store / mail key): the site works exactly as before. */
 export const accountsOff: AuthHandler = async (req) =>
   req.method === 'GET' && req.path === '/auth/me'
-    ? json(200, { configured: false, signedIn: false, access: 'free' })
+    ? json(200, { configured: false, paywall: false, signedIn: false, access: 'free' })
     : err(503, 'NOT_ENABLED', 'Accounts are not switched on yet.');
 
 export function makeAccountsHandler(d: AccountsDeps): AuthHandler {
@@ -122,7 +136,7 @@ export function makeAccountsHandler(d: AccountsDeps): AuthHandler {
     try {
       if (req.path === '/auth/me') {
         if (req.method !== 'GET') return err(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
-        return json(200, meBody(await sessionUser(d, cookie), d.now()));
+        return json(200, meBody(await sessionUser(d, cookie), d.now(), d));
       }
 
       if (req.path === '/auth/start') {
@@ -154,7 +168,7 @@ export function makeAccountsHandler(d: AccountsDeps): AuthHandler {
         const u = (await loadUser(d.kv, userId(email))) ?? newUser(email, now);
         u.lastSignInAt = new Date(now).toISOString();
         await saveUser(d.kv, u);
-        return json(200, { ...meBody(u, now), next: safeNext(next) }, { 'Set-Cookie': sessionCookie(signSession(d.secret, u, now)) });
+        return json(200, { ...meBody(u, now, d), next: safeNext(next) }, { 'Set-Cookie': sessionCookie(signSession(d.secret, u, now)) });
       }
 
       if (req.path === '/auth/signout') {

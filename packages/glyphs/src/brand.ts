@@ -43,3 +43,28 @@ export function brandJson<T>(x: T): T {
   }
   return x;
 }
+
+/**
+ * Plans (docs/PAYWALL.md). Prices are per 30-day period, paid in crypto (stage 3: NOWPayments). Change them here only.
+ */
+export const PLANS = {
+  pro: {
+    name: 'Pro',
+    usd: 19,
+    blurb: 'The whole site.',
+    features: ['Everything on the site: Well, Pressure, Intel, Scan', 'Full wallet detail, history and stress test', 'Telegram alerts for up to 10 wallets (when alerts open)'],
+  },
+  desk: {
+    name: 'Desk',
+    usd: 99,
+    blurb: 'The site plus the API.',
+    features: ['Everything in Pro', 'The full API, plus webhooks (when they open)', 'Alerts for up to 100 wallets (when alerts open)'],
+  },
+  free: {
+    name: 'Free',
+    usd: 0,
+    blurb: 'Check one wallet at a time.',
+    features: ["Any wallet's risk level and position types", 'Share links and cards', 'The rules, Checks and the public track record'],
+  },
+  PERIOD_DAYS: 30,
+} as const;

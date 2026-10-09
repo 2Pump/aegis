@@ -27,8 +27,10 @@ import { useLiveWell } from '../lib/live';
 import { wellPhase, displayPhase } from '../lib/wellState';
 import { useNow } from '../lib/hulls';
 import { fmtAge } from '../lib/fmt';
+import { usePlanGate } from '../lib/account';
+import { Locked } from '../components/Paywall';
 
-export function Home() {
+function WellHome() {
   const nav = useNavigate();
   const cache = useHullCache();
   const census = useCensus();
@@ -104,14 +106,6 @@ export function Home() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <div className="stack" style={{ gap: 6 }}>
-        <h2 className="page">{COPY.oneLiner}</h2>
-        <PasteBar autoFocus />
-        <div className="home-sub" data-testid="home-sub">
-          Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.
-        </div>
-      </div>
-
       {!WELL_ON ? (
         <>
           <div className="banner red" data-testid="unverified-banner">
@@ -235,6 +229,34 @@ export function Home() {
           <li>Made-up test wallets live on the <Link to="/calibration">Checks</Link> page and never appear here.</li>
         </ul>
       </Panel>
+    </div>
+  );
+}
+
+/**
+ * The homepage. The address field is always first and always free; the well under it needs a plan while the paywall
+ * is on (docs/PAYWALL.md) — and while locked, nothing of the scan is loaded at all.
+ */
+export function Home() {
+  const gate = usePlanGate();
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      {/* the address field stays mounted whatever the plan check says, so typing is never wiped */}
+      <div className="stack" style={{ gap: 6 }}>
+        <h2 className="page">{COPY.oneLiner}</h2>
+        <PasteBar autoFocus />
+        <div className="home-sub" data-testid="home-sub">
+          Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.
+        </div>
+      </div>
+      {gate === 'open' ? <WellHome /> : null}
+      {gate === 'locked' ? (
+        <Locked
+          title="The well"
+          testId="locked-well"
+          blurb="Every Tydro and Nado wallet on Ink, by position type and risk, updated hourly — with the near-liquidation list and live activity."
+        />
+      ) : null}
     </div>
   );
 }

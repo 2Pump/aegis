@@ -11,6 +11,8 @@ import { PressurePage } from './pages/Pressure';
 import { IntelPage } from './pages/Intel';
 import { CensusPage, DevelopersPage, NotFound, WatchPage } from './pages/Static';
 import { AccountPage, SignInPage, VerifyPage } from './pages/Account';
+import { PricingPage } from './pages/Pricing';
+import { PaidPage } from './components/Paywall';
 import './styles.css';
 
 installStaleBuildReload();
@@ -26,14 +28,36 @@ const router = createBrowserRouter([
       // the rules are the drawer now; old links to /rules open it over the well
       { path: '/rules', element: <Navigate to="/?rules=1" replace /> },
       { path: '/calibration', element: <CalibrationPage /> },
-      { path: '/pressure', element: <PressurePage /> },
-      { path: '/intel', element: <IntelPage /> },
-      { path: '/census', element: <CensusPage /> },
+      {
+        path: '/pressure',
+        element: (
+          <PaidPage heading="Pressure" title="Pressure map" blurb="How many wallets a price move would push toward liquidation — by asset, direction and size range.">
+            <PressurePage />
+          </PaidPage>
+        ),
+      },
+      {
+        path: '/intel',
+        element: (
+          <PaidPage heading="Intel" title="Intel" blurb="Ecosystem history, the liquidation ledger, oracle watch, protocol changes and carry — recorded live every hour.">
+            <IntelPage />
+          </PaidPage>
+        ),
+      },
+      {
+        path: '/census',
+        element: (
+          <PaidPage heading="Scan" title="Scan" blurb="Every wallet Phrourax has found on Tydro and Nado, to browse and filter.">
+            <CensusPage />
+          </PaidPage>
+        ),
+      },
       { path: '/watch', element: <WatchPage /> },
       { path: '/developers', element: <DevelopersPage /> },
       { path: '/signin', element: <SignInPage /> },
       { path: '/auth/verify', element: <VerifyPage /> },
       { path: '/account', element: <AccountPage /> },
+      { path: '/pricing', element: <PricingPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

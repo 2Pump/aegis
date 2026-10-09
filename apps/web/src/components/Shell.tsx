@@ -9,6 +9,8 @@ import { useChainHead, useNow } from '../lib/hulls';
 import { ENV } from '../lib/env';
 import { RulesContent } from './RulesContent';
 import { AccountButton } from '../pages/Account';
+import { LockIcon, SubscribeButton } from './Paywall';
+import { usePlanGate } from '../lib/account';
 
 /**
  * The rules live in ONE place: the drawer. It opens over whatever page you are on and is part of the address
@@ -50,6 +52,7 @@ export function Shell() {
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawer]);
+  const lock = usePlanGate() === 'locked' ? <LockIcon /> : null;
   return (
     <div className="shell">
       <header className="topbar">
@@ -61,10 +64,10 @@ export function Shell() {
           </div>
         </div>
         <nav className="nav" aria-label="Primary">
-          <NavLink to="/" end>Well</NavLink>
-          <NavLink to="/pressure">Pressure</NavLink>
-          <NavLink to="/intel">Intel</NavLink>
-          <NavLink to="/census">Scan</NavLink>
+          <NavLink to="/" end>Well{lock}</NavLink>
+          <NavLink to="/pressure">Pressure{lock}</NavLink>
+          <NavLink to="/intel">Intel{lock}</NavLink>
+          <NavLink to="/census">Scan{lock}</NavLink>
           <NavLink to="/watch" aria-label={ENV.alertsBot ? 'Alerts' : 'Alerts, coming soon'} data-testid="nav-alerts">
             Alerts{ENV.alertsBot ? null : <span className="nav-soon" aria-hidden>SOON</span>}
           </NavLink>
@@ -72,6 +75,7 @@ export function Shell() {
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>
         </nav>
         <MyWalletButton />
+        <SubscribeButton />
         <AccountButton />
       </header>
       <main>

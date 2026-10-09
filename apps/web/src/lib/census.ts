@@ -10,7 +10,14 @@ const read = (k: string): string | undefined => {
 };
 
 /** Where the hourly census lives. Local runs of `pnpm census` write apps/web/public/census/census.json. */
-export const CENSUS_URL = read('VITE_CENSUS_URL') ?? '/census/census.json';
+/**
+ * Where the census files come from. A deployed site always reads them through its own function (/api/v1/data/…),
+ * which applies the paywall (docs/PAYWALL.md) and can read the private store. A local dev build reads the folder the
+ * local census writes (or VITE_CENSUS_URL).
+ */
+export const CENSUS_URL = import.meta.env.DEV ? read('VITE_CENSUS_URL') ?? '/census/census.json' : '/api/v1/data/census.json';
+/** true when files come through the function (then per-wallet lookups have their own small endpoints) */
+export const DATA_VIA_API = CENSUS_URL.startsWith('/api/v1/data/');
 
 /**
  * The well stays locked until real numbers are matched against the official UIs (verification/status.json).

@@ -70,8 +70,6 @@ Status: built and **off** until the four settings below exist in Vercel. While o
 
 ## Next stages
 
-2. **Paywall:**
-   - Census and history files are served only to paid accounts, through the function.
-   - The teaser stays free: a wallet's risk level and types, share links, rules, Checks.
+2. **Paywall:** built, off until switched on (docs/PAYWALL.md).
 3. **Billing:** NOWPayments invoices per 30-day period, an IPN webhook that extends `paidUntil`, and renewal emails.
 4. **Plan features:** alerts per plan, Desk API keys, webhooks.

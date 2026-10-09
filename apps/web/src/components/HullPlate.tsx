@@ -10,6 +10,8 @@ import { WalletPlate } from './WalletPlate';
 import { StressTest } from './StressTest';
 import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification';
 import { setMyWallet, useMyWallet } from '../lib/myWallet';
+import { usePlanGate } from '../lib/account';
+import { Locked } from './Paywall';
 
 export interface HullPlateProps {
   book: Book;
@@ -27,6 +29,9 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
   const parsed = parseAddress(book.address);
   const checksum = parsed.ok ? parsed.value.checksum : book.address;
   const rail = TEMP_RAIL[pose.hullTemp];
+  // the paywall (docs/PAYWALL.md): the level and types are free; the detail needs a plan. Test wallets stay open.
+  const gate = usePlanGate();
+  const full = isFixture || gate === 'open';
 
   return (
     <div className="stack" data-testid="hull-plate">
@@ -100,17 +105,19 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         <Panel idx="02" title="Risk" rail={rail} testId="hull-temp">
           <div className={`temp ${pose.hullTemp}`}>{RISK_LABEL[pose.hullTemp].toUpperCase()}</div>
           <div className="dim" style={{ marginTop: 4 }}>{HULL_COPY[pose.hullTemp]}</div>
-          <dl className="kv" style={{ marginTop: 12 }}>
+          {full ? <dl className="kv" style={{ marginTop: 12 }}>
             <dt>tydro health factor</dt>
             <dd className="num">{pose.metrics.hf === null ? (book.tydro.status === 'OK' ? '∞ (no debt)' : "— couldn't read") : pose.metrics.hf.toFixed(3)}</dd>
             <dt>tydro distance to liquidation</dt>
             <dd className="num">{pose.liqDistanceBps === null ? '—' : fmtPct(pose.liqDistanceBps / 10_000)}</dd>
             <dt>nado margin buffer</dt>
             <dd className="num">{fmtPct(pose.metrics.nadoBuffer)}</dd>
-          </dl>
+          </dl> : null}
         </Panel>
       </div>
 
+      {full ? (
+        <>
       {/* 3 POSITION TYPE */}
       <Panel idx="03" title="Position type — why" rail={rail} right={<span className="mono">rules {pose.rulesVersion} · <Link to={{ search: '?rules=1' }}>read rules</Link></span>} testId="pose-panel">
         <ul className="reasons" data-testid="reasons">
@@ -191,6 +198,15 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
 
       {/* 7 STRESS TEST */}
       <StressTest book={book} pose={pose} idx="07" />
+
+        </>
+      ) : gate === 'locked' ? (
+        <Locked
+          title="Positions, stress test and history"
+          testId="locked-wallet"
+          blurb="Why it has this type, every Tydro and Nado position, net exposure, the stress test and the wallet's recorded history."
+        />
+      ) : null}
 
       {/* 8 SHARE */}
       <Share book={book} pose={pose} checksum={checksum} />

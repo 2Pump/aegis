@@ -14,8 +14,12 @@
 #   GitHub's own schedule is best-effort — on 2026-09-28/29 it started this workflow every 5–7 hours instead of
 #   hourly. So the hour is kept by an outside timer (cron-job.org) that calls GitHub's "run workflow" API with
 #   source=timer. GitHub's schedule below stays as a slow backup and skips itself when the census is fresh.
-#   Repo variable CENSUS_URL (Settings → Secrets and variables → Actions → Variables) = the public census.json URL,
-#   so the freshness check can read the snapshot's age. Without it, every run goes ahead.
+#   The freshness check reads the snapshot's age from the site's free /api/v1/status (repo variable STATUS_URL
+#   overrides it; the old CENSUS_URL variable is still tried as a fallback). If neither answers, the run goes ahead.
+#
+# Private storage (docs/PAYWALL.md): with repo variable CENSUS_STORE=private and secret CENSUS_BLOB_TOKEN (the private
+# Blob store's token), the census reads and writes the private store. Its first run there copies everything over from
+# the public store by itself (BLOB_READ_WRITE_TOKEN stays set for that).
 
 name: census
 run-name: census · ${{ inputs.source || github.event_name }}${{ inputs.full && ' · full' || '' }}
@@ -56,6 +60,7 @@ jobs:
       - name: Freshness check
         id: fresh
         env:
+          STATUS_URL: ${{ vars.STATUS_URL || 'https://phrourax.com/api/v1/status' }}
           CENSUS_URL: ${{ vars.CENSUS_URL }}
           SOURCE: ${{ github.event_name == 'schedule' && 'schedule' || inputs.source }}
           FULL: ${{ inputs.full }}
@@ -66,16 +71,21 @@ jobs:
               const limitMin = src === "timer" ? 15 : src === "schedule" ? 50 : 0;
               const out = (skip, why) => { console.log(why); require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`); };
               if (!limitMin || process.env.FULL === "true") return out(false, `started by ${src} — no freshness check`);
-              if (!process.env.CENSUS_URL) return out(false, "repo variable CENSUS_URL not set — running without a freshness check");
-              try {
-                const r = await fetch(process.env.CENSUS_URL + "?t=" + Date.now(), { cache: "no-store" });
-                const j = await r.json();
-                const age = (Date.now() - Date.parse(j.generatedAt)) / 60000;
-                if (age < limitMin) out(true, `census published ${age.toFixed(0)} min ago (< ${limitMin}) — skipping this ${src} run`);
-                else out(false, `census is ${age.toFixed(0)} min old — running`);
-              } catch (e) {
-                out(false, `could not read the census (${e.message}) — running anyway`);
+              const ageOf = async (url, pick) => {
+                const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const at = Date.parse(pick(await r.json()));
+                if (!Number.isFinite(at)) throw new Error("no timestamp");
+                return (Date.now() - at) / 60000;
+              };
+              let age = null, why = [];
+              for (const [url, pick] of [[process.env.STATUS_URL, (j) => j.data && j.data.generatedAt], [process.env.CENSUS_URL, (j) => j.generatedAt]]) {
+                if (!url || age !== null) continue;
+                try { age = await ageOf(url, pick); } catch (e) { why.push(e.message); }
               }
+              if (age === null) return out(false, `could not read the census age (${why.join("; ") || "no URL"}) — running anyway`);
+              if (age < limitMin) out(true, `census published ${age.toFixed(0)} min ago (< ${limitMin}) — skipping this ${src} run`);
+              else out(false, `census is ${age.toFixed(0)} min old — running`);
             })();
           '
 
@@ -104,6 +114,7 @@ jobs:
         run: pnpm census --store blob --budget-min 115 ${{ inputs.full && '--full' || '' }}
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          CENSUS_BLOB_TOKEN: ${{ vars.CENSUS_STORE == 'private' && secrets.CENSUS_BLOB_TOKEN || '' }}
           INK_RPC: ${{ secrets.INK_RPC }}
 
       # The Checks page (docs/VERIFICATION.md): runs only when the last automatic check is ~4 h old, so the hourly
@@ -117,4 +128,5 @@ jobs:
         run: pnpm verify:auto --store blob --if-due
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          CENSUS_BLOB_TOKEN: ${{ vars.CENSUS_STORE == 'private' && secrets.CENSUS_BLOB_TOKEN || '' }}
           INK_RPC: ${{ secrets.INK_RPC }}

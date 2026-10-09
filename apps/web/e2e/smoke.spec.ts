@@ -212,7 +212,7 @@ const R3 = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.ur
 async function serveRelease3(page: Page) {
   const month = new Date().toISOString().slice(0, 7);
   const json = (body: string) => ({ status: 200, contentType: 'application/json', body });
-  await page.route('**/census/history/**', (route) => {
+  await page.route('**/api/v1/data/history/**', (route) => {
     const u = new URL(route.request().url()).pathname;
     if (u.endsWith('/history/index.json')) return route.fulfill(json(JSON.stringify({ v: 1, kind: 'aegis-history-index', version: 'hist-1.0.0', shards: 64, months: [], baselined: [], compacted: [], firstAt: null, firstBlock: null, changeMonths: [month] })));
     if (u.endsWith('/history/oracle/latest.json')) return route.fulfill(json(R3('oracle-latest.json')));
@@ -364,7 +364,7 @@ function accountability(version: string, over: Record<string, unknown> = {}) {
   };
 }
 async function serveAccountability(page: Page, body: unknown) {
-  await page.route('**/census/history/**', (route) => {
+  await page.route('**/api/v1/data/history/**', (route) => {
     const u = new URL(route.request().url()).pathname;
     if (u.endsWith('/history/accountability.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     return route.fulfill({ status: 404, body: '' });
@@ -422,7 +422,7 @@ test('Track record (report from an older method): its own version shown and expl
     await expect(t).not.toContainText('0 of 32 eligible');
     await expect(t.getByTestId('track-lookback')).not.toContainText('0 of 32');
     await expect(t.getByText('1 of 32').first()).toBeVisible(); // figures defined the same way under every method stay
-    await page.unroute('**/census/history/**');
+    await page.unroute('**/api/v1/data/history/**');
   }
 });
 
@@ -523,7 +523,7 @@ test('Ecosystem history: a long full re-read is not a gap; each gap says what en
   ];
   const months = [...new Set(points.map((p) => p.at.slice(0, 7)))];
   const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-  await page.route('**/census/history/**', (route) => {
+  await page.route('**/api/v1/data/history/**', (route) => {
     const u = new URL(route.request().url()).pathname;
     if (u.endsWith('/history/index.json'))
       return route.fulfill(json({ v: 1, kind: 'aegis-history-index', version: 'hist-1.0.0', shards: 64, months, baselined: [], compacted: [], firstAt: points[0]!.at, firstBlock: points[0]!.block, changeMonths: [] }));
@@ -610,4 +610,61 @@ test('Accounts: a used or expired link says so and offers a new one', async ({ p
   await page.goto(`/auth/verify#t=${'B'.repeat(43)}`);
   await page.getByTestId('verify-go').click();
   await expect(page.getByTestId('verify-error')).toContainText('already used or has expired');
+});
+
+/* ── paywall (docs/PAYWALL.md) ── */
+async function serveMe(page: Page, me: Record<string, unknown>) {
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(me) }));
+}
+
+test('Paywall on, no plan: the address field stays free; Well, Pressure, Intel and Scan are locked and their data is never requested', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, signedIn: false, access: 'free' });
+  const dataCalls: string[] = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url()).pathname;
+    if (u.startsWith('/api/v1/data/') && !u.startsWith('/api/v1/data/subs/')) dataCalls.push(u);
+  });
+  await page.goto('/');
+  await expect(page.getByTestId('paste-input')).toBeVisible();
+  await expect(page.getByTestId('locked-well')).toContainText('Subscribers only');
+  await expect(page.getByTestId('nav-subscribe')).toBeVisible();
+  await expect(page.getByTestId('well-loading')).toHaveCount(0);
+  for (const [path, heading] of [['/pressure', 'Pressure'], ['/intel', 'Intel'], ['/census', 'Scan']] as const) {
+    await page.goto(path);
+    await expect(page.getByTestId('locked-page')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: heading, exact: true })).toBeVisible();
+  }
+  await page.getByTestId('locked-plans').click();
+  await expect(page).toHaveURL(/\/pricing$/);
+  await expect(page.getByTestId('plan-pro')).toContainText('$19');
+  await expect(page.getByTestId('plan-desk')).toContainText('$99');
+  await expect(page.getByTestId('subscribe-pro')).toHaveText('Sign in to subscribe');
+  expect(dataCalls).toEqual([]);
+});
+
+test('Paywall on, no plan: a wallet page shows its risk and types; the detail is locked; test wallets stay fully open', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, signedIn: true, email: 'a@b.co', access: 'free', plan: null, paidUntil: null });
+  await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
+  await expect(page.getByTestId('hull-plate')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('hull-temp')).toBeVisible();
+  await expect(page.getByTestId('locked-wallet')).toBeVisible();
+  await expect(page.getByTestId('pose-panel')).toHaveCount(0);
+  await expect(page.getByTestId('wallet-history')).toHaveCount(0);
+  await expect(page.getByTestId('share-panel')).toBeVisible();
+  await expect(page.getByTestId('locked-signin')).toHaveCount(0); // already signed in: only "See plans"
+  await page.goto('/fixture/carry');
+  await expect(page.getByTestId('pose-panel')).toBeVisible();
+  await expect(page.getByTestId('locked-wallet')).toHaveCount(0);
+});
+
+test('Paywall on, with a plan: everything opens; the header shows the plan, no Subscribe', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, signedIn: true, email: 'a@b.co', access: 'pro', plan: 'pro', paidUntil: '2099-01-01T00:00:00Z' });
+  await page.goto('/pressure');
+  await expect(page.getByTestId('locked-page')).toHaveCount(0);
+  await page.goto('/');
+  await expect(page.getByTestId('locked-well')).toHaveCount(0);
+  await expect(page.getByTestId('nav-subscribe')).toHaveCount(0);
+  await expect(page.getByTestId('nav-account')).toContainText('Pro');
+  await page.goto('/pricing');
+  await expect(page.getByTestId('current-pro')).toContainText('Your plan');
 });

@@ -29,7 +29,7 @@ import {
   readTydro,
 } from '@aegis/ink-io';
 import { classify } from '@aegis/pose';
-import { blobStore, fileStore, fixtureAddresses, runCensus } from '@aegis/census/node';
+import { blobStore, fileStore, fixtureAddresses, migrateToPrivateIfNeeded, runCensus } from '@aegis/census/node';
 
 const args = process.argv.slice(2);
 const flag = (k: string) => {
@@ -83,9 +83,11 @@ async function main() {
   const given = splitRpcList(flag('--rpc') || process.env.INK_RPC || process.env.VITE_INK_RPC);
   const candidates = given.length ? given : [...INK_PUBLIC_RPCS];
   const storeKind = flag('--store') ?? 'file';
-  const store = storeKind === 'blob' ? await blobStore() : fileStore(flag('--dir') ?? join(root, 'apps/web/public/census'));
   const started = Date.now();
   const log = (m: string) => console.log(`[census +${Math.round((Date.now() - started) / 1000)}s] ${m}`);
+  // first run against the private store: bring everything over from the public one before reading anything
+  if (storeKind === 'blob') await migrateToPrivateIfNeeded(log);
+  const store = storeKind === 'blob' ? await blobStore() : fileStore(flag('--dir') ?? join(root, 'apps/web/public/census'));
 
   // keep only endpoints that answer AND report chain 57073 — never mix chains
   let rpcs = candidates;

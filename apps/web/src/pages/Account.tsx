@@ -132,7 +132,8 @@ export function AccountPage() {
           <dt>Plan</dt>
           <dd data-testid="account-plan">
             {PLAN_LABEL[m.access]}
-            {m.access !== 'free' && m.paidUntil ? <span className="dim"> · paid to {fmtDay(m.paidUntil)}</span> : null}
+            {m.comp ? <span className="dim"> · complimentary</span> : null}
+            {m.access !== 'free' && !m.comp && m.paidUntil ? <span className="dim"> · paid to {fmtDay(m.paidUntil)}</span> : null}
             {m.access === 'free' && m.plan && m.paidUntil ? <span className="dim"> · {PLAN_LABEL[m.plan]} ended {fmtDay(m.paidUntil)}</span> : null}
           </dd>
           {m.since ? (
@@ -147,7 +148,9 @@ export function AccountPage() {
           <button className="pill-btn" onClick={() => void signOut(true)} disabled={busy} data-testid="signout-everywhere">Sign out on every device</button>
         </div>
       </Panel>
-      <div className="faint mono" style={{ fontSize: 11 }}>Plans and payment are coming next. {BRAND.display} is read-only and never connects to your wallet.</div>
+      <div className="faint mono" style={{ fontSize: 11 }}>
+        <Link to="/pricing">See plans</Link> · {BRAND.display} is read-only and never connects to your wallet.
+      </div>
     </div>
   );
 }

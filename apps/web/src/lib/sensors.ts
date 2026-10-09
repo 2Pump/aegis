@@ -1,6 +1,6 @@
 import { makeInkClient, readBook, readHead, type BookRead, type ChainHead, type NadoConfig, type NadoDiscovery, type Result } from '@aegis/ink-io';
 import { decodeSnapshot } from '@aegis/census';
-import { CENSUS_URL } from './census';
+import { CENSUS_URL, DATA_VIA_API } from './census';
 import { ENV } from './env';
 
 /** The only door from UI to chain/venue. All IO goes through @aegis/ink-io. */
@@ -35,7 +35,28 @@ function censusSubs() {
   return p;
 }
 
+/** Deployed: ask the function for this one wallet's subaccounts (free, small) instead of loading the whole census. */
+const subsCache = new Map<string, { at: number; p: Promise<NadoDiscovery | null> }>();
+function apiSubs(address: string): Promise<NadoDiscovery | null> {
+  const a = address.toLowerCase();
+  const hit = subsCache.get(a);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.p;
+  const p = (async () => {
+    try {
+      const res = await fetch(`/api/v1/data/subs/${a}`, { cache: 'no-cache' });
+      if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
+      const j = (await res.json()) as { block: number; complete: boolean; subs: string[] };
+      return j.complete ? { subs: j.subs, throughBlock: j.block } : null;
+    } catch {
+      return null;
+    }
+  })();
+  subsCache.set(a, { at: Date.now(), p });
+  return p;
+}
+
 export async function nadoDiscovery(address: string): Promise<NadoDiscovery | null> {
+  if (DATA_VIA_API) return apiSubs(address);
   const c = await censusSubs();
   // history not fully scanned yet → the list may be short; null makes the page say PARTIAL
   if (!c || !c.complete) return null;

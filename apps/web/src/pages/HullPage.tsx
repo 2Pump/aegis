@@ -8,6 +8,7 @@ import { PasteBar } from '../components/PasteBar';
 import { FIXTURES, FIXTURE_NAMES } from '../lib/fixtures';
 import { useLiveHull, useNow } from '../lib/hulls';
 import { remember } from '../lib/recent';
+import { usePlanGate } from '../lib/account';
 
 export function HullPage() {
   const { address = '' } = useParams();
@@ -16,6 +17,7 @@ export function HullPage() {
   useMemo(() => addr && remember(addr), [addr]);
   const { state, loading, nextInMs, refresh } = useLiveHull(addr);
   const now = useNow();
+  const gate = usePlanGate();
 
   if (!parsed.ok) {
     return (
@@ -46,7 +48,7 @@ export function HullPage() {
         onRefresh={refresh}
       />
       {/* real wallets only — test wallets (FixturePage) never get a history */}
-      <WalletHistory address={parsed.value.lower} />
+      {gate === 'open' ? <WalletHistory address={parsed.value.lower} /> : null}
     </div>
   );
 }

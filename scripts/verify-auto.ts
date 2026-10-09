@@ -12,7 +12,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INK_PUBLIC_RPCS, makeInkClient, splitRpcList } from '@aegis/ink-io';
-import { blobStore, fileStore, runVerification } from '@aegis/census/node';
+import { blobStore, fileStore, migrateToPrivateIfNeeded, runVerification } from '@aegis/census/node';
 import { VERIFY, verifyDue } from '@aegis/census';
 
 const args = process.argv.slice(2);
@@ -25,6 +25,7 @@ const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 async function main() {
   const given = splitRpcList(flag('--rpc') || process.env.INK_RPC || process.env.VITE_INK_RPC);
   const rpcs = given.length ? given : [...INK_PUBLIC_RPCS];
+  if (flag('--store') === 'blob') await migrateToPrivateIfNeeded();
   const store = flag('--store') === 'blob' ? await blobStore() : fileStore(flag('--dir') ?? join(root, 'apps/web/public/census'));
   if (args.includes('--if-due')) {
     // a quarter hour of slack, so an hourly caller lands on ~every 4 h instead of drifting to 5

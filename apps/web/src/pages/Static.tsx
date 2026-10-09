@@ -8,6 +8,7 @@ import { verificationText } from '../lib/verification';
 import { useNow } from '../lib/hulls';
 import { Panel } from '../components/bits';
 import { ENV } from '../lib/env';
+import { useMe } from '../lib/account';
 
 export function CensusPage() {
   const census = useCensus();
@@ -115,6 +116,8 @@ const API_ENDPOINTS: Array<[string, string]> = [
 ];
 
 export function DevelopersPage() {
+  const me = useMe();
+  const paywall = me.status === 'ok' && me.me.paywall === true;
   return (
     <div className="stack" data-testid="developers-page">
       <h2 className="page">Developers</h2>
@@ -123,6 +126,12 @@ export function DevelopersPage() {
           The same readings as the site, as JSON. Every response carries its schema, rules / engine / data versions, source block, generated time, age, freshness, completeness, approximation and coverage, and the disclaimer. Full description:{' '}
           <a className="mono" href="/api/v1/openapi.json">/api/v1/openapi.json</a> (OpenAPI 3.1).
         </p>
+        {paywall ? (
+          <div className="banner" data-testid="dev-paid">
+            Paid plans are on: <span className="mono">/status</span>, <span className="mono">/wallets/&#123;address&#125;</span>, <span className="mono">/performance</span> and{' '}
+            <span className="mono">/verification</span> stay free; the rest need the <Link to="/pricing">Desk plan</Link> (signed in for now — API keys are coming).
+          </div>
+        ) : null}
         <pre className="mono dev-pre" data-testid="dev-example">{`# example (values change every scan)
 curl https://phrourax.com/api/v1/stress
 
