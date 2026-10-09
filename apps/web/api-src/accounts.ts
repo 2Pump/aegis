@@ -10,9 +10,16 @@
  *
  * The paywall is OFF unless PAYWALL=1 — and it can only be on while accounts are on (nobody could unlock it otherwise).
  *   COMP_EMAILS (optional)                        comma-separated emails with complimentary Desk access (the owner)
+ *
+ * Payments (docs/BILLING.md) are OFF unless accounts are on and these exist:
+ *   NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET   from the NOWPayments dashboard
+ *   CRON_SECRET                                   any long random string; Vercel sends it to the daily reminder job
+ *   NOWPAYMENTS_SANDBOX=1 (optional)              use NOWPayments' sandbox (test payments, no real money)
  */
 import { BRAND } from '@aegis/glyphs';
 import {
+  billingOff,
+  makeBillingHandler,
   accountsOff,
   effectiveAccess,
   makeAccountsHandler,
@@ -27,6 +34,8 @@ import {
 
 export interface AccountsRuntime {
   handler: AuthHandler;
+  /** /billing/* (checkout, NOWPayments IPN, daily reminders) */
+  billing: AuthHandler;
   on: boolean;
   paywall: boolean;
   /** the visitor's plan from their cookie ('free' when signed out, or when accounts are off) */
@@ -40,15 +49,22 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env): AccountsRunt
   const resend = env.RESEND_API_KEY;
   if (!secret || !url || !token || !resend) {
     if (env.PAYWALL === '1') console.error('PAYWALL=1 ignored: accounts are not fully set up (docs/ACCOUNTS.md)');
-    return { handler: accountsOff, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
+    return { handler: accountsOff, billing: billingOff, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
   }
   const kv = upstashKv({ url, token });
   const mail = resendMailer({ apiKey: resend, from: env.MAIL_FROM || `${BRAND.display} <signin@phrourax.com>` });
   const comp = parseComp(env.COMP_EMAILS);
   const paywall = env.PAYWALL === '1';
   const now = () => Date.now();
+  const log = (m: string) => console.error(m);
+  const npKey = env.NOWPAYMENTS_API_KEY;
+  const npIpn = env.NOWPAYMENTS_IPN_SECRET;
+  const billingOn = Boolean(npKey && npIpn);
   return {
-    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, log: (m) => console.error(m) }),
+    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, billing: billingOn, log }),
+    billing: billingOn
+      ? makeBillingHandler({ kv, mail, secret, now, apiKey: npKey!, ipnSecret: npIpn!, cronSecret: env.CRON_SECRET, sandbox: env.NOWPAYMENTS_SANDBOX === '1', log })
+      : billingOff,
     on: true,
     paywall,
     who: async (cookie) => {

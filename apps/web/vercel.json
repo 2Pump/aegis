@@ -48,5 +48,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/billing/remind",
+      "schedule": "7 15 * * *"
+    }
   ]
 }

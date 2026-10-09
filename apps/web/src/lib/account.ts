@@ -18,10 +18,13 @@ export interface Me {
   plan?: 'pro' | 'desk' | null;
   paidUntil?: string | null;
   since?: string;
+  /** payments are switched on: the pricing page can sell */
+  billing?: boolean;
+  payments?: Array<{ at: string; plan: 'pro' | 'desk'; usd: number; paidUntil: string }>;
 }
 export type MeState = { status: 'loading' } | { status: 'ok'; me: Me };
 
-const OFF: Me = { configured: false, paywall: false, signedIn: false, access: 'free' };
+const OFF: Me = { configured: false, paywall: false, billing: false, signedIn: false, access: 'free' };
 let current: MeState = { status: 'loading' };
 let inflight: Promise<void> | null = null;
 const subs = new Set<(s: MeState) => void>();
@@ -57,9 +60,9 @@ export function useMe(): MeState {
   return s;
 }
 
-export async function authPost<T>(path: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; status: number; message: string }> {
+export async function authPost<T>(path: string, body: unknown, base = 'auth'): Promise<{ ok: true; data: T } | { ok: false; status: number; message: string }> {
   try {
-    const r = await fetch(`/api/v1/auth/${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(`/api/v1/${base}/${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = (await r.json().catch(() => null)) as (T & { error?: { message?: string } }) | null;
     if (!r.ok) return { ok: false, status: r.status, message: j?.error?.message ?? `Something went wrong (HTTP ${r.status}).` };
     return { ok: true, data: j as T };
@@ -82,3 +85,12 @@ export function gateOf(s: MeState): Gate {
   return s.me.access === 'pro' || s.me.access === 'desk' ? 'open' : 'locked';
 }
 export const usePlanGate = (): Gate => gateOf(useMe());
+
+/** Start paying for a plan: NOWPayments' page opens in this tab. Returns an error message, or never returns. */
+export async function startCheckout(plan: 'pro' | 'desk'): Promise<string> {
+  const r = await authPost<{ url: string }>('checkout', { plan }, 'billing');
+  if (!r.ok) return r.message;
+  if (!/^https:\/\/([a-z0-9-]+\.)*nowpayments\.io\//i.test(r.data.url)) return 'Unexpected payment page address — nothing was opened.';
+  window.location.assign(r.data.url);
+  return '';
+}

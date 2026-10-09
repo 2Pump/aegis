@@ -43,6 +43,8 @@ export interface AccountsDeps {
   comp?: ReadonlySet<string>;
   /** PAYWALL=1: the site shows locks to accounts without a plan */
   paywall?: boolean;
+  /** payments are set up (NOWPayments keys present): the pricing page can sell */
+  billing?: boolean;
 }
 
 export interface AuthRequest {
@@ -88,11 +90,12 @@ export async function sessionUser(d: Pick<AccountsDeps, 'kv' | 'secret' | 'now'>
   return u && u.sv === claims.v ? u : null;
 }
 
-export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<string>; paywall?: boolean } = {}) =>
+export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<string>; paywall?: boolean; billing?: boolean } = {}) =>
   u
     ? {
         configured: true,
         paywall: o.paywall === true,
+        billing: o.billing === true,
         signedIn: true,
         email: u.email,
         access: effectiveAccess(u, nowMs, o.comp),
@@ -100,13 +103,14 @@ export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<st
         plan: u.plan,
         paidUntil: u.paidUntil,
         since: u.createdAt,
+        payments: (u.payments ?? []).slice(0, 6).map((p) => ({ at: p.at, plan: p.plan, usd: p.usd, paidUntil: p.paidUntil })),
       }
-    : { configured: true, paywall: o.paywall === true, signedIn: false, access: 'free' as const };
+    : { configured: true, paywall: o.paywall === true, billing: o.billing === true, signedIn: false, access: 'free' as const };
 
 /** For when accounts aren't set up (no secret / store / mail key): the site works exactly as before. */
 export const accountsOff: AuthHandler = async (req) =>
   req.method === 'GET' && req.path === '/auth/me'
-    ? json(200, { configured: false, paywall: false, signedIn: false, access: 'free' })
+    ? json(200, { configured: false, paywall: false, billing: false, signedIn: false, access: 'free' })
     : err(503, 'NOT_ENABLED', 'Accounts are not switched on yet.');
 
 export function makeAccountsHandler(d: AccountsDeps): AuthHandler {

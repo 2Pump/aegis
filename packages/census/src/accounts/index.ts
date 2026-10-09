@@ -3,3 +3,4 @@ export * from './kv.js';
 export * from './mail.js';
 export * from './api.js';
 export * from './paywall.js';
+export * from './billing.js';

@@ -136,6 +136,10 @@ function Footer() {
       <span>read-only, not a broker</span>
       <span className="sep">·</span>
       <Link to={RULES_LINK}>rules</Link>
+      <span className="sep">·</span>
+      <Link to="/pricing">plans</Link>
+      <span className="sep">·</span>
+      <Link to="/terms">terms</Link>
       <span className="camera" style={{ flexBasis: '100%' }}>{COPY.footer}</span>
     </footer>
   );

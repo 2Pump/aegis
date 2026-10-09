@@ -656,3 +656,6 @@ a.pill-btn { display: inline-block; }
 .plan-on { outline: 1px solid var(--rail); }
 .plan-current { font-size: 12px; color: var(--cyan); letter-spacing: 0.08em; }
 @media (max-width: 860px) { .grid.three { grid-template-columns: minmax(0, 1fr); } }
+.terms ul { margin: 0; padding-left: 18px; line-height: 1.65; font-size: 14px; }
+.terms li + li { margin-top: 4px; }
+.terms { max-width: 880px; }

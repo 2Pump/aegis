@@ -66,7 +66,7 @@ The census, Checks, alerts and webhooks jobs all switch together through `CENSUS
 4. Check signed out: the Well, Pressure, Intel and Scan show **Subscribers only**, and the header shows **Subscribe**.
 5. Check signed in with your comp email: everything opens, and the header shows **Desk**.
 
-**Until stage 3 (payments) is live, nobody can buy a plan.** So turn the paywall on only once payments work, unless you mean to close the site to everyone but comp accounts.
+**Turn the paywall on only once payments work** (docs/BILLING.md). Until then nobody can buy a plan, so the site would be closed to everyone but comp accounts.
 
 **To switch it off:** remove `PAYWALL` and redeploy.
 

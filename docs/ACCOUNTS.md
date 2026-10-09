@@ -71,5 +71,5 @@ Status: built and **off** until the four settings below exist in Vercel. While o
 ## Next stages
 
 2. **Paywall:** built, off until switched on (docs/PAYWALL.md).
-3. **Billing:** NOWPayments invoices per 30-day period, an IPN webhook that extends `paidUntil`, and renewal emails.
+3. **Billing:** built, off until the NOWPayments keys are set (docs/BILLING.md).
 4. **Plan features:** alerts per plan, Desk API keys, webhooks.

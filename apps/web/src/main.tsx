@@ -12,6 +12,7 @@ import { IntelPage } from './pages/Intel';
 import { CensusPage, DevelopersPage, NotFound, WatchPage } from './pages/Static';
 import { AccountPage, SignInPage, VerifyPage } from './pages/Account';
 import { PricingPage } from './pages/Pricing';
+import { TermsPage } from './pages/Terms';
 import { PaidPage } from './components/Paywall';
 import './styles.css';
 
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
       { path: '/auth/verify', element: <VerifyPage /> },
       { path: '/account', element: <AccountPage /> },
       { path: '/pricing', element: <PricingPage /> },
+      { path: '/terms', element: <TermsPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

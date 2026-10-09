@@ -32,6 +32,19 @@ export interface User {
   paidUntil: string | null;
   /** session version: bumping it signs out every device */
   sv: number;
+  /** payments applied to this account, newest first (at most BILLING.KEEP_PAYMENTS) */
+  payments?: PaymentRecord[];
+  /** renewal reminders already sent, per paid-to date: e.g. { "2026-11-08T…": ["3d"] } */
+  reminded?: Record<string, string[]>;
+}
+
+export interface PaymentRecord {
+  at: string;
+  plan: Plan;
+  usd: number;
+  /** NOWPayments payment id */
+  paymentId: string;
+  paidUntil: string;
 }
 
 /** Lower-cased, trimmed, and a plain address shape — or null. Deliberately strict: one @, a dot in the domain. */

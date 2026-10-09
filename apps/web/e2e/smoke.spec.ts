@@ -668,3 +668,70 @@ test('Paywall on, with a plan: everything opens; the header shows the plan, no S
   await page.goto('/pricing');
   await expect(page.getByTestId('current-pro')).toContainText('Your plan');
 });
+
+/* ── billing (docs/BILLING.md) ── */
+test('Plans with payments on: Subscribe opens NOWPayments (crypto, on their page); renewing your own plan says it adds to the end', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: true, email: 'a@b.co', access: 'pro', plan: 'pro', paidUntil: '2099-01-01T00:00:00Z' });
+  const bodies: unknown[] = [];
+  await page.route('**/api/v1/billing/checkout', (route) => {
+    bodies.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://nowpayments.io/payment/?iid=123' }) });
+  });
+  await page.route('https://nowpayments.io/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>NOWPayments</title>pay here' }));
+  await page.goto('/pricing');
+  await expect(page.getByTestId('current-pro')).toContainText('paid to');
+  await expect(page.getByTestId('subscribe-pro')).toHaveText('Add 30 days — pay in crypto');
+  await expect(page.getByTestId('plan-desk')).toContainText('Switching plans starts a fresh 30 days');
+  await page.getByTestId('subscribe-desk').click();
+  await expect(page).toHaveURL(/nowpayments\.io\/payment/);
+  expect(bodies).toEqual([{ plan: 'desk' }]);
+});
+
+test('Plans: a failed checkout says so and opens nothing; an unexpected payment address is refused', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: true, email: 'a@b.co', access: 'free', plan: null, paidUntil: null });
+  let n = 0;
+  await page.route('**/api/v1/billing/checkout', (route) =>
+    ++n === 1
+      ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: { code: 'PAYMENT_PROVIDER', message: "The payment page couldn't be opened just now — try again in a minute." } }) })
+      : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://evil.example/pay' }) }),
+  );
+  await page.goto('/pricing');
+  await page.getByTestId('subscribe-pro').click();
+  await expect(page.getByTestId('checkout-error')).toContainText("couldn't be opened");
+  await page.getByTestId('subscribe-pro').click();
+  await expect(page.getByTestId('checkout-error')).toContainText('Unexpected payment page address');
+  await expect(page).toHaveURL(/\/pricing$/);
+});
+
+test('Back from paying: the account waits for the on-chain confirmation, then shows the plan and the payment', async ({ page }) => {
+  let paid = false;
+  await page.route('**/api/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        paid
+          ? { configured: true, paywall: true, billing: true, signedIn: true, email: 'a@b.co', access: 'pro', plan: 'pro', paidUntil: '2026-12-01T00:00:00Z', payments: [{ at: new Date().toISOString(), plan: 'pro', usd: 19, paidUntil: '2026-12-01T00:00:00Z' }] }
+          : { configured: true, paywall: true, billing: true, signedIn: true, email: 'a@b.co', access: 'free', plan: null, paidUntil: null, payments: [] },
+      ),
+    }),
+  );
+  await page.clock.install();
+  await page.goto('/account?paid=1');
+  await expect(page.getByTestId('paid-waiting')).toBeVisible();
+  paid = true;
+  await page.clock.runFor(16_000);
+  await expect(page.getByTestId('paid-applied')).toContainText('Pro is paid to 1 Dec 2026');
+  await expect(page.getByTestId('account-payments')).toContainText('$19');
+});
+
+test('Terms page: read-only, not advice, nothing renews by itself, refunds stated; linked from the footer and plans', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('footer').getByRole('link', { name: 'terms' }).click();
+  await expect(page).toHaveURL(/\/terms$/);
+  const t = page.getByTestId('terms-page');
+  await expect(t).toContainText('It is read-only.');
+  await expect(t).toContainText('not financial, investment, legal or tax advice');
+  await expect(t).toContainText('Nothing renews or charges by itself.');
+  await expect(page.getByTestId('refunds')).toContainText('Paid twice by mistake');
+});

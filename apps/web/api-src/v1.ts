@@ -139,9 +139,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.end(req.method === 'HEAD' ? undefined : body);
     return;
   }
-  // accounts: sign-in links and the session cookie (not part of the data API's envelope)
-  if (path.startsWith('/auth/')) {
-    const out = await accounts.handler({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req) });
+  // accounts: sign-in links and the session cookie; billing: checkout, NOWPayments notifications, reminders
+  if (path.startsWith('/auth/') || path.startsWith('/billing/')) {
+    const out = await (path.startsWith('/billing/') ? accounts.billing : accounts.handler)({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req) });
     res.statusCode = out.status;
     for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
     res.end(JSON.stringify(out.body));

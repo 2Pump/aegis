@@ -108,6 +108,18 @@ export function AccountPage() {
   const me = useMe();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [params] = useSearchParams();
+  const justPaid = params.get('paid') === '1';
+  // back from NOWPayments: the payment is applied when their notification arrives (usually a few minutes) — keep checking
+  useEffect(() => {
+    if (!justPaid) return;
+    const id = setInterval(() => void refreshMe(), 15_000);
+    const stop = setTimeout(() => clearInterval(id), 30 * 60_000);
+    return () => {
+      clearInterval(id);
+      clearTimeout(stop);
+    };
+  }, [justPaid]);
   useEffect(() => {
     if (me.status === 'ok' && me.me.configured && !me.me.signedIn) nav('/signin?next=/account', { replace: true });
   }, [me, nav]);
@@ -122,9 +134,20 @@ export function AccountPage() {
   if (!me.me.configured) return <div className="stack"><h2 className="page">Account</h2><NotOn /></div>;
   if (!me.me.signedIn) return null;
   const m = me.me;
+  const lastPay = m.payments?.[0];
+  const applied = lastPay && Date.now() - Date.parse(lastPay.at) < 60 * 60_000;
   return (
     <div className="stack auth-page" data-testid="account-page">
       <h2 className="page">Account</h2>
+      {justPaid ? (
+        applied ? (
+          <div className="banner cyan" data-testid="paid-applied">Payment received — {PLAN_LABEL[lastPay.plan]} is paid to {fmtDay(lastPay.paidUntil)}. A receipt is on its way to your email.</div>
+        ) : (
+          <div className="banner" data-testid="paid-waiting">
+            Waiting for the payment to confirm on-chain. That usually takes a few minutes; this page updates by itself, and you'll get an email receipt.
+          </div>
+        )
+      ) : null}
       <Panel title="Your account" rail="var(--cyan)">
         <dl className="kv account-kv">
           <dt>Email</dt>
@@ -143,7 +166,25 @@ export function AccountPage() {
             </>
           ) : null}
         </dl>
+        {m.payments?.length ? (
+          <div className="table-wrap" style={{ marginTop: 14 }}>
+            <table className="t" data-testid="account-payments">
+              <thead><tr><th>Paid</th><th>Plan</th><th className="r">USD</th><th>Paid to</th></tr></thead>
+              <tbody>
+                {m.payments.map((p) => (
+                  <tr key={p.at}>
+                    <td className="mono">{fmtDay(p.at)}</td>
+                    <td>{PLAN_LABEL[p.plan]}</td>
+                    <td className="r num">${p.usd}</td>
+                    <td className="mono">{fmtDay(p.paidUntil)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
         <div className="row" style={{ marginTop: 14, gap: 8, flexWrap: 'wrap' }}>
+          {!m.comp && m.billing ? <Link className="pill-btn solid" to="/pricing" data-testid="account-renew">{m.access === 'free' ? 'Choose a plan' : 'Renew or change plan'}</Link> : null}
           <button className="pill-btn" onClick={() => void signOut(false)} disabled={busy} data-testid="signout">Sign out</button>
           <button className="pill-btn" onClick={() => void signOut(true)} disabled={busy} data-testid="signout-everywhere">Sign out on every device</button>
         </div>

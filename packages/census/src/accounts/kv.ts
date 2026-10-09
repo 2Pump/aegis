@@ -12,6 +12,8 @@ export interface Kv {
   /** add 1; the first add starts a window of ttlS seconds. Returns the new count. */
   incrWindow(key: string, ttlS: number): Promise<number>;
   del(key: string): Promise<void>;
+  /** set only if the key doesn't exist yet; true when this call set it (a payment is applied once) */
+  setIfAbsent(key: string, value: string, ttlS?: number): Promise<boolean>;
 }
 
 export function memoryKv(now: () => number = Date.now): Kv & { dump(): Map<string, { v: string; exp: number | null }> } {
@@ -45,6 +47,11 @@ export function memoryKv(now: () => number = Date.now): Kv & { dump(): Map<strin
     async del(k) {
       m.delete(k);
     },
+    async setIfAbsent(k, v, ttlS) {
+      if (live(k)) return false;
+      m.set(k, { v, exp: ttlS ? now() + ttlS * 1000 : null });
+      return true;
+    },
     dump: () => m,
   };
 }
@@ -77,6 +84,9 @@ export function upstashKv(o: { url: string; token: string; fetch?: FetchLike }):
     },
     async del(k) {
       await cmd('DEL', k);
+    },
+    async setIfAbsent(k, v, ttlS) {
+      return (await (ttlS ? cmd('SET', k, v, 'NX', 'EX', ttlS) : cmd('SET', k, v, 'NX'))) === 'OK';
     },
   };
 }
