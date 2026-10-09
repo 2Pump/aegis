@@ -246,7 +246,9 @@ export function Home() {
         <h2 className="page">{COPY.oneLiner}</h2>
         <PasteBar autoFocus />
         <div className="home-sub" data-testid="home-sub">
-          Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.
+          {gate === 'locked'
+            ? 'Paste an Ink wallet to see its position type and liquidation risk — free. Subscribers also get cross-venue exposure, the stress test and history. Read-only. No wallet connection required.'
+            : 'Paste an Ink wallet to see its position type, liquidation risk, cross-venue exposure, and response to simulated market moves. Read-only. No wallet connection required.'}
         </div>
       </div>
       {gate === 'open' ? <WellHome /> : null}

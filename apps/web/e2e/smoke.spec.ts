@@ -627,6 +627,9 @@ test('Paywall on, no plan: the address field stays free; Well, Pressure, Intel a
   await page.goto('/');
   await expect(page.getByTestId('paste-input')).toBeVisible();
   await expect(page.getByTestId('locked-well')).toContainText('Subscribers only');
+  // the free promise is only what's free
+  await expect(page.getByTestId('home-sub')).toContainText('position type and liquidation risk — free');
+  await expect(page.getByTestId('home-sub')).not.toContainText('response to simulated market moves');
   await expect(page.getByTestId('nav-subscribe')).toBeVisible();
   await expect(page.getByTestId('well-loading')).toHaveCount(0);
   for (const [path, heading] of [['/pressure', 'Pressure'], ['/intel', 'Intel'], ['/census', 'Scan']] as const) {
