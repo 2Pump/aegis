@@ -14,7 +14,7 @@ export {
   type NadoConfig,
   type SymbolMap,
 } from './nado.js';
-export { readBook, type BookRead, type SensorsConfig } from './book.js';
+export { readBook, type BookRead, type ReadStage, type SensorsConfig } from './book.js';
 export { readNadoChain, chainInfoToGatewayShape, RECENT_SUB_SCAN_MAX_BLOCKS, type NadoDiscovery } from './nado-chain.js';
 export { NADO_CONTRACTS, NADO_PRODUCTS, NADO_SDK_COMMIT, NADO_PRODUCTS_FETCHED, NLP_PRODUCT_ID } from './nado-registry.js';
 export { multicallAdaptive, type Call, type CallResult } from './batch.js';

@@ -2,7 +2,7 @@
  * The paywall on screen (docs/PAYWALL.md). With PAYWALL off — or accounts off — everything renders as before.
  * Locked pages never load their data: the paid component isn't mounted at all, and the server refuses the files anyway.
  */
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useMe, usePlanGate } from '../lib/account';
 import { Panel } from './bits';
@@ -17,7 +17,7 @@ export function LockIcon({ size = 10 }: { size?: number }) {
 }
 
 /** "Subscribers only" panel: what the part shows, and the way in. */
-export function Locked({ title, blurb, testId = 'locked' }: { title: string; blurb: ReactNode; testId?: string }) {
+export function Locked({ title, blurb, testId = 'locked', demo = false }: { title: string; blurb: ReactNode; testId?: string; demo?: boolean }) {
   const me = useMe();
   const { pathname } = useLocation();
   const signedIn = me.status === 'ok' && me.me.signedIn;
@@ -28,6 +28,11 @@ export function Locked({ title, blurb, testId = 'locked' }: { title: string; blu
         <p className="locked-blurb">{blurb}</p>
         <div className="row" style={{ gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link className="pill-btn solid" to="/pricing" data-testid="locked-plans">See plans</Link>
+          {demo ? (
+            <Link className="pill-btn" to="/fixture/carry" data-testid="demo-wallet-link" title="A made-up test wallet with hand-written values — not a real account">
+              Explore a demo wallet
+            </Link>
+          ) : null}
           {signedIn ? null : <Link className="pill-btn" to={`/signin?next=${encodeURIComponent(pathname)}`} data-testid="locked-signin">Sign in</Link>}
         </div>
       </div>
@@ -35,17 +40,24 @@ export function Locked({ title, blurb, testId = 'locked' }: { title: string; blu
   );
 }
 
-/** A whole page that needs a plan. */
-export function PaidPage({ heading, title, blurb, children }: { heading: string; title: string; blurb: ReactNode; children: ReactNode }) {
+/** A whole page that needs a plan: locked, it explains itself with a safe preview (ProductPreview → LockedFeature). */
+export function PaidPage({ heading, feature, children }: { heading: string; feature: 'pressure' | 'intel' | 'scan'; children: ReactNode }) {
   const gate = usePlanGate();
   if (gate === 'open') return <>{children}</>;
   return (
     <div className="stack">
       <h2 className="page">{heading}</h2>
-      {gate === 'loading' ? <div className="dim" role="status">…</div> : <Locked title={title} blurb={blurb} testId="locked-page" />}
+      {gate === 'loading' ? (
+        <div className="dim" role="status">…</div>
+      ) : (
+        <Suspense fallback={<div className="preview-wait" aria-hidden />}>
+          <LockedFeature k={feature} />
+        </Suspense>
+      )}
     </div>
   );
 }
+const LockedFeature = lazy(() => import('./ProductPreview').then((m) => ({ default: m.LockedFeature })));
 
 /** Header: SUBSCRIBE while the paywall is on and this visitor has no plan. */
 export function SubscribeButton() {

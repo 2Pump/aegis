@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { RULES, SCENARIO_ENGINE_VERSION, classify } from '@aegis/pose';
 import { VERIFY, caseName, latestChecks, type CheckDisplay } from '@aegis/census';
 import { useVerificationLog } from '../lib/verificationLog';
-import { ForecastTrack, TrackRecord } from '../components/TrackRecord';
+import { ForecastTrack, TrackRecord, TrackRecordGuide } from '../components/TrackRecord';
 import { fmtAge } from '../lib/fmt';
 import { useNow } from '../lib/hulls';
 import { RISK_LABEL, brandText } from '@aegis/glyphs';
@@ -22,6 +22,7 @@ export function CalibrationPage() {
 
       <AutoChecks />
 
+      <TrackRecordGuide />
       <TrackRecord />
 
       <ForecastTrack />

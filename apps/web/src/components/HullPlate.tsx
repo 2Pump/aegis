@@ -204,6 +204,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
         <Locked
           title="Positions, stress test and history"
           testId="locked-wallet"
+          demo
           blurb="Why it has this type, every Tydro and Nado position, net exposure, the stress test and the wallet's recorded history."
         />
       ) : null}

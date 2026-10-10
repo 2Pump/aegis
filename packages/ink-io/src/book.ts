@@ -10,6 +10,14 @@ export interface SensorsConfig {
   nado: NadoConfig;
   /** what Phrourax already knows about an owner's Nado subaccounts (the census); null/absent = default only, PARTIAL */
   nadoDiscovery?: (address: string) => Promise<NadoDiscovery | null>;
+  /** optional: told when each venue's read starts and ends (the wallet page shows real progress; the census passes none) */
+  onStage?: (s: ReadStage) => void;
+}
+
+/** One venue's progress during a read. 'lookup' = finding the owner's Nado subaccounts before reading them. */
+export interface ReadStage {
+  venue: 'tydro' | 'nado';
+  phase: 'lookup' | 'reading' | 'ok' | 'failed';
 }
 
 export interface BookRead {
@@ -27,15 +35,34 @@ const dark = <T>(e: InkError, at: number): Sensor<T> => ({ status: 'DARK', code:
  * still holds that block's state; when it doesn't, the venue is DARK with the node's reason — never guessed.
  */
 export async function readBook(address: `0x${string}`, cfg: SensorsConfig, blockNumber?: bigint): Promise<BookRead> {
-  const nadoRead =
-    (cfg.nado.mode ?? 'chain') === 'chain'
-      ? (cfg.nadoDiscovery ? cfg.nadoDiscovery(address).catch(() => null) : Promise.resolve(null)).then((d) =>
-          readNadoChain(cfg.client, address, blockNumber, d).then((r) => (r.ok ? { ok: true as const, value: r.value.book } : r)),
-        )
+  const stage = (venue: ReadStage['venue'], phase: ReadStage['phase']) => {
+    try {
+      cfg.onStage?.({ venue, phase });
+    } catch {
+      /* progress reporting never affects the read */
+    }
+  };
+  const chain = (cfg.nado.mode ?? 'chain') === 'chain';
+  stage('nado', chain && cfg.nadoDiscovery ? 'lookup' : 'reading');
+  const nadoRead = (
+    chain
+      ? (cfg.nadoDiscovery ? cfg.nadoDiscovery(address).catch(() => null) : Promise.resolve(null)).then((d) => {
+          if (cfg.nadoDiscovery) stage('nado', 'reading');
+          return readNadoChain(cfg.client, address, blockNumber, d).then((r) => (r.ok ? { ok: true as const, value: r.value.book } : r));
+        })
       : blockNumber !== undefined
         ? Promise.resolve({ ok: false as const, error: { code: 'DARK' as const, message: "Nado's API can't read past blocks" } })
-        : readNado(address, cfg.nado);
-  const [t, n] = await Promise.all([readTydro(cfg.client, address as Address, blockNumber), nadoRead]);
+        : readNado(address, cfg.nado)
+  ).then((r) => {
+    stage('nado', r.ok ? 'ok' : 'failed');
+    return r;
+  });
+  stage('tydro', 'reading');
+  const tydroRead = readTydro(cfg.client, address as Address, blockNumber).then((r) => {
+    stage('tydro', r.ok ? 'ok' : 'failed');
+    return r;
+  });
+  const [t, n] = await Promise.all([tydroRead, nadoRead]);
   const at = Date.now();
   const tydro: Sensor<TydroBook> = t.ok ? { status: 'OK', data: t.value.book, asOfTime: at, asOfBlock: t.value.block } : dark(t.error, at);
   const nado: Sensor<NadoBook> = n.ok ? { status: 'OK', data: n.value, asOfTime: at, asOfBlock: null } : dark(n.error, at);

@@ -1,4 +1,4 @@
-import { makeInkClient, readBook, readHead, type BookRead, type ChainHead, type NadoConfig, type NadoDiscovery, type Result } from '@aegis/ink-io';
+import { makeInkClient, readBook, readHead, type BookRead, type ReadStage, type ChainHead, type NadoConfig, type NadoDiscovery, type Result } from '@aegis/ink-io';
 import { decodeSnapshot } from '@aegis/census';
 import { CENSUS_URL, DATA_VIA_API } from './census';
 import { ENV } from './env';
@@ -63,8 +63,8 @@ export async function nadoDiscovery(address: string): Promise<NadoDiscovery | nu
   return { subs: c.subs.get(address.toLowerCase()) ?? [], throughBlock: c.block };
 }
 
-export function loadBook(address: `0x${string}`): Promise<BookRead> {
-  return readBook(address, { client: inkClient, nado: nadoConfig, nadoDiscovery });
+export function loadBook(address: `0x${string}`, onStage?: (s: ReadStage) => void): Promise<BookRead> {
+  return readBook(address, { client: inkClient, nado: nadoConfig, nadoDiscovery, onStage });
 }
 
 /** The wallet as it was at a past block (both venues, same block). Needs an RPC that still holds that state. */

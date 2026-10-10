@@ -28,7 +28,7 @@ import { wellPhase, displayPhase } from '../lib/wellState';
 import { useNow } from '../lib/hulls';
 import { fmtAge } from '../lib/fmt';
 import { usePlanGate } from '../lib/account';
-import { Locked } from '../components/Paywall';
+const HomePreview = lazy(() => import('../components/ProductPreview'));
 
 function WellHome() {
   const nav = useNavigate();
@@ -253,11 +253,9 @@ export function Home() {
       </div>
       {gate === 'open' ? <WellHome /> : null}
       {gate === 'locked' ? (
-        <Locked
-          title="The well"
-          testId="locked-well"
-          blurb="Every Tydro and Nado wallet on Ink, by position type and risk, updated hourly — with the near-liquidation list and live activity."
-        />
+        <Suspense fallback={<div className="preview-wait" aria-hidden />}>
+          <HomePreview />
+        </Suspense>
       ) : null}
     </div>
   );

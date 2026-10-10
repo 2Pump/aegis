@@ -622,11 +622,13 @@ test('Paywall on, no plan: the address field stays free; Well, Pressure, Intel a
   const dataCalls: string[] = [];
   page.on('request', (r) => {
     const u = new URL(r.url()).pathname;
-    if (u.startsWith('/api/v1/data/') && !u.startsWith('/api/v1/data/subs/')) dataCalls.push(u);
+    // the free files (Checks, track record) may load for the public record; nothing else may
+    if (u.startsWith('/api/v1/data/') && !u.startsWith('/api/v1/data/subs/') && !/\/(verification-log|history\/accountability|history\/forecast-score)\.json$/.test(u)) dataCalls.push(u);
   });
   await page.goto('/');
   await expect(page.getByTestId('paste-input')).toBeVisible();
-  await expect(page.getByTestId('locked-well')).toContainText('Subscribers only');
+  await expect(page.getByTestId('home-preview')).toBeVisible();
+  await expect(page.getByTestId('feature-well')).toContainText('DEMO DATA — MADE-UP TEST WALLETS');
   // the free promise is only what's free
   await expect(page.getByTestId('home-sub')).toContainText('position type and liquidation risk — free');
   await expect(page.getByTestId('home-sub')).not.toContainText('response to simulated market moves');
@@ -637,7 +639,7 @@ test('Paywall on, no plan: the address field stays free; Well, Pressure, Intel a
     await expect(page.getByTestId('locked-page')).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: heading, exact: true })).toBeVisible();
   }
-  await page.getByTestId('locked-plans').click();
+  await page.getByTestId('locked-page').getByTestId('cta-plans').click();
   await expect(page).toHaveURL(/\/pricing$/);
   await expect(page.getByTestId('plan-pro')).toContainText('$19');
   await expect(page.getByTestId('plan-desk')).toContainText('$99');
@@ -737,4 +739,90 @@ test('Terms page: read-only, not advice, nothing renews by itself, refunds state
   await expect(t).toContainText('not financial, investment, legal or tax advice');
   await expect(t).toContainText('Nothing renews or charges by itself.');
   await expect(page.getByTestId('refunds')).toContainText('Paid twice by mistake');
+});
+
+/* ── the product shown honestly to visitors without a plan ── */
+test('Home without a plan: actions, public record, four previews from TEST wallets only — and no paid file requested', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: false, access: 'free' });
+  const paid: string[] = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url()).pathname;
+    if (u.startsWith('/api/v1/data/') && !/\/(verification-log|history\/accountability|history\/forecast-score)\.json$/.test(u) && !u.startsWith('/api/v1/data/subs/')) paid.push(u);
+  });
+  await page.goto('/');
+  const p = page.getByTestId('home-preview');
+  await expect(p).toBeVisible();
+  for (const id of ['cta-check', 'demo-wallet-link', 'cta-plans', 'cta-signin']) await expect(p.getByTestId(id).first()).toBeVisible();
+  await expect(p.getByTestId('demo-note')).toContainText('made up');
+  // public evidence: chain and rules always; what isn't recorded here says so — never a zero
+  const ev = p.getByTestId('public-evidence');
+  await expect(ev).toContainText('Ink · 57073');
+  await expect(ev).toContainText('v1.2.0');
+  await expect(ev).toContainText(/not recorded yet|unavailable|loading/);
+  for (const k of ['well', 'pressure', 'intel', 'scan']) await expect(p.getByTestId(`feature-${k}`)).toBeVisible();
+  await expect(p.getByTestId('feature-pressure')).toContainText('SIMULATION, NOT PREDICTION');
+  await expect(p.getByTestId('feature-intel')).toContainText('STRUCTURE — NO DATA SHOWN');
+  // demo rows are the test wallets, linking to their fixture pages
+  await expect(p.getByTestId('feature-well').getByRole('link', { name: 'carry' })).toHaveAttribute('href', '/fixture/carry');
+  // Check a wallet focuses the address field
+  await p.getByTestId('cta-check').click();
+  await expect(page.getByTestId('paste-input')).toBeFocused();
+  await p.getByTestId('demo-wallet-link').first().click();
+  await expect(page).toHaveURL(/\/fixture\/carry$/);
+  await expect(page.getByTestId('fixture-banner')).toBeVisible();
+  expect(paid).toEqual([]);
+});
+
+test('Locked Pressure, Intel and Scan explain themselves differently; each has a safe preview and the ways in', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, signedIn: false, access: 'free' });
+  const seen: string[] = [];
+  for (const [path, words] of [['/pressure', 'Simulation, not prediction'], ['/intel', 'Follow liquidations and oracle events'], ['/census', 'See coverage against each protocol']] as const) {
+    await page.goto(path);
+    const l = page.getByTestId('locked-page');
+    await expect(l).toBeVisible();
+    await expect(l).toContainText(words);
+    await expect(l.getByTestId('demo-wallet-link')).toBeVisible();
+    await expect(l.getByTestId('cta-plans')).toBeVisible();
+    await expect(l.getByTestId('cta-signin')).toBeVisible();
+    await expect(l.locator('.feature-caps li')).toHaveCount(3);
+    seen.push((await l.locator('.feature-problem').textContent()) ?? '');
+  }
+  expect(new Set(seen).size).toBe(3);
+});
+
+test('Pricing: who each plan is for, a truthful comparison (alerts and webhooks COMING SOON), proof links, payment terms kept', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: false, access: 'free' });
+  await page.goto('/pricing');
+  await expect(page.getByTestId('for-free')).toContainText('Checking an individual wallet');
+  await expect(page.getByTestId('for-desk')).toContainText('automated integrations');
+  const c = page.getByTestId('plan-compare');
+  await expect(c.getByRole('row', { name: /Telegram alerts/ })).toContainText('COMING SOON');
+  await expect(c.getByRole('row', { name: /Webhooks/ })).not.toContainText('INCLUDED · ');
+  await expect(c.getByRole('row', { name: /^Webhooks/ }).locator('td').nth(2)).toContainText('COMING SOON');
+  await expect(c.getByRole('row', { name: /The Well/ }).locator('td').first()).toContainText('NOT INCLUDED');
+  const proof = page.getByTestId('plan-proof');
+  await expect(proof.getByTestId('demo-wallet-link')).toHaveAttribute('href', '/fixture/carry');
+  await expect(proof.getByRole('link', { name: /API documentation/ })).toHaveAttribute('href', '/developers');
+  const note = page.getByTestId('pricing-page');
+  for (const t of ['NOWPayments', 'never connects', 'no automatic renewal', 'lasts 30 days', 'read-only', 'not financial', 'Terms and refunds']) await expect(note).toContainText(t);
+  await expect(page.getByTestId('plan-pro')).toContainText('$19');
+  await expect(page.getByTestId('plan-desk')).toContainText('$99');
+});
+
+test('Checks: the track record guide defines coverage, follow-through and lead time — no overall accuracy', async ({ page }) => {
+  await page.goto('/calibration');
+  const g = page.getByTestId('track-guide');
+  for (const t of ['Warning coverage', 'Warning follow-through', 'Warning lead time', 'No single number is presented as overall accuracy', 'baseline', 'still awaiting outcome', 'neither a hit nor a miss']) await expect(g).toContainText(t);
+  await expect(page.getByTestId('track-record')).toBeVisible();
+});
+
+test('Wallet read: real per-venue stages while reading, seconds counted, never a zero', async ({ page }) => {
+  await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
+  const rp = page.getByTestId('read-progress');
+  // the read in this sandbox fails fast or completes; either way the progress panel shows only real stage words
+  await expect(page.getByTestId('hull-plate').or(rp)).toBeVisible({ timeout: 30_000 });
+  if (await rp.count()) {
+    await expect(rp).toContainText('Most reads complete within 5–15 seconds');
+    await expect(rp).not.toContainText(/\b0 wallets\b/);
+  }
 });

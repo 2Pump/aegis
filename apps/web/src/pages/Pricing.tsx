@@ -5,6 +5,43 @@ import { BRAND, PLANS } from '@aegis/glyphs';
 import { PLAN_LABEL, fmtDay, startCheckout, useMe } from '../lib/account';
 
 type Key = 'free' | 'pro' | 'desk';
+type Cell = 'yes' | 'no' | 'soon' | string;
+
+/** Who each plan is for — plain, no claims. */
+const FOR: Record<Key, string> = {
+  free: 'Checking an individual wallet.',
+  pro: 'Active Ink users, researchers and anyone monitoring risk across the ecosystem.',
+  desk: 'Developers, teams and automated integrations.',
+};
+
+/** The comparison. Truthful states only: alerts and webhooks are not open yet, so they say so. */
+const COMPARE: Array<[string, Cell, Cell, Cell]> = [
+  ["A wallet's risk level and position types", 'yes', 'yes', 'yes'],
+  ['Share links and preview cards', 'yes', 'yes', 'yes'],
+  ['Public rules, Checks and track record', 'yes', 'yes', 'yes'],
+  ['The Well — every wallet found, by type and risk', 'no', 'yes', 'yes'],
+  ['Pressure — defined market moves across Ink', 'no', 'yes', 'yes'],
+  ['Intel — history, liquidations, oracles, changes, carry', 'no', 'yes', 'yes'],
+  ['Scan — wallets found and coverage', 'no', 'yes', 'yes'],
+  ['Full wallet positions and exposure', 'no', 'yes', 'yes'],
+  ['Wallet history', 'no', 'yes', 'yes'],
+  ['Wallet stress test', 'no', 'yes', 'yes'],
+  ['Telegram alerts', 'no', 'soon:up to 10 wallets', 'soon:up to 100 wallets'],
+  ['API — free endpoints (/status, /wallets/{address}, /performance, /verification)', 'yes', 'yes', 'yes'],
+  ['API — every other endpoint', 'no', 'no', 'yes:signed-in session now; API keys coming soon'],
+  ['Webhooks', 'no', 'no', 'soon'],
+];
+
+function CellView({ c }: { c: Cell }) {
+  const [kind, note] = c.includes(':') ? [c.slice(0, c.indexOf(':')), c.slice(c.indexOf(':') + 1)] : [c, ''];
+  const label = kind === 'yes' ? 'INCLUDED' : kind === 'soon' ? 'COMING SOON' : 'NOT INCLUDED';
+  return (
+    <span className={`cmp cmp-${kind}`}>
+      <span className="cmp-mark" aria-hidden>{kind === 'yes' ? '●' : kind === 'soon' ? '◌' : '—'}</span> {label}
+      {note ? <span className="cmp-note"> · {note}</span> : null}
+    </span>
+  );
+}
 
 export function PricingPage() {
   const me = useMe();
@@ -59,6 +96,7 @@ export function PricingPage() {
             {p.usd ? <small> USDC / {PLANS.PERIOD_DAYS} days</small> : null}
           </div>
           <div className="dim" style={{ fontSize: 13 }}>{p.blurb}</div>
+          <div className="plan-for" data-testid={`for-${k}`}>For: {FOR[k]}</div>
           <ul className="plan-list">
             {p.features.map((f) => <li key={f}>{f}</li>)}
           </ul>
@@ -76,9 +114,58 @@ export function PricingPage() {
         {card('pro', 'var(--cyan)')}
         {card('desk', 'var(--amber)')}
       </div>
+      <section className="panel" style={{ ['--rail' as string]: 'var(--slate)' }} data-testid="plan-compare" aria-labelledby="compare-title">
+        <div className="rail" aria-hidden />
+        <div className="body">
+          <h3 className="panel-title" id="compare-title">Compare plans</h3>
+          <div className="table-wrap">
+            <table className="t compare-t">
+              <thead>
+                <tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Pro · ${PLANS.pro.usd}</th><th scope="col">Desk · ${PLANS.desk.usd}</th></tr>
+              </thead>
+              <tbody>
+                {COMPARE.map(([what, f, p, d]) => (
+                  <tr key={what}>
+                    <th scope="row">{what}</th>
+                    <td><CellView c={f} /></td>
+                    <td><CellView c={p} /></td>
+                    <td><CellView c={d} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel" style={{ ['--rail' as string]: 'var(--cyan)' }} data-testid="plan-proof" aria-labelledby="proof-title">
+        <div className="rail" aria-hidden />
+        <div className="body">
+          <h3 className="panel-title" id="proof-title">Look before you pay</h3>
+          <div className="proof-grid">
+            <Link to="/fixture/carry" className="proof" data-testid="demo-wallet-link">
+              <b>Explore a demo wallet</b>
+              <span>The full wallet page on a made-up test wallet — hand-written values, not a real account.</span>
+            </Link>
+            <Link to="/calibration" className="proof">
+              <b>View public Checks</b>
+              <span>Every automatic check of the readings against the official sources, passes and failures alike.</span>
+            </Link>
+            <Link to="/calibration" className="proof">
+              <b>Read the public track record</b>
+              <span>Warnings against real liquidations, with the denominators and the cases too few to judge.</span>
+            </Link>
+            <Link to="/developers" className="proof">
+              <b>View the API documentation</b>
+              <span>Every endpoint, its fields and its limits (OpenAPI 3.1).</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <div className="note-text" style={{ maxWidth: 820 }}>
-        You pay on NOWPayments' page from your own wallet — {BRAND.display} never connects to it. Each {PLANS.PERIOD_DAYS}-day period is paid separately: nothing renews or
-        charges by itself, and we email a renewal link before it ends. A subscription buys information only: {BRAND.display} is read-only, never trades, and is not financial
+        Paid in crypto through NOWPayments: you pay on their page from your own wallet — {BRAND.display} never connects to it. Each period lasts {PLANS.PERIOD_DAYS} days and is paid separately:
+        no automatic renewal, nothing charges by itself, and we email a renewal link before it ends. A subscription buys information only: {BRAND.display} is read-only, never trades, and is not financial
         advice. <Link to="/terms">Terms and refunds</Link>.
         {current ? <> You're signed in on the <b>{PLAN_LABEL[current]}</b> plan.</> : null}
       </div>

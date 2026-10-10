@@ -350,3 +350,41 @@ function ForecastBody({ f }: { f: ForecastScore }) {
     </div>
   );
 }
+
+/**
+ * How to read the numbers below — definitions only, no interpretation of the results. Each line matches what the
+ * scorer actually computes (packages/census/src/ledger.ts, scoring method shown on the panel).
+ */
+export function TrackRecordGuide() {
+  const windows = LEDGER.WINDOWS_H.map((h) => (h >= 24 ? `${h / 24} day${h === 24 ? '' : 's'}` : `${h} h`)).join(', ');
+  return (
+    <section className="panel" style={{ ['--rail' as string]: 'var(--violet)' }} data-testid="track-guide" aria-labelledby="track-guide-title">
+      <div className="rail" aria-hidden />
+      <div className="body">
+        <h3 className="panel-title" id="track-guide-title">How to read the track record</h3>
+        <div className="grid three guide-grid">
+          <div>
+            <div className="guide-k">Warning coverage</div>
+            <p>Of the liquidations Phrourax could judge, the share where it had recorded NEAR LIQUIDATION far enough in advance — shown for each lookback window ({windows}).</p>
+          </div>
+          <div>
+            <div className="guide-k">Warning follow-through</div>
+            <p>Of the new warnings old enough to judge, the share followed by that same wallet&apos;s liquidation within the window.</p>
+          </div>
+          <div>
+            <div className="guide-k">Warning lead time</div>
+            <p>How long before a liquidation Phrourax first recorded the warning that applied to it.</p>
+          </div>
+        </div>
+        <ul className="guide-notes">
+          <li>These are separate measurements. No single number is presented as overall accuracy.</li>
+          <li>A warning that isn&apos;t followed by a liquidation may have resolved because the owner added collateral or closed exposure — it is counted, not called wrong.</li>
+          <li>A liquidation without enough recording history before it can&apos;t fairly count as a miss, so it is shown separately as &ldquo;not enough recording history&rdquo;.</li>
+          <li>Wallets already near liquidation when recording began are a baseline, not predictions, and are never scored.</li>
+          <li>Warnings younger than a window are &ldquo;still awaiting outcome&rdquo; for that window — not failures.</li>
+          <li>Pressure forecasts are conditional: when the market move never happened, the forecast is neither a hit nor a miss.</li>
+        </ul>
+      </div>
+    </section>
+  );
+}

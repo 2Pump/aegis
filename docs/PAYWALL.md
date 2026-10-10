@@ -18,6 +18,33 @@ Status: built and **off**. It turns on only when `PAYWALL=1` is set in Vercel *a
 - **Test wallets** (`/fixture/…`) are always fully open.
 - **Complimentary accounts:** `COMP_EMAILS`, comma-separated, count as Desk. Put your own email there.
 
+## What visitors without a plan see (the product, shown honestly)
+
+- **Homepage:** under the free address field, `ProductPreview.tsx` shows:
+  - **Actions:** Check a wallet, Explore a demo wallet (`/fixture/carry`), See plans, Sign in.
+  - **Public record:** only facts that are already public:
+    - chain and latest block;
+    - rules version;
+    - verification status;
+    - automatic checks and when the last one ran (`verification-log.json`);
+    - recording start, evaluable liquidations, counted new warnings and last scoring (`history/accountability.json`).
+
+    Anything unavailable says so, never 0.
+  - **Four previews:**
+    - **Well:** the six made-up TEST wallets through the real classifier, labelled *DEMO DATA — MADE-UP TEST WALLETS*.
+    - **Pressure:** the same test wallets under *all crypto −30%* through the real scenario engine, labelled *simulation, not prediction*.
+    - **Intel** and **Scan:** their structure only, labelled *STRUCTURE — NO DATA SHOWN*.
+- **Locked Pressure, Intel and Scan pages** each give:
+  - what the page is for and three things it does;
+  - the matching safe preview;
+  - Explore a demo wallet, See plans and Sign in.
+- **Plans page:**
+  - who each plan is for;
+  - a comparison with truthful states (INCLUDED, NOT INCLUDED, COMING SOON for alerts and webhooks);
+  - proof links: demo wallet, Checks, track record, API docs;
+  - the payment terms.
+- **Nothing in these previews requests a paid file.** The server would refuse it anyway. Test wallets never enter the Well, the census or any score.
+
 ## How it is enforced
 
 - **Data goes through the function.** A deployed site no longer reads census files from the Blob URL. It reads them through `/api/v1/data/<file>`.

@@ -32,7 +32,7 @@ const router = createBrowserRouter([
       {
         path: '/pressure',
         element: (
-          <PaidPage heading="Pressure" title="Pressure map" blurb="How many wallets a price move would push toward liquidation — by asset, direction and size range.">
+          <PaidPage heading="Pressure" feature="pressure">
             <PressurePage />
           </PaidPage>
         ),
@@ -40,7 +40,7 @@ const router = createBrowserRouter([
       {
         path: '/intel',
         element: (
-          <PaidPage heading="Intel" title="Intel" blurb="Ecosystem history, the liquidation ledger, oracle watch, protocol changes and carry — recorded live every hour.">
+          <PaidPage heading="Intel" feature="intel">
             <IntelPage />
           </PaidPage>
         ),
@@ -48,7 +48,7 @@ const router = createBrowserRouter([
       {
         path: '/census',
         element: (
-          <PaidPage heading="Scan" title="Scan" blurb="Every wallet Phrourax has found on Tydro and Nado, to browse and filter.">
+          <PaidPage heading="Scan" feature="scan">
             <CensusPage />
           </PaidPage>
         ),

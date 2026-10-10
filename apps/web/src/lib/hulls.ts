@@ -4,7 +4,14 @@ import { NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from '@aegis/glyphs';
 import { ENV } from './env';
 import { log } from './log';
 import { loadBook, loadHead } from './sensors';
-import type { ChainHead } from '@aegis/ink-io';
+import type { ChainHead, ReadStage } from '@aegis/ink-io';
+
+/** What a read in progress is actually doing, per venue (from readBook's own callbacks — never a timed animation). */
+export interface ReadProgress {
+  startedAt: number;
+  tydro: ReadStage['phase'] | 'waiting';
+  nado: ReadStage['phase'] | 'waiting';
+}
 
 export interface HullState {
   book: Book;
@@ -32,9 +39,10 @@ export function useHullCache(): Map<string, HullState> {
 }
 
 /* ───────── focused hull polling: 15s, backoff on 429, pause while hidden ───────── */
-export function useLiveHull(addr: `0x${string}` | null): { state: HullState | null; loading: boolean; nextInMs: number | null; refresh: () => void } {
+export function useLiveHull(addr: `0x${string}` | null): { state: HullState | null; loading: boolean; progress: ReadProgress | null; nextInMs: number | null; refresh: () => void } {
   const [state, setState] = useState<HullState | null>(addr ? cache.get(addr) ?? null : null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<ReadProgress | null>(null);
   const [nextAt, setNextAt] = useState<number | null>(null);
   const delay = useRef<number>(ENV.hullPollMs);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,8 +63,10 @@ export function useLiveHull(addr: `0x${string}` | null): { state: HullState | nu
       setLoading(true);
       const t0 = performance.now();
       log('info', addr, 'read → Tydro + Nado (both via Ink RPC)');
-      const r = await loadBook(addr);
+      setProgress({ startedAt: Date.now(), tydro: 'waiting', nado: 'waiting' });
+      const r = await loadBook(addr, (st) => alive && setProgress((p) => (p ? { ...p, [st.venue]: st.phase } : p)));
       if (!alive) return;
+      setProgress(null);
       const ms = Math.round(performance.now() - t0);
       const b = r.book;
       log(b.tydro.status === 'OK' ? 'ok' : 'err', addr, b.tydro.status === 'OK' ? `TYDRO ok · block ${b.asOfBlock ?? '?'} · hf ${b.tydro.data.hf?.toFixed(3) ?? '∞ (no debt)'} · ${b.tydro.data.supplies.length} supply / ${b.tydro.data.debts.length} debt legs` : `TYDRO COULDN'T READ · ${b.tydro.code} · ${b.tydro.message}`);
@@ -98,7 +108,7 @@ export function useLiveHull(addr: `0x${string}` | null): { state: HullState | nu
     };
   }, [addr]);
 
-  return { state, loading, nextInMs: nextAt === null ? null : Math.max(0, nextAt - Date.now()), refresh: () => kick.current() };
+  return { state, loading, progress, nextInMs: nextAt === null ? null : Math.max(0, nextAt - Date.now()), refresh: () => kick.current() };
 }
 
 /* ───────── footer: chain head ───────── */
@@ -106,27 +116,37 @@ export interface HeadState {
   head: ChainHead | null;
   error: string | null;
 }
-export function useChainHead(): HeadState {
-  const [s, set] = useState<HeadState>({ head: null, error: null });
-  useEffect(() => {
-    let alive = true;
-    const go = async () => {
-      const r = await loadHead();
-      if (!alive) return;
-      if (r.ok) set({ head: r.value, error: null });
-      else {
-        set((p) => ({ head: p.head, error: `${r.error.code}: ${r.error.message}` }));
-        log('err', 'chain', `head ${r.error.code} · ${r.error.message}`);
+let headState: HeadState = { head: null, error: null };
+const headSubs = new Set<() => void>();
+let headTimer: ReturnType<typeof setInterval> | null = null;
+async function pollHead() {
+  const r = await loadHead();
+  headState = r.ok ? { head: r.value, error: null } : { head: headState.head, error: `${r.error.code}: ${r.error.message}` };
+  if (!r.ok) log('err', 'chain', `head ${r.error.code} · ${r.error.message}`);
+  headSubs.forEach((f) => f());
+}
+// stable subscribe (a new function each render would make React resubscribe — and re-poll — on every render)
+function subscribeHead(f: () => void): () => void {
+  headSubs.add(f);
+  if (!headTimer) {
+    void pollHead();
+    headTimer = setInterval(() => void pollHead(), ENV.hullPollMs);
+  }
+  return () => {
+    headSubs.delete(f);
+    // stop only when nobody has listened for a moment (a remount re-subscribes immediately)
+    setTimeout(() => {
+      if (!headSubs.size && headTimer) {
+        clearInterval(headTimer);
+        headTimer = null;
       }
-    };
-    void go();
-    const id = setInterval(() => void go(), ENV.hullPollMs);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, []);
-  return s;
+    }, 1000);
+  };
+}
+const headSnapshot = () => headState;
+/** The chain head — one shared poll however many parts of the page show it (footer, public evidence). */
+export function useChainHead(): HeadState {
+  return useSyncExternalStore(subscribeHead, headSnapshot);
 }
 
 /** 1 Hz clock for "age" labels. */
