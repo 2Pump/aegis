@@ -114,6 +114,11 @@ This vector cannot pass the human step unless you control that wallet. It proves
 `pnpm verify:auto` — run about every 4 hours by the hourly census itself (census.yml → "Checks (when due)": it runs when the last automatic check is ≥ 3¾ h old, so cron-job.org's hourly timer keeps the checks on time with no timer of their own). By hand: Actions → verify → Run workflow, same secrets as the census.
 - Picks real wallets from the latest census (a different set each run): a Tydro borrower, a Nado default-only wallet, a Nado wallet with an isolated subaccount.
 - Reads each with the site's own readers and compares with sources Phrourax does not read from: Tydro AaveProtocolDataProvider balances (±1e-9) and a recomputed HF (±0.5%) at the same block; Nado Clearinghouse.getHealth for every subaccount (±1%).
+- **E-Mode (since 2026-10-10):** the recomputed HF applies the wallet's E-Mode category.
+  - It reads `Pool.getUserEMode`, then the category's liquidation threshold for the assets it covers. That's the v3.2 collateral bitmap, or the v3.0 per-reserve category.
+  - Without this, an asset that is collateral only inside E-Mode (syrupUSDT: standard threshold 0) made the recomputation 0 while Tydro's own HF was 1.022. That was the FAILED record of 2026-10-10 20:10 UTC (`0x6431…ac26`, block 58,164,642).
+  - That record stays in the history. The site's own HF always came from `Pool.getUserAccountData`, which is E-Mode-aware, so wallet pages were never affected.
+  - If the E-Mode configuration can't be read, the row is SOURCE UNAVAILABLE, never a pass.
 - Compares Nado's official API too, with a plain request (it answered from GitHub's runners on 2026-10-04). When Cloudflare refuses it, the row is SOURCE UNAVAILABLE — never a pass, never worked around.
 - Tydro: wallets the census already flags as borrowing (a Tydro wound, a same-family loop, an at-risk watch) are tried first, up to 40.
 - A case with no suitable wallet that run is recorded as NOT CHECKED. Every expected check always has a row on the page, so a missing one is never silently left out.

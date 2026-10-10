@@ -40,6 +40,46 @@ const dataProviderAbi = parseAbi([
 ]);
 const oracleAbi = parseAbi(['function getAssetsPrices(address[] assets) view returns (uint256[])', 'function BASE_CURRENCY_UNIT() view returns (uint256)']);
 const getHealthAbi = parseAbi(['function getHealth(bytes32 subaccount, uint8 healthType) view returns (int128)']);
+/**
+ * E-Mode (2026-10-10): a wallet in an E-Mode category gets that category's liquidation threshold for the assets the
+ * category covers — some assets (e.g. syrupUSDT) count as collateral ONLY inside E-Mode (standard threshold 0). The
+ * recomputation must apply it, or it reports 0 for a healthy wallet. Two Aave v3 layouts are supported:
+ *   v3.2+: getEModeCategoryCollateralConfig(id) + getEModeCategoryCollateralBitmap(id), reserve id from getReserveData
+ *   v3.0/3.1: getEModeCategoryData(id) + the data provider's getReserveEModeCategory(asset)
+ */
+const poolEModeAbi = parseAbi([
+  'function getUserEMode(address user) view returns (uint256)',
+  'function getEModeCategoryCollateralConfig(uint8 id) view returns ((uint16 ltv, uint16 liquidationThreshold, uint16 liquidationBonus))',
+  'function getEModeCategoryCollateralBitmap(uint8 id) view returns (uint128)',
+  'function getReserveData(address asset) view returns ((uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))',
+  'function getEModeCategoryData(uint8 id) view returns ((uint16 ltv, uint16 liquidationThreshold, uint16 liquidationBonus, address priceSource, string label))',
+]);
+const dpEModeAbi = parseAbi(['function getReserveEModeCategory(address asset) view returns (uint256)']);
+
+/** The liquidation threshold (bps) each reserve gets for this wallet under its E-Mode, or null = not in E-Mode. Throws if the wallet is in E-Mode but the category can't be read. */
+export async function eModeThresholds(client: PublicClient, user: Address, blockNumber: bigint): Promise<{ category: number; layout: string; lt: Map<string, number> } | null> {
+  const category = Number(await client.readContract({ address: TYDRO.POOL, abi: poolEModeAbi, functionName: 'getUserEMode', args: [user], blockNumber }));
+  if (!category) return null;
+  const lt = new Map<string, number>();
+  try {
+    const [cfg, bitmap] = await Promise.all([
+      client.readContract({ address: TYDRO.POOL, abi: poolEModeAbi, functionName: 'getEModeCategoryCollateralConfig', args: [category], blockNumber }),
+      client.readContract({ address: TYDRO.POOL, abi: poolEModeAbi, functionName: 'getEModeCategoryCollateralBitmap', args: [category], blockNumber }),
+    ]);
+    const ids = await Promise.all(TYDRO_RESERVES.map((r) => client.readContract({ address: TYDRO.POOL, abi: poolEModeAbi, functionName: 'getReserveData', args: [r.underlying], blockNumber })));
+    TYDRO_RESERVES.forEach((r, i) => {
+      if ((BigInt(bitmap) >> BigInt(ids[i]!.id)) & 1n) lt.set(r.underlying.toLowerCase(), Number(cfg.liquidationThreshold));
+    });
+    return { category, layout: 'v3.2 collateral bitmap', lt };
+  } catch {
+    const data = await client.readContract({ address: TYDRO.POOL, abi: poolEModeAbi, functionName: 'getEModeCategoryData', args: [category], blockNumber });
+    const cats = await Promise.all(TYDRO_RESERVES.map((r) => client.readContract({ address: TYDRO.AAVE_PROTOCOL_DATA_PROVIDER, abi: dpEModeAbi, functionName: 'getReserveEModeCategory', args: [r.underlying], blockNumber })));
+    TYDRO_RESERVES.forEach((r, i) => {
+      if (Number(cats[i]) === category) lt.set(r.underlying.toLowerCase(), Number(data.liquidationThreshold));
+    });
+    return { category, layout: 'v3.0 category data', lt };
+  }
+}
 
 export interface VerifyOpts {
   client: PublicClient;
@@ -155,6 +195,13 @@ async function verifyTydro(client: PublicClient, book: Book, name: string, at: s
       Promise.all(TYDRO_RESERVES.map((r) => client.readContract({ address: TYDRO.AAVE_PROTOCOL_DATA_PROVIDER, abi: dataProviderAbi, functionName: 'getUserReserveData', args: [r.underlying, book.address as Address], blockNumber }))),
       Promise.all(TYDRO_RESERVES.map((r) => client.readContract({ address: TYDRO.AAVE_PROTOCOL_DATA_PROVIDER, abi: dataProviderAbi, functionName: 'getReserveConfigurationData', args: [r.underlying], blockNumber }))),
     ]);
+    // the wallet's E-Mode, if any — without it the recomputation would be wrong, so an unreadable E-Mode is "source unavailable", never a pass or a fail
+    let emode: Awaited<ReturnType<typeof eModeThresholds>>;
+    try {
+      emode = await eModeThresholds(client, book.address as Address, blockNumber);
+    } catch (e) {
+      return finalize({ ...rec, source: `${rec.source} + Pool E-Mode`, fields: [], sourceUnavailable: true, failureReason: `the wallet's E-Mode configuration couldn't be read: ${String(e).slice(0, 140)}` });
+    }
     const fields: FieldCheck[] = [];
     let weighted = 0;
     let debtUsd = 0;
@@ -168,11 +215,13 @@ async function verifyTydro(client: PublicClient, book: Book, name: string, at: s
       const aDebt = t.debts.find((s) => s.symbol === sym)?.amount ?? 0;
       if (sup > 0 || aSup > 0) fields.push(compareField({ id: `supply.${sym}`, label: `${sym} supplied`, expected: sup, aegis: aSup, tolerance: 1e-9, unit: 'rel' }));
       if (debt > 0 || aDebt > 0) fields.push(compareField({ id: `debt.${sym}`, label: `${sym} borrowed`, expected: debt, aegis: aDebt, tolerance: 1e-9, unit: 'rel' }));
-      if (u[8] && sup > 0) weighted += sup * px * (Number(cfgRes[i]![2]) / 10_000);
+      const ltBps = emode?.lt.get(r.underlying.toLowerCase()) ?? Number(cfgRes[i]![2]);
+      if (u[8] && sup > 0) weighted += sup * px * (ltBps / 10_000);
       debtUsd += debt * px;
     });
     if (t.hf !== null && debtUsd > 0) fields.push(compareField({ id: 'hf', label: 'health factor', expected: weighted / debtUsd, aegis: t.hf, tolerance: 0.005, unit: 'rel' }));
-    return finalize({ ...rec, fields, sourceUnavailable: false });
+    const source = emode ? `${rec.source} + Pool E-Mode category ${emode.category} (${emode.layout})` : rec.source;
+    return finalize({ ...rec, source, fields, sourceUnavailable: false });
   } catch (e) {
     return finalize({ ...rec, fields: [], sourceUnavailable: true, failureReason: `on-chain source unreachable: ${String(e).slice(0, 160)}` });
   }
