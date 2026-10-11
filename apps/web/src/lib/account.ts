@@ -20,6 +20,8 @@ export interface Me {
   since?: string;
   /** payments are switched on: the pricing page can sell */
   billing?: boolean;
+  /** Telegram alerts are open to this visitor (live for everyone, or the owner testing before going live) */
+  alerts?: boolean;
   payments?: Array<{ at: string; plan: 'pro' | 'desk'; usd: number; paidUntil: string }>;
 }
 export type MeState = { status: 'loading' } | { status: 'ok'; me: Me };

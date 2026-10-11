@@ -15,12 +15,19 @@
  *   NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET   from the NOWPayments dashboard
  *   CRON_SECRET                                   any long random string; Vercel sends it to the daily reminder job
  *   NOWPAYMENTS_SANDBOX=1 (optional)              use NOWPayments' sandbox (test payments, no real money)
+ *
+ * Telegram alerts (docs/ALERTS.md) are OFF unless accounts are on and this exists:
+ *   TELEGRAM_BOT_TOKEN                            from @BotFather (the same value as the GitHub secret)
+ *   ALERTS_LIVE=1 (optional)                      every paying account sees alerts; without it only COMP_EMAILS do
  */
 import { BRAND } from '@aegis/glyphs';
 import {
   billingOff,
   makeBillingHandler,
   accountsOff,
+  alertsOff,
+  makeAlertsHandler,
+  TELEGRAM_TOKEN_SHAPE,
   effectiveAccess,
   makeAccountsHandler,
   parseAuthSecret,
@@ -29,6 +36,7 @@ import {
   sessionUser,
   upstashKv,
   type Access,
+  type AlertsDeps,
   type AuthHandler,
 } from '@aegis/census/accounts';
 
@@ -36,6 +44,8 @@ export interface AccountsRuntime {
   handler: AuthHandler;
   /** /billing/* (checkout, NOWPayments IPN, daily reminders) */
   billing: AuthHandler;
+  /** /alerts/* and /telegram/hook */
+  alerts: AuthHandler;
   on: boolean;
   paywall: boolean;
   /** the visitor's plan from their cookie ('free' when signed out, or when accounts are off) */
@@ -45,14 +55,14 @@ export interface AccountsRuntime {
 const WHO_TTL_MS = 30_000;
 const whoCache = new Map<string, { at: number; v: { signedIn: boolean; access: Access } }>();
 
-export function makeAccounts(env: NodeJS.ProcessEnv = process.env): AccountsRuntime {
+export function makeAccounts(env: NodeJS.ProcessEnv = process.env, extra: Pick<AlertsDeps, 'fixtures' | 'read'> = { fixtures: new Set() }): AccountsRuntime {
   const secret = parseAuthSecret(env.AUTH_SECRET);
   const url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
   const token = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN;
   const resend = env.RESEND_API_KEY;
   if (!secret || !url || !token || !resend) {
     if (env.PAYWALL === '1') console.error('PAYWALL=1 ignored: accounts are not fully set up (docs/ACCOUNTS.md)');
-    return { handler: accountsOff, billing: billingOff, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
+    return { handler: accountsOff, billing: billingOff, alerts: alertsOff, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
   }
   const kv = upstashKv({ url, token });
   const mail = resendMailer({ apiKey: resend, from: env.MAIL_FROM || `${BRAND.display} <signin@phrourax.com>` });
@@ -63,8 +73,13 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env): AccountsRunt
   const npKey = env.NOWPAYMENTS_API_KEY;
   const npIpn = env.NOWPAYMENTS_IPN_SECRET;
   const billingOn = Boolean(npKey && npIpn);
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+  const alertsOn = Boolean(botToken && TELEGRAM_TOKEN_SHAPE.test(botToken));
+  if (botToken && !alertsOn) console.error('TELEGRAM_BOT_TOKEN ignored: it does not look like a bot token (docs/ALERTS.md)');
+  const alertsLive = alertsOn && env.ALERTS_LIVE === '1';
   return {
-    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, billing: billingOn, log }),
+    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, billing: billingOn, alerts: alertsOn ? (alertsLive ? 'live' : 'owner') : 'off', log }),
+    alerts: alertsOn ? makeAlertsHandler({ kv, secret, now, comp, botToken: botToken!, live: alertsLive, fixtures: extra.fixtures, read: extra.read, log }) : alertsOff,
     billing: billingOn
       ? makeBillingHandler({ kv, mail, secret, now, apiKey: npKey!, ipnSecret: npIpn!, cronSecret: env.CRON_SECRET, sandbox: env.NOWPAYMENTS_SANDBOX === '1', log })
       : billingOff,

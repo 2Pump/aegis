@@ -7,3 +7,4 @@ export { parseCommand, handleCommand, HELP_TEXT, COMMANDS, type Command, type Co
 export { TestTransport, type AlertsTransport, type IncomingMessage, type SendResult } from './transport.js';
 export { runAlerts, unreadableObservation, type RunDeps, type RunReport } from './run.js';
 export { FOOTER_TEXT } from './text.js';
+export * from './linked.js';

@@ -9,7 +9,8 @@ import { FixturePage, HullPage } from './pages/HullPage';
 import { CalibrationPage } from './pages/Calibration';
 import { PressurePage } from './pages/Pressure';
 import { IntelPage } from './pages/Intel';
-import { CensusPage, DevelopersPage, NotFound, WatchPage } from './pages/Static';
+import { CensusPage, DevelopersPage, NotFound } from './pages/Static';
+import { AlertsPage } from './pages/Alerts';
 import { AccountPage, SignInPage, VerifyPage } from './pages/Account';
 import { PricingPage } from './pages/Pricing';
 import { TermsPage } from './pages/Terms';
@@ -53,7 +54,8 @@ const router = createBrowserRouter([
           </PaidPage>
         ),
       },
-      { path: '/watch', element: <WatchPage /> },
+      { path: '/watch', element: <AlertsPage /> },
+      { path: '/alerts', element: <AlertsPage /> },
       { path: '/developers', element: <DevelopersPage /> },
       { path: '/signin', element: <SignInPage /> },
       { path: '/auth/verify', element: <VerifyPage /> },

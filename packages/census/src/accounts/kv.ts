@@ -14,6 +14,12 @@ export interface Kv {
   del(key: string): Promise<void>;
   /** set only if the key doesn't exist yet; true when this call set it (a payment is applied once) */
   setIfAbsent(key: string, value: string, ttlS?: number): Promise<boolean>;
+  /** several keys in one round trip (null for missing) */
+  mget(keys: readonly string[]): Promise<Array<string | null>>;
+  /** a set of strings (the alerts index): add, remove, list */
+  sadd(key: string, member: string): Promise<void>;
+  srem(key: string, member: string): Promise<void>;
+  smembers(key: string): Promise<string[]>;
 }
 
 export function memoryKv(now: () => number = Date.now): Kv & { dump(): Map<string, { v: string; exp: number | null }> } {
@@ -52,6 +58,22 @@ export function memoryKv(now: () => number = Date.now): Kv & { dump(): Map<strin
       m.set(k, { v, exp: ttlS ? now() + ttlS * 1000 : null });
       return true;
     },
+    async mget(ks) {
+      return ks.map((k) => live(k)?.v ?? null);
+    },
+    async sadd(k, member) {
+      const set = new Set<string>(JSON.parse(live(k)?.v ?? '[]') as string[]);
+      set.add(member);
+      m.set(k, { v: JSON.stringify([...set]), exp: null });
+    },
+    async srem(k, member) {
+      const set = new Set<string>(JSON.parse(live(k)?.v ?? '[]') as string[]);
+      set.delete(member);
+      m.set(k, { v: JSON.stringify([...set]), exp: null });
+    },
+    async smembers(k) {
+      return JSON.parse(live(k)?.v ?? '[]') as string[];
+    },
     dump: () => m,
   };
 }
@@ -87,6 +109,19 @@ export function upstashKv(o: { url: string; token: string; fetch?: FetchLike }):
     },
     async setIfAbsent(k, v, ttlS) {
       return (await (ttlS ? cmd('SET', k, v, 'NX', 'EX', ttlS) : cmd('SET', k, v, 'NX'))) === 'OK';
+    },
+    async mget(ks) {
+      if (!ks.length) return [];
+      return ((await cmd('MGET', ...ks)) as Array<string | null>).map((x) => x ?? null);
+    },
+    async sadd(k, member) {
+      await cmd('SADD', k, member);
+    },
+    async srem(k, member) {
+      await cmd('SREM', k, member);
+    },
+    async smembers(k) {
+      return ((await cmd('SMEMBERS', k)) as string[] | null) ?? [];
     },
   };
 }

@@ -493,6 +493,28 @@ button.pm-bar:hover { border-color: var(--hair); }
 .alerts-page .panel p, .alerts-page .panel li { font-size: 13px; line-height: 1.55; }
 .alerts-page .panel ul { margin: 6px 0; padding-left: 18px; }
 .alerts-page .kv dt.alerts-cmd { font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.alerts-list { display: flex; flex-direction: column; }
+.alerts-row { border-top: 1px solid var(--hair-2); padding: 10px 0; }
+.alerts-row:first-child { border-top: 0; }
+.alerts-row[data-over="yes"] { opacity: 0.6; }
+.alerts-row-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.alerts-row-main .mono { font-size: 13px; }
+.alerts-lines { font-size: 12.5px; flex: 1 1 200px; min-width: 0; }
+.alerts-row-btns { display: inline-flex; gap: 6px; margin-left: auto; }
+.alerts-row-btns .pill-btn { padding: 5px 10px; font-size: 11px; }
+.alerts-edit { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin-top: 10px; padding: 12px; background: var(--hull-2); border: 1px solid var(--hair-2); }
+.alerts-edit label { display: flex; flex-direction: column; gap: 4px; font: 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+.alerts-edit input, .alerts-edit select { background: #020406; border: 1px solid var(--hair); color: var(--ink); font: 13px var(--mono); padding: 7px 9px; border-radius: 2px; width: 120px; }
+.alerts-edit select { width: auto; min-width: 120px; }
+.alerts-edit input:focus, .alerts-edit select:focus { outline: none; border-color: var(--cyan); }
+.alerts-edit input:disabled { opacity: 0.4; }
+.alerts-toggle { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; padding: 6px 0; cursor: pointer; }
+.alerts-toggle input { margin-top: 3px; accent-color: var(--cyan); }
+@media (max-width: 560px) {
+  .alerts-row-btns { margin-left: 0; }
+  .alerts-edit input, .alerts-edit select { width: 100%; }
+  .alerts-edit label { flex: 1 1 45%; }
+}
 @media (max-width: 640px) {
   .alerts-page .kv { grid-template-columns: 1fr; gap: 2px 0; }
   .alerts-page .kv dt.alerts-cmd { overflow-wrap: anywhere; padding-top: 8px; }

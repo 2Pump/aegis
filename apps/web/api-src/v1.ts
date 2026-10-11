@@ -18,11 +18,11 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { API, DISCLAIMER, RateLimiter, handle, makeDataHandler, makeShareHandler, type ApiDeps } from '@aegis/census/api';
-import { apiUnlocked, isFreeApiPath, PAYMENT_REQUIRED } from '@aegis/census/accounts';
+import { ALERTS_SITE, apiUnlocked, isFreeApiPath, PAYMENT_REQUIRED } from '@aegis/census/accounts';
 import { decodeShip, type CensusSnapshot } from '@aegis/census';
 import { INK_PUBLIC_RPCS, makeInkClient, readBook, splitRpcList } from '@aegis/ink-io';
 import { makeWebhookHandler } from './webhooks';
-import { privateCensusReader } from '@aegis/census/node';
+import { makeAlertsReader, privateCensusReader } from '@aegis/census/node';
 import { makeAccounts } from './accounts';
 
 declare const __FIXTURES__: string[];
@@ -102,7 +102,11 @@ async function renderPng(svg: string): Promise<Uint8Array> {
   const fontFiles = FONT_FILES.map((f) => fileURLToPath(new URL(`../api-assets/fonts/${f}`, import.meta.url)));
   return new Resvg(svg, { font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'IBM Plex Mono' } }).render().asPng();
 }
-const accounts = makeAccounts();
+const accounts = makeAccounts(process.env, {
+  fixtures,
+  // the bot's /watch and /status replies: the same reader the alerts runner uses (Tydro + every known Nado subaccount)
+  read: async (address, scenarios) => makeAlertsReader(client, await get('census.json').catch(() => null))(address, scenarios),
+});
 const share = makeShareHandler({ readWallet: (a) => deps.readWallet!(a), render: renderPng, now: () => Date.now(), fixtures });
 
 function clientIp(req: IncomingMessage): string {
@@ -110,13 +114,13 @@ function clientIp(req: IncomingMessage): string {
   return xf || String(req.headers['x-real-ip'] ?? '') || req.socket.remoteAddress || 'unknown';
 }
 
-async function readBody(req: IncomingMessage): Promise<string | undefined> {
+async function readBody(req: IncomingMessage, max: number = API.MAX_BODY_BYTES): Promise<string | undefined> {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return undefined;
   const chunks: Buffer[] = [];
   let n = 0;
   for await (const c of req) {
     n += (c as Buffer).length;
-    if (n > API.MAX_BODY_BYTES + 1) break; // stop reading: the handler answers 413
+    if (n > max + 1) break; // stop reading: the handler answers 413
     chunks.push(c as Buffer);
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -176,9 +180,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.end(req.method === 'HEAD' ? undefined : gz ? enc.gz! : enc.raw);
     return;
   }
-  // accounts: sign-in links and the session cookie; billing: checkout, NOWPayments notifications, reminders
-  if (path.startsWith('/auth/') || path.startsWith('/billing/')) {
-    const out = await (path.startsWith('/billing/') ? accounts.billing : accounts.handler)({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req) });
+  // accounts: sign-in links and the session cookie; billing: checkout, NOWPayments notifications, reminders;
+  // alerts: the Alerts page, the Telegram bot's webhook, and the alerts runner's feed/report
+  if (path.startsWith('/auth/') || path.startsWith('/billing/') || path.startsWith('/alerts/') || path === '/telegram/hook') {
+    const h = path.startsWith('/billing/') ? accounts.billing : path.startsWith('/auth/') ? accounts.handler : accounts.alerts;
+    const out = await h({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req, path === '/alerts/report' ? ALERTS_SITE.MAX_REPORT_BYTES : API.MAX_BODY_BYTES) });
     res.statusCode = out.status;
     for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
     res.end(JSON.stringify(out.body));

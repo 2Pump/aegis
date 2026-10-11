@@ -10,7 +10,7 @@ import { ENV } from '../lib/env';
 import { RulesContent } from './RulesContent';
 import { AccountButton } from '../pages/Account';
 import { LockIcon, SubscribeButton } from './Paywall';
-import { usePlanGate } from '../lib/account';
+import { gateOf, useMe } from '../lib/account';
 
 /**
  * The rules live in ONE place: the drawer. It opens over whatever page you are on and is part of the address
@@ -52,7 +52,9 @@ export function Shell() {
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawer]);
-  const lock = usePlanGate() === 'locked' ? <LockIcon /> : null;
+  const meState = useMe();
+  const lock = gateOf(meState) === 'locked' ? <LockIcon /> : null;
+  const alertsOn = meState.status === 'ok' && meState.me.alerts === true;
   return (
     <div className="shell">
       <header className="topbar">
@@ -68,8 +70,8 @@ export function Shell() {
           <NavLink to="/pressure">Pressure{lock}</NavLink>
           <NavLink to="/intel">Intel{lock}</NavLink>
           <NavLink to="/census">Scan{lock}</NavLink>
-          <NavLink to="/watch" aria-label={ENV.alertsBot ? 'Alerts' : 'Alerts, coming soon'} data-testid="nav-alerts">
-            Alerts{ENV.alertsBot ? null : <span className="nav-soon" aria-hidden>SOON</span>}
+          <NavLink to="/watch" aria-label={alertsOn ? 'Alerts' : 'Alerts, coming soon'} data-testid="nav-alerts">
+            Alerts{alertsOn ? null : <span className="nav-soon" aria-hidden>SOON</span>}
           </NavLink>
           <NavLink to="/calibration">Checks</NavLink>
           <button className="pill-btn" onClick={() => setDrawer(true)} data-testid="rules-drawer-btn">Rules</button>

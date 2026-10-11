@@ -94,3 +94,32 @@ export function telegramTransport(opts: TelegramOpts): AlertsTransport {
     },
   };
 }
+
+/**
+ * Bot setup the runner keeps in place on every run (so nobody has to do it by hand): the webhook that sends bot
+ * messages to phrourax.com, and the command menu. Only changed when different. Returns what it did, never the token.
+ */
+export async function ensureTelegramSetup(o: { token: string; hookUrl: string; hookSecret: string; fetch?: FetchLike; commands?: Array<{ command: string; description: string }> }): Promise<string> {
+  if (!TELEGRAM_TOKEN_RE.test(o.token)) throw new Error('TELEGRAM_BOT_TOKEN is not a valid bot token');
+  const f: FetchLike = o.fetch ?? ((u, i) => fetch(u, i as RequestInit) as unknown as ReturnType<FetchLike>);
+  const base = `https://api.telegram.org/bot${o.token}`;
+  const scrub = (s: string) => s.split(o.token).join('<token>');
+  const call = async <T>(method: string, body: unknown): Promise<TgResponse<T>> => {
+    const res = await f(`${base}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = (await res.json().catch(() => ({ ok: false, description: `HTTP ${res.status}` }))) as TgResponse<T>;
+    if (!r.ok) throw new Error(scrub(`Telegram ${method}: ${r.description ?? `HTTP ${res.status}`}`));
+    return r;
+  };
+  const info = await call<{ url?: string; last_error_message?: string; pending_update_count?: number }>('getWebhookInfo', {});
+  const notes: string[] = [];
+  // set every run (cheap, and it repairs a changed secret); the secret travels only to Telegram, which sends it back
+  // on every update so the site knows the message really came from Telegram
+  await call('setWebhook', { url: o.hookUrl, secret_token: o.hookSecret, allowed_updates: ['message'], max_connections: 20 });
+  if (info.result?.url !== o.hookUrl) {
+    if (o.commands?.length) await call('setMyCommands', { commands: o.commands });
+    notes.push('webhook set (first time)');
+  } else notes.push('webhook in place');
+  if (info.result?.last_error_message) notes.push(`Telegram last saw an error at the webhook: ${scrub(info.result.last_error_message).slice(0, 120)}`);
+  if (info.result?.pending_update_count) notes.push(`${info.result.pending_update_count} update(s) waiting`);
+  return notes.join(' · ');
+}

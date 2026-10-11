@@ -14,7 +14,7 @@ const FOR: Record<Key, string> = {
   desk: 'Developers, teams and automated integrations.',
 };
 
-/** The comparison. Truthful states only: alerts and webhooks are not open yet, so they say so. */
+/** The comparison. Truthful states only: what isn't open yet says so (Telegram alerts flip to INCLUDED when the server says they're live). */
 const COMPARE: Array<[string, Cell, Cell, Cell]> = [
   ["A wallet's risk level and position types", 'yes', 'yes', 'yes'],
   ['Share links and preview cards', 'yes', 'yes', 'yes'],
@@ -124,7 +124,7 @@ export function PricingPage() {
                 <tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Pro · ${PLANS.pro.usd}</th><th scope="col">Desk · ${PLANS.desk.usd}</th></tr>
               </thead>
               <tbody>
-                {COMPARE.map(([what, f, p, d]) => (
+                {(m?.alerts ? COMPARE.map((r): typeof r => (r[0] === 'Telegram alerts' ? [r[0], 'no', 'yes:up to 10 wallets', 'yes:up to 100 wallets'] : r)) : COMPARE).map(([what, f, p, d]) => (
                   <tr key={what}>
                     <th scope="row">{what}</th>
                     <td><CellView c={f} /></td>

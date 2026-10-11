@@ -826,3 +826,70 @@ test('Wallet read: real per-venue stages while reading, seconds counted, never a
     await expect(rp).not.toContainText(/\b0 wallets\b/);
   }
 });
+
+/* ── Telegram alerts for accounts (docs/ALERTS.md) ── */
+test('Alerts live, Pro account: Connect Telegram gives a one-time t.me link, the page notices the link, wallets and lines are edited, pause works', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, alerts: true, signedIn: true, email: 'a@b.co', access: 'pro', plan: 'pro', paidUntil: '2099-01-01T00:00:00Z' });
+  const A = '0x00000000000000000000000000000000000a1e71';
+  let st: Record<string, unknown> = { enabled: true, signedIn: true, live: true, bot: 'PhrouraxBot', limit: 10, linked: false, linkedAt: null, paused: false, protocol: false, watches: [], lastRun: null };
+  const posts: Array<{ path: string; body: unknown }> = [];
+  await page.route('**/api/v1/alerts/**', async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v1/alerts/', '');
+    const json = (b: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (path === 'me') return json(st);
+    const body = req.postDataJSON() as Record<string, unknown>;
+    posts.push({ path, body });
+    if (path === 'link') {
+      st = { ...st, linked: true, linkedAt: Date.now() }; // the bot answered /start
+      return json({ url: 'https://t.me/PhrouraxBot?start=AbCdEfGhIjKlMnOpQrStUvWx', expiresInS: 600 });
+    }
+    if (path === 'watch') {
+      const prev = (st.watches as Array<Record<string, unknown>>).find((w) => w.address === body.address);
+      const w = { address: body.address, venue: body.venue ?? 'any', hfBelow: body.hfBelow ? Number(body.hfBelow) : null, bufferPct: null, scenario: (body.scenario as object) ?? null, overLimit: false, level: prev ? 'WATCH' : null, checkedAt: prev ? Date.now() - 120_000 : null };
+      st = { ...st, watches: prev ? [w] : [...(st.watches as unknown[]), w] };
+      return json(st);
+    }
+    if (path === 'settings') {
+      st = { ...st, ...body };
+      return json(st);
+    }
+    return json(st);
+  });
+  await page.goto('/');
+  await expect(page.getByTestId('nav-alerts')).toHaveAccessibleName('Alerts');
+  await expect(page.getByTestId('nav-alerts')).not.toContainText('SOON');
+  await page.getByTestId('nav-alerts').click();
+  await expect(page.getByTestId('alerts-page')).toHaveAttribute('data-live', 'yes');
+  await expect(page.getByTestId('alerts-unavailable')).toHaveCount(0);
+  await page.getByTestId('alerts-connect-btn').click();
+  await expect(page.getByTestId('alerts-open-telegram')).toHaveAttribute('href', /^https:\/\/t\.me\/PhrouraxBot\?start=/);
+  await expect(page.getByTestId('alerts-linked')).toContainText('@PhrouraxBot', { timeout: 10_000 });
+
+  await page.getByTestId('alerts-add-input').fill(A);
+  await page.getByTestId('alerts-add-btn').click();
+  await expect(page.getByTestId('alerts-row')).toHaveCount(1);
+  await expect(page.getByTestId('alerts-count')).toHaveText('1 / 10');
+  await page.getByTestId('alerts-edit').click();
+  await page.getByTestId('alerts-hf').fill('1.3');
+  await page.getByTestId('alerts-save').click();
+  await expect(page.getByTestId('alerts-row')).toContainText('HF < 1.30');
+  await expect(page.getByTestId('alerts-level')).toHaveText('WATCH');
+  await page.getByTestId('alerts-pause').click(); // controlled: it ticks once the server has saved it
+  await expect(page.getByTestId('alerts-pause')).toBeChecked();
+  expect(posts.map((p) => p.path)).toEqual(['link', 'watch', 'watch', 'settings']);
+  expect(posts[2]!.body).toMatchObject({ address: A, hfBelow: '1.3', scenario: null });
+
+  await page.goto('/pricing');
+  await expect(page.getByTestId('plan-compare').getByRole('row', { name: /Telegram alerts/ })).toContainText('INCLUDED · up to 10 wallets');
+});
+
+test('Alerts live, no plan: the page explains the plans and offers no Connect button', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, alerts: true, signedIn: true, email: 'a@b.co', access: 'free', plan: null, paidUntil: null });
+  await page.route('**/api/v1/alerts/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, signedIn: true, live: true, bot: 'PhrouraxBot', limit: 0, linked: false, watches: [] }) }));
+  await page.goto('/watch');
+  await expect(page.getByTestId('alerts-needs-plan')).toContainText('Pro watches 10 wallets, Desk 100');
+  await expect(page.getByTestId('alerts-connect-btn')).toHaveCount(0);
+  await page.getByTestId('alerts-choose-plan').click();
+  await expect(page).toHaveURL(/\/pricing$/);
+});
