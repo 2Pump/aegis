@@ -141,7 +141,7 @@ function Connect({ a, reload, act, busy }: { a: AlertsMe; reload: () => Promise<
         </div>
       ) : link ? (
         <div className="stack" style={{ gap: 10 }} data-testid="alerts-link-ready">
-          <a className="pill-btn solid" href={link.url} target="_blank" rel="noreferrer" style={{ alignSelf: 'flex-start' }} data-testid="alerts-open-telegram">
+          <a className="pill-btn solid" href={link.url} target="_blank" rel="noreferrer" style={{ justifySelf: 'start' }} data-testid="alerts-open-telegram">
             Open Telegram
           </a>
           <p className="dim" style={{ margin: 0 }}>
@@ -151,7 +151,7 @@ function Connect({ a, reload, act, busy }: { a: AlertsMe; reload: () => Promise<
       ) : (
         <div className="stack" style={{ gap: 10 }}>
           <p style={{ margin: 0 }}>Link a Telegram chat to receive alerts. Phrourax stores the chat's id (encrypted) and nothing else from Telegram.</p>
-          <button className="pill-btn solid" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => void connect()} data-testid="alerts-connect-btn">
+          <button className="pill-btn solid" style={{ justifySelf: 'start' }} disabled={busy} onClick={() => void connect()} data-testid="alerts-connect-btn">
             Connect Telegram
           </button>
           {err ? <div className="auth-error" role="alert">{err}</div> : null}

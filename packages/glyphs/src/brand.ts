@@ -52,13 +52,13 @@ export const PLANS = {
     name: 'Pro',
     usd: 19,
     blurb: 'The whole site.',
-    features: ['Everything on the site: Well, Pressure, Intel, Scan', 'Full wallet detail, history and stress test', 'Telegram alerts for up to 10 wallets (when alerts open)'],
+    features: ['Everything on the site: Well, Pressure, Intel, Scan', 'Full wallet detail, history and stress test', 'Telegram alerts for up to 10 wallets'],
   },
   desk: {
     name: 'Desk',
     usd: 99,
     blurb: 'The site plus the API.',
-    features: ['Everything in Pro', 'The full API, plus webhooks (when they open)', 'Alerts for up to 100 wallets (when alerts open)'],
+    features: ['Everything in Pro', 'The full API, plus webhooks (when they open)', 'Telegram alerts for up to 100 wallets'],
   },
   free: {
     name: 'Free',
