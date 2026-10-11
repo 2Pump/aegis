@@ -42,7 +42,7 @@ import {
   type WalletFile,
   type WalletState,
 } from '@aegis/census';
-import { CENSUS_URL } from './census';
+import { CENSUS_URL, bust } from './census';
 import { readJson } from './brandJson';
 
 export const HISTORY_BASE = CENSUS_URL.replace(/census\.json(\?.*)?$/, '');
@@ -69,7 +69,7 @@ async function getJson(path: string, mutable: boolean): Promise<unknown | null> 
   const hit = cache.get(path);
   if (hit && (!mutable || Date.now() - hit.at < 5 * 60_000)) return hit.v;
   const v = (async () => {
-    const res = await fetch(`${HISTORY_BASE}${path}${mutable ? `?t=${Math.floor(Date.now() / 300_000)}` : ''}`, { cache: mutable ? 'no-cache' : 'default' });
+    const res = await fetch(mutable ? bust(`${HISTORY_BASE}${path}`, 300_000) : `${HISTORY_BASE}${path}`, { cache: mutable ? 'no-cache' : 'default' });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${path}`);
     if (!(res.headers.get('content-type') ?? '').includes('json')) return null; // SPA fallback = not there

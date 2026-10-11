@@ -154,3 +154,27 @@ describe('accounts', () => {
     expect(calls.filter((c) => c[0] === 'EXPIRE')).toEqual([['EXPIRE', 'r', '900']]);
   });
 });
+
+describe('accounts under load', () => {
+  it('/auth/me answers from a 15 s memory per session (one store read, not one per page view); sign-out clears it', async () => {
+    let t = Date.UTC(2026, 9, 11);
+    const kv = memoryKv(() => t);
+    let gets = 0;
+    const counting = { ...kv, get: async (k: string) => (gets++, kv.get(k)) };
+    const sent: Mail[] = [];
+    const h = makeAccountsHandler({ kv: counting, secret, now: () => t, site: SITE, mail: async (m) => void sent.push(m) });
+    const post = (path: string, body: unknown, extra: Record<string, string> = {}) => h({ method: 'POST', path, ip: '1.1.1.1', headers: { 'content-type': 'application/json', origin: SITE, ...extra }, body: JSON.stringify(body) });
+    await post('/auth/start', { email: 'a@b.co' });
+    const v = await post('/auth/verify', { token: sent[0]!.text.match(/#t=([\w-]{43})/)![1] });
+    const cookie = v.headers['Set-Cookie']!.split(';')[0]!;
+    const me = () => h({ method: 'GET', path: '/auth/me', ip: 'x', headers: { cookie } });
+    gets = 0;
+    for (let i = 0; i < 20; i++) expect((await me()).body).toMatchObject({ signedIn: true });
+    expect(gets).toBe(1);
+    t += 16_000;
+    await me();
+    expect(gets).toBe(2);
+    await post('/auth/signout', { everywhere: true }, { cookie });
+    expect((await me()).body).toMatchObject({ signedIn: false });
+  });
+});

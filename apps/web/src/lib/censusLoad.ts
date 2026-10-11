@@ -22,7 +22,7 @@ export async function loadCensusOnce(o: {
     if (o.alive()) o.update((prev) => (prev.status === 'ok' ? { ...prev, refreshError: why } : otherwise));
   };
   try {
-    const res = await o.fetchFn(`${o.url}${o.url.includes('?') ? '&' : '?'}t=${Math.floor(o.nowMs / 60_000)}`, { cache: 'no-cache' });
+    const res = await o.fetchFn(o.url.startsWith('/api/v1/data/') ? o.url : `${o.url}${o.url.includes('?') ? '&' : '?'}t=${Math.floor(o.nowMs / 60_000)}`, { cache: 'no-cache' });
     if (res.status === 404) return keepOr('the scan file is missing right now', { status: 'missing', message: missing });
     if (!res.ok) throw new Error(`HTTP ${res.status} from ${o.url}`);
     // the SPA fallback answers index.html for a file that isn't there

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PRESSURE_VERSION, type PressureSnapshot } from '@aegis/census';
-import { CENSUS_URL } from './census';
+import { CENSUS_URL, bust } from './census';
 import { log } from './log';
 import { readJson } from './brandJson';
 
@@ -47,7 +47,7 @@ export function usePressure(): { state: PressureState; refresh: () => boolean } 
     load.current = async () => {
       lastTry.current = Date.now();
       try {
-        const res = await fetch(`${PRESSURE_URL}${PRESSURE_URL.includes('?') ? '&' : '?'}t=${Math.floor(Date.now() / 60_000)}`, { cache: 'no-cache' });
+        const res = await fetch(bust(PRESSURE_URL, 60_000), { cache: 'no-cache' });
         const type = res.headers.get('content-type') ?? '';
         if (res.status === 404 || (res.ok && !type.includes('json'))) {
           if (alive) set((prev) => (prev.status === 'ok' ? { ...prev, refreshError: 'the map file is missing right now' } : { status: 'missing' }));

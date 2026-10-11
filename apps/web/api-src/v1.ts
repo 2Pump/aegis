@@ -16,6 +16,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { API, DISCLAIMER, RateLimiter, handle, makeDataHandler, makeShareHandler, type ApiDeps } from '@aegis/census/api';
 import { apiUnlocked, isFreeApiPath, PAYMENT_REQUIRED } from '@aegis/census/accounts';
 import { decodeShip, type CensusSnapshot } from '@aegis/census';
@@ -32,6 +33,18 @@ const PRIVATE_TOKEN = (process.env.CENSUS_BLOB_TOKEN || '').trim();
 const TTL_MS = 60_000;
 const cache = new Map<string, { at: number; v: Promise<unknown | null> }>();
 const readPrivate = PRIVATE_TOKEN ? privateCensusReader(PRIVATE_TOKEN) : null;
+
+/** A file's bytes, gzip and ETag, kept with the cached parsed copy (a WeakMap: they go when the copy goes). */
+const bytes = new WeakMap<object, { raw: Buffer; gz: Buffer | null; etag: string }>();
+function encoded(body: object): { raw: Buffer; gz: Buffer | null; etag: string } {
+  let e = bytes.get(body);
+  if (!e) {
+    const raw = Buffer.from(JSON.stringify(body));
+    e = { raw, gz: raw.length > 32_768 ? gzipSync(raw) : null, etag: `"${createHash('sha1').update(raw).digest('base64url')}"` };
+    bytes.set(body, e);
+  }
+  return e;
+}
 
 /** one census file by name — from the private store when it's configured, else the public URL */
 async function readSource(name: string): Promise<unknown | null> {
@@ -57,6 +70,8 @@ async function get(name: string): Promise<unknown | null> {
 const rpcs = splitRpcList(process.env.INK_RPC);
 const client = makeInkClient(rpcs.length ? rpcs : [...INK_PUBLIC_RPCS]);
 const limiter = new RateLimiter();
+/** /api/v1/data/*: per client IP per minute, per function instance */
+const dataLimiter = new RateLimiter({ data: 300 });
 const fixtures = new Set(__FIXTURES__);
 
 const deps: ApiDeps = {
@@ -125,18 +140,40 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const cookie = typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined;
   // the census files the site draws (paid ones need a plan while PAYWALL=1)
   if (path.startsWith('/data/')) {
+    // generous: a page that opens a year of history loads ~30 files at once; this only stops a script hammering it
+    const lim = dataLimiter.take(clientIp(req), 'data', Date.now());
+    if (!lim.ok) {
+      res.statusCode = 429;
+      res.setHeader('Retry-After', String(lim.resetS));
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: { code: 'RATE_LIMITED', message: 'Too many requests — try again shortly.' } }));
+      return;
+    }
     const data = makeDataHandler({ read: get, paywall: accounts.paywall, access: () => accounts.who(cookie) });
     const out = await data({ method: req.method ?? 'GET', path });
-    res.statusCode = out.status;
     for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
-    let body: string | Buffer = JSON.stringify(out.body);
-    // census.json is megabytes: compress it here (a function's response body is capped at 4.5 MB)
-    if (body.length > 32_768 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
-      body = gzipSync(body);
-      res.setHeader('Content-Encoding', 'gzip');
-      res.setHeader('Vary', [out.headers.Vary, 'Accept-Encoding'].filter(Boolean).join(', '));
+    if (out.status !== 200 || out.body === null || typeof out.body !== 'object') {
+      res.statusCode = out.status;
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify(out.body));
+      return;
     }
-    res.end(req.method === 'HEAD' ? undefined : body);
+    // serialised, compressed and fingerprinted ONCE per cached copy of a file — not once per request
+    const enc = encoded(out.body as object);
+    res.setHeader('ETag', enc.etag);
+    res.setHeader('Vary', [out.headers.Vary, 'Accept-Encoding'].filter(Boolean).join(', '));
+    // the browser already has this exact file: 304, nothing re-sent (census.json changes once an hour)
+    const inm = String(req.headers['if-none-match'] ?? '');
+    if (inm && inm.split(/\s*,\s*/).includes(enc.etag)) {
+      res.statusCode = 304;
+      res.end();
+      return;
+    }
+    res.statusCode = 200;
+    // census.json is megabytes: send it gzipped (a function's response body is capped at 4.5 MB)
+    const gz = enc.gz && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
+    if (gz) res.setHeader('Content-Encoding', 'gzip');
+    res.end(req.method === 'HEAD' ? undefined : gz ? enc.gz! : enc.raw);
     return;
   }
   // accounts: sign-in links and the session cookie; billing: checkout, NOWPayments notifications, reminders

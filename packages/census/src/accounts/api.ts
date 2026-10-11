@@ -70,6 +70,8 @@ const err = (status: number, code: string, message: string) => json(status, { er
 const h1 = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export const userKey = (id: string) => `user:${id}`;
+/** how long /auth/me may answer from memory (a payment, plan change or sign-out elsewhere shows within this) */
+export const ME_TTL_MS = 15_000;
 
 export async function loadUser(kv: Kv, id: string): Promise<User | null> {
   const raw = await kv.get(userKey(id));
@@ -135,12 +137,24 @@ export function makeAccountsHandler(d: AccountsDeps): AuthHandler {
     }
   };
 
+  // short per-instance memory of who a cookie belongs to; sign-in and sign-out on this instance clear it at once
+  const meCache = new Map<string, { at: number; u: User | null }>();
   return async function handleAuth(req) {
     const cookie = h1(req.headers.cookie);
+    if (req.path === '/auth/verify' || req.path === '/auth/signout') meCache.clear();
     try {
       if (req.path === '/auth/me') {
         if (req.method !== 'GET') return err(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
-        return json(200, meBody(await sessionUser(d, cookie), d.now(), d));
+        // every page asks this once: one store read per session per ME_TTL_MS per instance, not one per page view
+        const key = cookie ?? '';
+        const hit = key ? meCache.get(key) : undefined;
+        const now = d.now();
+        const u = hit && now - hit.at < ME_TTL_MS ? hit.u : await sessionUser(d, cookie);
+        if (key && !(hit && now - hit.at < ME_TTL_MS)) {
+          if (meCache.size > 5000) meCache.clear();
+          meCache.set(key, { at: now, u });
+        }
+        return json(200, meBody(u, now, d));
       }
 
       if (req.path === '/auth/start') {

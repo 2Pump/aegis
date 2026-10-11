@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { VerificationRecord } from '@aegis/census';
-import { CENSUS_URL } from './census';
+import { CENSUS_URL, bust } from './census';
 import { readJson } from './brandJson';
 
 /** Written by the `verify` workflow (every 4 h) next to census.json. Only records of the published shape are kept. */
@@ -19,7 +19,7 @@ export function useVerificationLog(): VerifyLogState {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${VERIFY_LOG_URL}${VERIFY_LOG_URL.includes('?') ? '&' : '?'}t=${Math.floor(Date.now() / 600_000)}`, { cache: 'no-cache' });
+        const res = await fetch(bust(VERIFY_LOG_URL, 600_000), { cache: 'no-cache' });
         if (res.status === 404 || (res.ok && !(res.headers.get('content-type') ?? '').includes('json'))) return alive && set({ status: 'missing' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const j: unknown = await readJson(res);

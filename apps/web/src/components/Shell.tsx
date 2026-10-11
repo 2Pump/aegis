@@ -113,12 +113,15 @@ function MyWalletButton() {
 function Footer() {
   const { head, error } = useChainHead();
   const now = useNow();
-  let rpcHost = ENV.inkRpc;
-  try {
-    rpcHost = new URL(ENV.inkRpc).host;
-  } catch {
-    /* keep raw */
-  }
+  const rpcs = ENV.inkRpc.split(/[\s,]+/).filter(Boolean);
+  const hostOf = (u: string) => {
+    try {
+      return new URL(u).host;
+    } catch {
+      return u;
+    }
+  };
+  const rpcHost = rpcs.length > 1 ? `${rpcs.length} public RPCs, rotating` : hostOf(rpcs[0] ?? '');
   return (
     <footer className="footer" data-testid="footer">
       <span>chain {INK_CHAIN_ID}</span>

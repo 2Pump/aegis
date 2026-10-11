@@ -57,3 +57,10 @@ export function useCensus(): CensusState {
   }, []);
   return s;
 }
+
+/**
+ * A cache-busting suffix for direct Blob URLs only. Through the function (/api/v1/data/…) the URL stays the same, so
+ * the browser revalidates with the file's ETag and gets a tiny 304 when nothing changed (census.json changes hourly).
+ */
+export const bust = (url: string, bucketMs: number): string =>
+  url.startsWith('/api/v1/data/') ? url : `${url}${url.includes('?') ? '&' : '?'}t=${Math.floor(Date.now() / bucketMs)}`;

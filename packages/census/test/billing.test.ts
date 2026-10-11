@@ -80,8 +80,10 @@ describe('billing', () => {
     expect((await s.me(c)).access).toBe('free');
     expect((await s.ipn({ ...base, payment_status: 'confirmed' })).body).toMatchObject({ applied: true });
     expect((await s.ipn({ ...base, payment_status: 'finished' })).body).toMatchObject({ applied: false, reason: 'already applied' });
+    const paidTo = new Date(s.now() + 30 * DAY).toISOString();
+    s.advance(16_000); // /auth/me may answer from its 15 s memory; the account page polls, so the plan shows within that
     const m = await s.me(c);
-    expect(m).toMatchObject({ access: 'pro', plan: 'pro', paidUntil: new Date(s.now() + 30 * DAY).toISOString() });
+    expect(m).toMatchObject({ access: 'pro', plan: 'pro', paidUntil: paidTo });
     expect((m.payments as unknown[]).length).toBe(1);
     expect(s.mails.at(-1)!.subject).toContain('payment received');
     // a forged notification changes nothing
@@ -89,7 +91,8 @@ describe('billing', () => {
     // renewing the same plan adds 30 days to the end
     await s.post(s.bill, '/billing/checkout', { plan: 'pro' }, { cookie: c });
     await s.ipn({ ...base, payment_id: 9003, order_id: String(s.invoices.at(-1)!.order_id), payment_status: 'finished' });
-    expect((await s.me(c)).paidUntil).toBe(new Date(s.now() + 60 * DAY).toISOString());
+    s.advance(16_000);
+    expect((await s.me(c)).paidUntil).toBe(new Date(Date.parse(paidTo) + 30 * DAY).toISOString());
   });
 
   it('underpriced or unknown orders are not applied', async () => {
@@ -117,6 +120,7 @@ describe('billing', () => {
     s.advance(3 * DAY);
     expect((await s.remind()).body).toMatchObject({ sent: 1 });
     expect(s.mails.at(-1)!.subject).toMatch(/has ended/);
+    s.advance(16_000);
     expect((await s.me(c)).access).toBe('free');
     expect(s.mails.length - before).toBe(2);
     expect(BILLING.REMIND_DAYS).toEqual([3, 0]);

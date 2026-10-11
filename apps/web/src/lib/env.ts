@@ -1,4 +1,4 @@
-import { INK_DEFAULT_RPC, NADO_DIRECT } from '@aegis/ink-io';
+import { INK_PUBLIC_RPCS, NADO_DIRECT } from '@aegis/ink-io';
 
 const read = (k: string): string | undefined => {
   const v = (import.meta.env as Record<string, string | undefined>)[k];
@@ -6,7 +6,12 @@ const read = (k: string): string | undefined => {
 };
 
 export const ENV = {
-  inkRpc: read('VITE_INK_RPC') ?? INK_DEFAULT_RPC,
+  /**
+   * Every visitor's browser reads Ink directly. By default the reads are spread round-robin over Ink's four public
+   * RPCs (one that throttles or fails rests 20 s), so many visitors don't all lean on one provider.
+   * VITE_INK_RPC (one URL or a comma-separated list) overrides it, e.g. with a paid endpoint.
+   */
+  inkRpc: read('VITE_INK_RPC') ?? INK_PUBLIC_RPCS.join(','),
   /**
    * Nado is read DIRECTLY from the viewer's browser — the same way app.nado.xyz does.
    * Nado's Cloudflare challenges every non-browser client (curl, dev proxy, servers), verified 2026-09-28,

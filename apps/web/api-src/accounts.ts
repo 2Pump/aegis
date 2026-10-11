@@ -42,6 +42,9 @@ export interface AccountsRuntime {
   who: (cookieHeader: string | undefined) => Promise<{ signedIn: boolean; access: Access }>;
 }
 
+const WHO_TTL_MS = 30_000;
+const whoCache = new Map<string, { at: number; v: { signedIn: boolean; access: Access } }>();
+
 export function makeAccounts(env: NodeJS.ProcessEnv = process.env): AccountsRuntime {
   const secret = parseAuthSecret(env.AUTH_SECRET);
   const url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
@@ -67,10 +70,16 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env): AccountsRunt
       : billingOff,
     on: true,
     paywall,
+    // one store read per session per 30 s per instance — not one per file a page loads (a plan change shows within 30 s)
     who: async (cookie) => {
       if (!cookie) return { signedIn: false, access: 'free' };
+      const hit = whoCache.get(cookie);
+      if (hit && now() - hit.at < WHO_TTL_MS) return hit.v;
       const u = await sessionUser({ kv, secret, now }, cookie);
-      return { signedIn: u !== null, access: effectiveAccess(u, now(), comp) };
+      const v = { signedIn: u !== null, access: effectiveAccess(u, now(), comp) };
+      if (whoCache.size > 5000) whoCache.clear();
+      whoCache.set(cookie, { at: now(), v });
+      return v;
     },
   };
 }
