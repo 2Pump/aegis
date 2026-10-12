@@ -111,6 +111,7 @@ describe('sharing a wallet (text, card, share page)', () => {
     const { sharePageHtml } = await import('../src/share');
     const h = sharePageHtml({ address: A, facts: { ...f, tags: [...f.tags] }, imageBucket: 7 });
     expect(h).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    expect(h).toContain('<meta name="twitter:site" content="@Phrourax" />');
     expect(h).toContain(`<meta property="og:image" content="https://phrourax.com/og/${A}.png?h=7" />`);
     expect(h).toContain('<meta name="robots" content="noindex" />');
     expect(h).toContain(`url=https://phrourax.com/hull/${A}`);

@@ -12,6 +12,8 @@ export const BRAND = {
   /** in sentences */
   display: 'Phrourax',
   siteUrl: 'https://phrourax.com',
+  /** the official X account (verified 2026-10-12) */
+  x: { handle: '@Phrourax', user: 'Phrourax', url: 'https://x.com/Phrourax' },
   category: 'On-chain risk intelligence',
   tagline: 'See risk before it moves.',
   shortDescription:

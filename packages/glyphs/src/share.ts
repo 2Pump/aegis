@@ -142,7 +142,7 @@ ${row === 0 ? `<text x="64" y="450" font-family="${SANS}" font-size="20" fill="#
 ${mark(865, 185, 200, f.hullTemp === 'NOMINAL' ? '#CFD9E3' : rc, 1.4)}
 ${venue(64, 'TYDRO', f.venues.tydro)}${venue(64 + tydroW, 'NADO', f.venues.nado)}
 <text x="64" y="${H - 96}" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="#657284">${esc(readAt)}</text>
-<text x="${W - 64}" y="${H - 128}" text-anchor="end" font-family="${MONO}" font-weight="600" font-size="16" letter-spacing="3.2" fill="#CFD9E3">${esc(new URL(BRAND.siteUrl).host.toUpperCase())}</text>
+<text x="${W - 64}" y="${H - 128}" text-anchor="end" font-family="${MONO}" font-weight="600" font-size="16" letter-spacing="3.2" fill="#CFD9E3">${esc(`${new URL(BRAND.siteUrl).host.toUpperCase()} · ${BRAND.x.handle}`)}</text>
 <text x="${W - 64}" y="${H - 96}" text-anchor="end" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="#657284">Read-only · not financial advice</text>
 </svg>`;
 }
@@ -177,6 +177,7 @@ ${m('og:image:width', String(SHARE.WIDTH))}
 ${m('og:image:height', String(SHARE.HEIGHT))}
 ${m('og:image:alt', `${title} — ${o.facts ? `${shareTypeText(o.facts.tags)}, risk ${RISK_LABEL[o.facts.hullTemp]}` : 'wallet card'}`)}
 ${m('twitter:card', 'summary_large_image', 'name')}
+${m('twitter:site', BRAND.x.handle, 'name')}
 ${m('twitter:title', title, 'name')}
 ${m('twitter:description', desc, 'name')}
 ${m('twitter:image', image, 'name')}

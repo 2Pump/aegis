@@ -145,6 +145,8 @@ function Footer() {
       <Link to="/pricing">plans</Link>
       <span className="sep">·</span>
       <Link to="/terms">terms</Link>
+      <span className="sep">·</span>
+      <a href={BRAND.x.url} target="_blank" rel="noreferrer" data-testid="footer-x">{BRAND.x.handle} on X</a>
       <span className="camera" style={{ flexBasis: '100%' }}>{COPY.footer}</span>
     </footer>
   );

@@ -8,6 +8,7 @@ test('home boots gated: no well, no fixture stars, read-only footer', async ({ p
   await expect(page.getByText('EX1 CARRY')).toHaveCount(0);
   await expect(page.getByTestId('footer')).toContainText('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
   await expect(page.getByTestId('footer')).toContainText('chain 57073');
+  await expect(page.getByTestId('footer-x')).toHaveAttribute('href', 'https://x.com/Phrourax');
 });
 
 test('paste empty / junk address → error, no navigation', async ({ page }) => {
@@ -475,6 +476,7 @@ test('Share: post text in short lines, Post on X / Copy text / Copy link / Downl
   const href = (await x.getAttribute('href')) ?? '';
   expect(href).toMatch(/^https:\/\/x\.com\/intent\/tweet\?text=/);
   expect(decodeURIComponent(href)).toContain(`url=https://phrourax.com/s/${checksum}`);
+  expect(href).toContain('&via=Phrourax');
   expect(await x.getAttribute('target')).toBe('_blank');
   await expect(p.getByTestId('share-copy-text')).toBeEnabled();
   await expect(p.getByTestId('share-copy-link')).toBeEnabled();

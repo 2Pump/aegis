@@ -429,7 +429,7 @@ function Share({ book, pose, checksum }: { book: Book; pose: Pose; checksum: str
       flash('clipboard blocked — select the text above');
     }
   };
-  const intent = `https://x.com/intent/tweet?text=${encodeURIComponent(shareTextNoUrl(facts))}&url=${encodeURIComponent(url)}`;
+  const intent = `https://x.com/intent/tweet?text=${encodeURIComponent(shareTextNoUrl(facts))}&url=${encodeURIComponent(url)}&via=${BRAND.x.user}`;
   const nativeShare = async () => {
     try {
       await navigator.share({ title: `${BRAND.display} · ${shortAddress(checksum)}`, text: shareTextNoUrl(facts), url });
