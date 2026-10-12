@@ -72,6 +72,7 @@ export function TermsPage() {
           <li><b>If you use the API or webhooks:</b> a fingerprint of each API key (never the key itself), and for each webhook its address, the wallets and events you chose, its signing secret (stored encrypted) and a short delivery log.</li>
           <li>Services we use: Vercel (hosting and storage), Upstash (account store), Resend (emails), NOWPayments (payments — their own privacy terms apply on their page), Telegram (alert messages, if you link it) and GitHub (runs the scheduled checks).</li>
           <li>No advertising, no selling of data, no tracking cookies. The only cookie is the one that keeps you signed in.</li>
+          <li>Visits are counted anonymously with Vercel Web Analytics, which uses no cookies. Wallet addresses are removed from page addresses before anything is counted.</li>
           <li>To delete your account and everything stored with it (alerts, API keys, webhooks), email us from the account's address.</li>
         </ul>
       </Panel>

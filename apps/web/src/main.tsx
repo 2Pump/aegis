@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { AppError } from './components/AppError';
@@ -15,6 +16,7 @@ import { AccountPage, SignInPage, VerifyPage } from './pages/Account';
 import { PricingPage } from './pages/Pricing';
 import { TermsPage } from './pages/Terms';
 import { PaidPage } from './components/Paywall';
+import { beforeSend } from './lib/analytics';
 import './styles.css';
 
 installStaleBuildReload();
@@ -70,5 +72,6 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RouterProvider router={router} />
+    <Analytics beforeSend={beforeSend} />
   </StrictMode>,
 );
