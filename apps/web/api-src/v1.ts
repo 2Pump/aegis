@@ -199,6 +199,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.end(JSON.stringify(out.body));
     return;
   }
+  // a webhook test receiver for Desk accounts (GET /hooktest: your URL and what arrived; POST /hooktest/<token>: the receiver)
+  if (path === '/hooktest' || path.startsWith('/hooktest/')) {
+    const out = await accounts.hooktest({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req, 64_000) });
+    res.statusCode = out.status;
+    for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
+    res.end(JSON.stringify(out.body, null, path === '/hooktest' ? 2 : 0));
+    return;
+  }
   // daily (vercel.json): pause webhooks whose account is no longer on Desk
   if (path === '/cron/webhooks') {
     const ok = !!process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;

@@ -112,6 +112,13 @@ POST   /api/v1/webhooks/{id}/test    → a webhook.test delivery on the next run
   the plan is off that PATCH answers 402. Deleting frees a slot.
 - Pricing and the Developers page show webhooks as INCLUDED for Desk only while they're switched on.
 
+## Test receiver (Desk)
+
+`GET /api/v1/hooktest` (signed in, Desk) gives an account its own receiver URL,
+`https://phrourax.com/api/v1/hooktest/<token>`, and lists the last 20 deliveries it got (event type, delivery id, time,
+text, whether it was signed). The receiver echoes the verification challenge, so a webhook pointed at it verifies by
+itself. It's for trying webhooks before building your own endpoint; it doesn't check signatures (it has no secret).
+
 ## Turning it on (owner's decision)
 
 1. Make a key in PowerShell (it goes to the clipboard, not the screen):

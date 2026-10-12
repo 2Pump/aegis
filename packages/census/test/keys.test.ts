@@ -122,3 +122,25 @@ describe('Webhooks are Desk-only', () => {
     expect(h.owned.get('u1')!.size).toBe(0);
   });
 });
+
+describe('Webhook test receiver (Desk)', () => {
+  it('a Desk account gets a receiver URL; it echoes the verification challenge and keeps the last 20 deliveries', async () => {
+    const { makeHookTestHandler } = await import('../src/accounts/index.js');
+    const s = setup();
+    const h = makeHookTestHandler({ kv: s.kv, secret, now: s.now, site: SITE });
+    const pro = await s.user('pro@x.co', 'pro');
+    expect((await h({ method: 'GET', path: '/hooktest', ip: 'x', headers: { cookie: pro.cookie } })).status).toBe(402);
+    const d = await s.user('desk@x.co', 'desk');
+    const me = (await h({ method: 'GET', path: '/hooktest', ip: 'x', headers: { cookie: d.cookie } })).body as { url: string; deliveries: unknown[] };
+    expect(me.url).toMatch(/^https:\/\/phrourax\.com\/api\/v1\/hooktest\/[A-Za-z0-9_-]{24}$/);
+    const path = new URL(me.url).pathname.replace('/api/v1', '');
+    const deliver = (body: unknown, sig = 't=1,v1=' + 'a'.repeat(64)) => h({ method: 'POST', path, ip: 'w', headers: { 'phrourax-signature': sig }, body: JSON.stringify(body) });
+    const v = await deliver({ deliveryId: 'dlv_1', event: { type: 'webhook.verification', text: 'verify', data: { challenge: 'CH-123' } } });
+    expect(JSON.stringify(v.body)).toContain('CH-123');
+    for (let i = 0; i < 25; i++) await deliver({ deliveryId: `dlv_${i + 2}`, event: { type: 'webhook.test', text: 't' } });
+    const after = (await h({ method: 'GET', path: '/hooktest', ip: 'x', headers: { cookie: d.cookie } })).body as { deliveries: Array<{ event: string; signed: boolean }> };
+    expect(after.deliveries).toHaveLength(20);
+    expect(after.deliveries[0]).toMatchObject({ event: 'webhook.test', signed: true });
+    expect((await h({ method: 'POST', path: '/hooktest/' + 'x'.repeat(24), ip: 'w', headers: {}, body: '{}' })).status).toBe(404);
+  });
+});

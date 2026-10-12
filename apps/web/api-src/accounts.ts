@@ -31,6 +31,7 @@ import {
   effectiveAccess,
   makeAccountsHandler,
   makeKeyResolver,
+  makeHookTestHandler,
   makeKeysHandler,
   loadUser,
   parseAuthSecret,
@@ -52,6 +53,8 @@ export interface AccountsRuntime {
   alerts: AuthHandler;
   /** /keys — Desk API keys (create, list, revoke) */
   keys: AuthHandler;
+  /** /hooktest — a webhook test receiver for Desk accounts */
+  hooktest: AuthHandler;
   /** an API key's account and plan (null = not a live key) */
   byKey: (key: string) => Promise<{ uid: string; keyId: string; access: Access } | null>;
   /** the signed-in account behind a cookie (uncached; for rare actions like creating a webhook) */
@@ -75,7 +78,7 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env, extra: Pick<A
   const resend = env.RESEND_API_KEY;
   if (!secret || !url || !token || !resend) {
     if (env.PAYWALL === '1') console.error('PAYWALL=1 ignored: accounts are not fully set up (docs/ACCOUNTS.md)');
-    return { handler: accountsOff, billing: billingOff, alerts: alertsOff, keys: accountsOff, byKey: async () => null, sessionOf: async () => null, accessOf: async () => 'free', kv: null, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
+    return { handler: accountsOff, billing: billingOff, alerts: alertsOff, keys: accountsOff, hooktest: accountsOff, byKey: async () => null, sessionOf: async () => null, accessOf: async () => 'free', kv: null, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
   }
   const kv = upstashKv({ url, token });
   const mail = resendMailer({ apiKey: resend, from: env.MAIL_FROM || `${BRAND.display} <signin@phrourax.com>` });
@@ -93,6 +96,7 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env, extra: Pick<A
   const site = BRAND.siteUrl.replace(/\/+$/, '');
   return {
     keys: makeKeysHandler({ kv, secret, now, comp, site, log }),
+    hooktest: makeHookTestHandler({ kv, secret, now, comp, site }),
     byKey: makeKeyResolver({ kv, now, comp, log }),
     sessionOf: async (cookie) => {
       const u = await sessionUser({ kv, secret, now }, cookie);

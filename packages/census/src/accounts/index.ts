@@ -6,3 +6,4 @@ export * from './paywall.js';
 export * from './billing.js';
 export * from './alerts.js';
 export * from './keys.js';
+export * from './hooktest.js';
