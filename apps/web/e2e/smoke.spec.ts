@@ -743,6 +743,9 @@ test('Terms page: read-only, not advice, nothing renews by itself, refunds state
   await page.getByTestId('footer').getByRole('link', { name: 'terms' }).click();
   await expect(page).toHaveURL(/\/terms$/);
   const t = page.getByTestId('terms-page');
+  await expect(page.getByTestId('terms-alerts')).toContainText("Don't rely on them as your only warning");
+  await expect(page.getByTestId('terms-privacy')).toContainText('Telegram chat id (stored encrypted)');
+  await expect(page.getByTestId('terms-privacy')).toContainText('never the key itself');
   await expect(t).toContainText('It is read-only.');
   await expect(t).toContainText('not financial, investment, legal or tax advice');
   await expect(t).toContainText('Nothing renews or charges by itself.');

@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { BRAND, PLANS } from '@aegis/glyphs';
 import { Panel } from '../components/bits';
 
-export const TERMS_UPDATED = '9 October 2026';
+export const TERMS_UPDATED = '12 October 2026';
 const CONTACT = 'phrourax@gmail.com';
 
 export function TermsPage() {
@@ -30,6 +30,16 @@ export function TermsPage() {
           <li>You sign in with an emailed link. Keep access to your email secure — whoever can read it can sign in as you.</li>
           <li>One person per account. Don't share your account or resell what {d} shows; quoting and linking with credit is fine.</li>
           <li>Don't try to get around the paywall, overload the service, or scrape it beyond the API's published limits. We may suspend accounts that do.</li>
+          <li><b>API keys</b> (Desk) act as your account. Keep them on your own servers, never in a web page or public code. If one leaks, revoke it on the Account page — it stops working within about a minute. You're responsible for what's done with your keys.</li>
+        </ul>
+      </Panel>
+
+      <Panel title="2a · Alerts and webhooks" rail="var(--slate)" testId="terms-alerts">
+        <ul>
+          <li>Telegram alerts (Pro and Desk) and webhooks (Desk) are a convenience, not a guarantee. Wallets are checked about every 10 minutes, so a message can arrive after the chain has already moved, and a message can be delayed or not arrive at all (Telegram, your endpoint or our scheduler can fail). <b>Don't rely on them as your only warning.</b></li>
+          <li>Alerts and webhooks carry risk levels, health-factor and margin-buffer readings, and public events — never balances or position sizes.</li>
+          <li>When your plan ends, alerts stop (we tell your Telegram chat once) and webhooks are paused. Your wallets and settings are kept, and start again when you renew.</li>
+          <li>Webhooks are signed; checking the signature on your side is your responsibility.</li>
         </ul>
       </Panel>
 
@@ -54,13 +64,15 @@ export function TermsPage() {
         </ul>
       </Panel>
 
-      <Panel title="5 · Privacy" rail="var(--slate)">
+      <Panel title="5 · Privacy" rail="var(--slate)" testId="terms-privacy">
         <ul>
           <li>We store your email address, your plan and its dates, and the record of your payments (date, plan, amount, the payment provider's reference).</li>
-          <li>We don't store anything about your wallets — wallet pages are read from the public chain in your browser. "My wallet" is saved in your browser only.</li>
-          <li>Services we use: Vercel (hosting and storage), Upstash (account store), Resend (emails), NOWPayments (payments — their own privacy terms apply on their page).</li>
+          <li><b>Wallets you only look at</b> on the site are read from the public chain in your browser and aren't stored; "My wallet" is saved in your browser only.</li>
+          <li><b>If you use alerts:</b> the wallet addresses you choose to watch, the lines you set, and your Telegram chat id (stored encrypted). Unlinking Telegram removes the chat id at once.</li>
+          <li><b>If you use the API or webhooks:</b> a fingerprint of each API key (never the key itself), and for each webhook its address, the wallets and events you chose, its signing secret (stored encrypted) and a short delivery log.</li>
+          <li>Services we use: Vercel (hosting and storage), Upstash (account store), Resend (emails), NOWPayments (payments — their own privacy terms apply on their page), Telegram (alert messages, if you link it) and GitHub (runs the scheduled checks).</li>
           <li>No advertising, no selling of data, no tracking cookies. The only cookie is the one that keeps you signed in.</li>
-          <li>To delete your account and its records, email us from the account's address.</li>
+          <li>To delete your account and everything stored with it (alerts, API keys, webhooks), email us from the account's address.</li>
         </ul>
       </Panel>
 
