@@ -80,8 +80,6 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
             <dd className="mono">
               {isFixture ? checksum : <a href={`${INK_EXPLORER}/address/${checksum}`} target="_blank" rel="noreferrer">{checksum}</a>}
             </dd>
-            <dt>ens</dt>
-            <dd className="faint">not wired (later)</dd>
             <dt>first seen</dt>
             <dd className="mono">{new Date(firstSeen).toISOString().replace('T', ' ').slice(0, 19)} UTC <span className="faint">(this browser session)</span></dd>
             <dt>tydro last read</dt>

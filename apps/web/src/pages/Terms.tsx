@@ -49,7 +49,7 @@ export function TermsPage() {
           <li>Payment is handled by NOWPayments on their own page. You pay from your own wallet; {d} never sees or touches it. Network fees are yours.</li>
           <li><b>Nothing renews or charges by itself.</b> We email a reminder before a period ends; you choose whether to pay again.</li>
           <li>Paying again for the same plan adds {PLANS.PERIOD_DAYS} days to the end of your current period. Switching to a different plan starts a fresh {PLANS.PERIOD_DAYS} days of the new plan from the moment it's paid.</li>
-          <li>A plan starts when the payment is confirmed on-chain (usually minutes). Features marked "when they open" aren't part of what you're paying for until they do.</li>
+          <li>A plan starts when the payment is confirmed on-chain (usually minutes).</li>
           <li>We may change prices for future periods; a period you've paid for keeps its price.</li>
         </ul>
       </Panel>
