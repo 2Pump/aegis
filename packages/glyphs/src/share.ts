@@ -7,9 +7,8 @@
  */
 import type { HullTemp, Tag } from '@aegis/pose';
 import { BRAND } from './brand.js';
-import { TAG_COLORS } from '@aegis/pose';
-/** the share card keeps the original dark look (seen on X, away from the site): its own bright type colours */
-const tagColor = (t: string | null): string => (t ? (TAG_COLORS[t] ?? '#9CA3AF') : '#6B7280');
+import { tagColor } from './core.js';
+import { PALETTE as P, RISK_COLOR as RISK } from './palette.js';
 import { HULL_COPY, NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from './labels.js';
 
 export interface ShareFacts {
@@ -70,7 +69,8 @@ export const shareTextNoUrl = (f: ShareFacts): string => shareText(f, '').trimEn
 
 /* ───────────────────────── card (SVG, 1200 × 630) ───────────────────────── */
 
-const RISK_COLOR: Record<HullTemp, string> = { NOMINAL: '#4CE0D2', ELEVATED: '#F5C14A', CRITICAL: '#FF4D4D', UNKNOWN: '#7D8B9B' };
+/** the card follows the site's palette (Ivory & Bank Green); WATCH uses its darker text tone on the light card */
+const RISK_COLOR: Record<HullTemp, string> = { ...RISK, ELEVATED: P.watchText };
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /** IBM Plex Mono advances 0.6 em per character, so widths are exact without measuring. */
 const monoWidth = (s: string, size: number, spacing: number) => [...s].length * (size * 0.6 + spacing) - spacing;
@@ -91,7 +91,7 @@ export function shareCardSvg(f: ShareFacts): string {
   const ls = 2.3;
   const chipW = (t: string) => monoWidth(t, fs, ls) + 30;
   const types = shareTypes(f.tags);
-  const all = types.length ? types.map((t) => ({ text: TAG_LABEL[t].toUpperCase(), color: tagColor(t) })) : [{ text: NO_TYPE_LABEL.toUpperCase(), color: '#7D8B9B' }];
+  const all = types.length ? types.map((t) => ({ text: TAG_LABEL[t].toUpperCase(), color: tagColor(t) })) : [{ text: NO_TYPE_LABEL.toUpperCase(), color: P.inkFaint }];
   // lay out up to two rows inside the left column; anything that doesn't fit becomes a "+N MORE" chip (never hidden silently)
   const place = (items: { text: string; color: string }[]) => {
     const out: Array<{ text: string; color: string; x: number; row: number; w: number }> = [];
@@ -110,7 +110,7 @@ export function shareCardSvg(f: ShareFacts): string {
     return out;
   };
   let laid = place(all);
-  for (let keep = all.length - 1; !laid && keep >= 1; keep--) laid = place([...all.slice(0, keep), { text: `+${all.length - keep} MORE`, color: '#7D8B9B' }]);
+  for (let keep = all.length - 1; !laid && keep >= 1; keep--) laid = place([...all.slice(0, keep), { text: `+${all.length - keep} MORE`, color: P.inkFaint }]);
   const chipsLaid = laid ?? [];
   const row = chipsLaid.reduce((m, c) => Math.max(m, c.row), 0);
   const chips = chipsLaid.map(
@@ -121,31 +121,31 @@ export function shareCardSvg(f: ShareFacts): string {
   // a second chip row pushes the risk block down; the risk sentence then gives way so the venue line stays clear
   const shift = row * 48;
   const venue = (x: number, name: string, ok: boolean) =>
-    `${ok ? `<circle cx="${x + 5}" cy="${H - 134}" r="4.5" fill="#CFD9E3"/>` : `<circle cx="${x + 5}" cy="${H - 134}" r="4.5" fill="none" stroke="#7D8B9B" stroke-width="1.5"/>`}` +
-    `<text x="${x + 18}" y="${H - 128}" font-family="${MONO}" font-weight="500" font-size="17" letter-spacing="2" fill="${ok ? '#CFD9E3' : '#7D8B9B'}">${name}${ok ? '' : " — couldn't read"}</text>`;
+    `${ok ? `<circle cx="${x + 5}" cy="${H - 134}" r="4.5" fill="${P.ink}"/>` : `<circle cx="${x + 5}" cy="${H - 134}" r="4.5" fill="none" stroke="${P.inkFaint}" stroke-width="1.5"/>`}` +
+    `<text x="${x + 18}" y="${H - 128}" font-family="${MONO}" font-weight="500" font-size="17" letter-spacing="2" fill="${ok ? P.ink : P.inkFaint}">${name}${ok ? '' : " — couldn't read"}</text>`;
   const tydroW = 18 + monoWidth(`TYDRO${f.venues.tydro ? '' : " — couldn't read"}`, 17, 2) + 30;
   const readAt = `${f.block ? `Read at block ${f.block.toLocaleString('en-US')}` : 'Read'}${f.at ? ` · ${fmtWhen(f.at)}` : ''}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-<defs><radialGradient id="g" cx="0.78" cy="0.45" r="0.75"><stop offset="0" stop-color="#071016"/><stop offset="1" stop-color="#020305"/></radialGradient></defs>
+<defs><radialGradient id="g" cx="0.78" cy="0.45" r="0.75"><stop offset="0" stop-color="${P.panel}"/><stop offset="1" stop-color="${P.page}"/></radialGradient></defs>
 <rect width="${W}" height="${H}" fill="url(#g)"/>
-<rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" fill="none" stroke="#78BEC8" stroke-opacity="0.16"/>
-<path d="M22 48 V22 H48" fill="none" stroke="#78BEC8" stroke-opacity="0.5"/><path d="M${W - 22} ${H - 48} V${H - 22} H${W - 48}" fill="none" stroke="#78BEC8" stroke-opacity="0.5"/>
-${mark(64, 58, 30, '#CFD9E3', 2.4)}
-<text x="108" y="81" font-family="${MONO}" font-weight="600" font-size="20" letter-spacing="6.4" fill="#CFD9E3">${esc(BRAND.name)}</text>
-<text x="${(108 + monoWidth(BRAND.name, 20, 6.4) + 22).toFixed(0)}" y="81" font-family="${MONO}" font-weight="500" font-size="20" letter-spacing="6.4" fill="#657284">· INK WALLET</text>
-<text x="64" y="200" font-family="${MONO}" font-weight="600" font-size="64" fill="#E6EDF3">${esc(shortAddress(f.address))}</text>
-<text x="64" y="256" font-family="${MONO}" font-weight="500" font-size="15" letter-spacing="3.6" fill="#7D8B9B">POSITION TYPE</text>
+<rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" fill="none" stroke="${P.ink}" stroke-opacity="0.12"/>
+<path d="M22 48 V22 H48" fill="none" stroke="${P.ink}" stroke-opacity="0.35"/><path d="M${W - 22} ${H - 48} V${H - 22} H${W - 48}" fill="none" stroke="${P.ink}" stroke-opacity="0.35"/>
+${mark(64, 58, 30, P.ink, 2.4)}
+<text x="108" y="81" font-family="${MONO}" font-weight="600" font-size="20" letter-spacing="6.4" fill="${P.ink}">${esc(BRAND.name)}</text>
+<text x="${(108 + monoWidth(BRAND.name, 20, 6.4) + 22).toFixed(0)}" y="81" font-family="${MONO}" font-weight="500" font-size="20" letter-spacing="6.4" fill="${P.inkFaint}">· INK WALLET</text>
+<text x="64" y="200" font-family="${MONO}" font-weight="600" font-size="64" fill="${P.ink}">${esc(shortAddress(f.address))}</text>
+<text x="64" y="256" font-family="${MONO}" font-weight="500" font-size="15" letter-spacing="3.6" fill="${P.inkFaint}">POSITION TYPE</text>
 ${chips.join('\n')}
-<text x="64" y="${362 + shift}" font-family="${MONO}" font-weight="500" font-size="15" letter-spacing="3.6" fill="#7D8B9B">RISK NOW</text>
+<text x="64" y="${362 + shift}" font-family="${MONO}" font-weight="500" font-size="15" letter-spacing="3.6" fill="${P.inkFaint}">RISK NOW</text>
 <text x="64" y="${414 + shift}" font-family="${MONO}" font-weight="600" font-size="40" letter-spacing="6.4" fill="${rc}">${esc(RISK_LABEL[f.hullTemp].toUpperCase())}</text>
-${row === 0 ? `<text x="64" y="450" font-family="${SANS}" font-size="20" fill="#9AA7B5">${esc(HULL_COPY[f.hullTemp])}</text>` : ''}
+${row === 0 ? `<text x="64" y="450" font-family="${SANS}" font-size="20" fill="${P.inkDim}">${esc(HULL_COPY[f.hullTemp])}</text>` : ''}
 <circle cx="965" cy="285" r="150" fill="none" stroke="${rc}" stroke-opacity="0.9" stroke-width="3"${f.hullTemp === 'UNKNOWN' ? ' stroke-dasharray="6 10"' : ''}/>
-<circle cx="965" cy="285" r="132" fill="none" stroke="#78BEC8" stroke-opacity="0.18"/>
-${mark(865, 185, 200, f.hullTemp === 'NOMINAL' ? '#CFD9E3' : rc, 1.4)}
+<circle cx="965" cy="285" r="132" fill="none" stroke="${P.ink}" stroke-opacity="0.18"/>
+${mark(865, 185, 200, f.hullTemp === 'NOMINAL' ? P.ink : rc, 1.4)}
 ${venue(64, 'TYDRO', f.venues.tydro)}${venue(64 + tydroW, 'NADO', f.venues.nado)}
-<text x="64" y="${H - 96}" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="#657284">${esc(readAt)}</text>
-<text x="${W - 64}" y="${H - 128}" text-anchor="end" font-family="${MONO}" font-weight="600" font-size="16" letter-spacing="3.2" fill="#CFD9E3">${esc(`${new URL(BRAND.siteUrl).host.toUpperCase()} · ${BRAND.x.handle}`)}</text>
-<text x="${W - 64}" y="${H - 96}" text-anchor="end" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="#657284">Read-only · not financial advice</text>
+<text x="64" y="${H - 96}" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="${P.inkFaint}">${esc(readAt)}</text>
+<text x="${W - 64}" y="${H - 128}" text-anchor="end" font-family="${MONO}" font-weight="600" font-size="16" letter-spacing="3.2" fill="${P.ink}">${esc(`${new URL(BRAND.siteUrl).host.toUpperCase()} · ${BRAND.x.handle}`)}</text>
+<text x="${W - 64}" y="${H - 96}" text-anchor="end" font-family="${MONO}" font-size="16" letter-spacing="1.6" fill="${P.inkFaint}">Read-only · not financial advice</text>
 </svg>`;
 }
 
@@ -184,8 +184,8 @@ ${m('twitter:title', title, 'name')}
 ${m('twitter:description', desc, 'name')}
 ${m('twitter:image', image, 'name')}
 <meta http-equiv="refresh" content="0; url=${esc(target)}" />
-</head><body style="background:#020305;color:#cfd9e3;font-family:monospace">
-<p>Opening <a href="${esc(target)}" style="color:#4ce0d2">${esc(title)}</a>…</p>
+</head><body style="background:#F5F3EE;color:#1A1E22;font-family:monospace">
+<p>Opening <a href="${esc(target)}" style="color:#1F5C4A">${esc(title)}</a>…</p>
 <script>location.replace(${JSON.stringify(target)})</script>
 </body></html>`;
 }

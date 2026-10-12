@@ -105,7 +105,7 @@ describe('sharing a wallet (text, card, share page)', () => {
     const unknown = shareCardSvg({ ...f, tags: ['LOCKED'], hullTemp: 'UNKNOWN', venues: { tydro: true, nado: false } });
     expect(unknown).toContain("NADO — couldn't read");
     expect(unknown).toContain('stroke-dasharray');
-    expect(shareCardSvg({ ...f, tags: ['LEVERED'], hullTemp: 'CRITICAL' })).toContain('#FF4D4D');
+    expect(shareCardSvg({ ...f, tags: ['LEVERED'], hullTemp: 'CRITICAL' })).toContain('#B42F35');
   });
   it('share page: preview tags for crawlers, noindex, and straight on to the wallet page', async () => {
     const { sharePageHtml } = await import('../src/share');
