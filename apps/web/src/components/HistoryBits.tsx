@@ -6,7 +6,7 @@ import type { HullTemp } from '@aegis/pose';
 import { RISK_LABEL } from '@aegis/glyphs';
 import { RANGES, type Range } from '../lib/history';
 
-export const RISK_COLOR: Record<HullTemp, string> = { NOMINAL: '#3b8f88', ELEVATED: 'var(--amber)', CRITICAL: 'var(--red)', UNKNOWN: 'var(--slate)' };
+export const RISK_COLOR: Record<HullTemp, string> = { NOMINAL: 'var(--cyan)', ELEVATED: 'var(--amber)', CRITICAL: 'var(--red)', UNKNOWN: 'var(--slate)' };
 
 export const when = (ms: number) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
@@ -43,11 +43,11 @@ export function RiskStrip({
     <svg className="hist-strip" viewBox={`0 0 ${W} 28`} preserveAspectRatio="none" role="img" aria-label={label}>
       <defs>
         <pattern id="hist-gap" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="6" height="6" fill="#05080c" />
-          <line x1="0" y1="0" x2="0" y2="6" stroke="#4f5a68" strokeWidth="2" />
+          <rect width="6" height="6" fill="var(--field)" />
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#A3A8AB" strokeWidth="2" />
         </pattern>
       </defs>
-      <rect x="0" y="0" width={W} height="28" fill="#05080c" />
+      <rect x="0" y="0" width={W} height="28" fill="var(--field)" />
       {spans.map((s, i) => (
         <rect key={i} x={x(s.from)} y="4" width={Math.max(1, x(s.to) - x(s.from))} height="20" fill={s.color ?? RISK_COLOR[s.hull ?? 'UNKNOWN']}>
           <title>{s.text}</title>
@@ -95,12 +95,12 @@ export function CountChart({
   return (
     <div>
       <svg className="hist-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={label} style={{ height: H }}>
-        <rect x="0" y="0" width={W} height={H} fill="#05080c" />
+        <rect x="0" y="0" width={W} height={H} fill="var(--field)" />
         {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="rgba(160,170,180,0.08)" />
+          <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="rgba(26,30,34,0.08)" />
         ))}
         {gaps.map((g, i) => (
-          <rect key={i} x={x(g.from)} y="0" width={Math.max(1, x(g.to) - x(g.from))} height={H} fill="rgba(79,90,104,0.18)">
+          <rect key={i} x={x(g.from)} y="0" width={Math.max(1, x(g.to) - x(g.from))} height={H} fill="rgba(26,30,34,0.07)">
             <title>No scan between {when(g.from)} and {when(g.to)}</title>
           </rect>
         ))}
@@ -113,7 +113,7 @@ export function CountChart({
             ? s.points.map((p) => <rect key={`${s.name}${p.t}`} x={Math.min(W - 8, Math.max(0, x(p.t) - 4))} y={y(p.v) - 4} width="8" height="8" fill={s.color} />)
             : null,
         )}
-        <text x="4" y="12" fill="#7d8b9b" fontSize="11" fontFamily="IBM Plex Mono, monospace">{max.toLocaleString('en-US')}</text>
+        <text x="4" y="12" fill="var(--ink-faint)" fontSize="11" fontFamily="IBM Plex Mono, monospace">{max.toLocaleString('en-US')}</text>
       </svg>
       <div className="hist-legend">
         {series.map((s) => (

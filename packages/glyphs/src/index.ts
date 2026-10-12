@@ -1,4 +1,5 @@
-import { TAG_COLORS, type HullTemp, type Pose, type Tag } from '@aegis/pose';
+import type { HullTemp, Pose, Tag } from '@aegis/pose';
+import { PALETTE } from './palette.js';
 import { HULL_RING, hash32, hexA, tagColor, unit, type ShipLite, type SizeBand } from './core.js';
 import { BRAND } from './brand.js';
 import { NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from './labels.js';
@@ -9,6 +10,7 @@ export * from './sphere.js';
 export * from './labels.js';
 export * from './brand.js';
 export * from './share.js';
+export * from './palette.js';
 import { shareText } from './share.js';
 
 /* ───────────────────────── size bands (privacy default) ───────────────────────── */
@@ -30,7 +32,7 @@ export function shipSizeUsd(p: Pose): number {
 
 /** Color by primary, but a WOUNDED ship always burns red. */
 export function shipColor(p: Pose): string {
-  if (p.tags.includes('WOUNDED')) return TAG_COLORS.WOUNDED!;
+  if (p.tags.includes('WOUNDED')) return PALETTE.near;
   return tagColor(p.primary);
 }
 
@@ -149,9 +151,9 @@ export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: numb
   ctx.clearRect(0, 0, w, h);
 
   const g = ctx.createRadialGradient(v.cx, v.cy, v.R * 0.05, v.cx, v.cy, v.R);
-  g.addColorStop(0, '#000000');
-  g.addColorStop(0.7, '#05080C');
-  g.addColorStop(1, '#0B1118');
+  g.addColorStop(0, PALETTE.wellDeep);
+  g.addColorStop(0.7, PALETTE.well);
+  g.addColorStop(1, PALETTE.panel);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(v.cx, v.cy, v.R, 0, Math.PI * 2);
@@ -159,10 +161,10 @@ export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: numb
 
   ctx.lineWidth = 1;
   for (const [frac, col] of [
-    [0.32, 'rgba(255,77,77,0.22)'],
-    [0.54, 'rgba(245,193,74,0.16)'],
-    [0.84, 'rgba(76,224,210,0.12)'],
-    [1, 'rgba(148,163,184,0.25)'],
+    [0.32, hexA(PALETTE.near, 0.3)],
+    [0.54, hexA(PALETTE.watch, 0.3)],
+    [0.84, hexA(PALETTE.safe, 0.25)],
+    [1, hexA(PALETTE.ink, 0.15)],
   ] as const) {
     ctx.strokeStyle = col;
     ctx.setLineDash(frac === 1 ? [] : [2, 6]);
@@ -191,7 +193,7 @@ export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: numb
     ctx.beginPath();
     ctx.arc(x, y, px / 2 + 0.5, 0, Math.PI * 2);
     if (s.hollow) {
-      ctx.strokeStyle = hexA(s.color === '#6B7280' ? '#9CA3AF' : s.color, 0.8);
+      ctx.strokeStyle = hexA(s.color, 0.8);
       ctx.lineWidth = 1;
       ctx.stroke();
     } else {
@@ -199,14 +201,14 @@ export function drawWellStatic(ctx: CanvasRenderingContext2D, w: number, h: numb
       ctx.fill();
     }
     if (s.wounded) {
-      ctx.strokeStyle = hexA(TAG_COLORS.WOUNDED!, 0.95);
+      ctx.strokeStyle = hexA(PALETTE.near, 0.95);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(x, y, px / 2 + 2.5, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (s.focused) {
-      ctx.strokeStyle = '#E5F9F7';
+      ctx.strokeStyle = PALETTE.ink;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(x, y, px / 2 + 5, 0, Math.PI * 2);
@@ -232,7 +234,7 @@ export function drawWellOverlay(
   ctx.clearRect(0, 0, w, h);
   if (found) {
     const [x, y] = shipXY(found, v);
-    ctx.strokeStyle = 'rgba(229,249,247,0.35)';
+    ctx.strokeStyle = hexA(PALETTE.ink, 0.3);
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 5]);
     ctx.beginPath();
@@ -244,7 +246,7 @@ export function drawWellOverlay(
     ctx.setLineDash([]);
     const p = 0.5 + 0.5 * Math.sin(t / 300);
     for (const [rad, a] of [[10 + p * 4, 0.95], [18 + p * 6, 0.5]] as const) {
-      ctx.strokeStyle = `rgba(229,249,247,${a})`;
+      ctx.strokeStyle = hexA(PALETTE.ink, Number(a));
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(x, y, rad, 0, Math.PI * 2);
@@ -255,7 +257,7 @@ export function drawWellOverlay(
     const [x, y] = shipXY(s, v);
     if (s.pulse) {
       const p = 0.5 + 0.5 * Math.sin(t / 260 + s.angle * 3);
-      ctx.strokeStyle = hexA(TAG_COLORS.WOUNDED!, 0.3 + p * 0.4);
+      ctx.strokeStyle = hexA(PALETTE.near, 0.3 + p * 0.4);
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(x, y, (s.sizePx * k) / 2 + 2 + p * 4 * k, 0, Math.PI * 2);
@@ -263,7 +265,7 @@ export function drawWellOverlay(
     }
     if (s.flashAt && now - s.flashAt < 6000) {
       const k = 1 - (now - s.flashAt) / 6000;
-      ctx.strokeStyle = `rgba(229,249,247,${(0.8 * k).toFixed(3)})`;
+      ctx.strokeStyle = hexA(PALETTE.accent, 0.8 * k);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(x, y, s.sizePx / 2 + 4 + (1 - k) * 16, 0, Math.PI * 2);
@@ -272,7 +274,7 @@ export function drawWellOverlay(
   }
   if (hover) {
     const [x, y] = shipXY(hover, v);
-    ctx.strokeStyle = '#E5F9F7';
+    ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(x, y, hover.sizePx / 2 + 6, 0, Math.PI * 2);
@@ -288,7 +290,7 @@ export function drawWellOverlay(
  * No balances are encoded — safe for unfurls.
  */
 export function hullSigilSvg(address: string, pose: Pick<Pose, 'primary' | 'tags' | 'hullTemp'>, size = 96): string {
-  const color = pose.tags.includes('WOUNDED') ? TAG_COLORS.WOUNDED! : tagColor(pose.primary);
+  const color = pose.tags.includes('WOUNDED') ? PALETTE.near : tagColor(pose.primary);
   const c = size / 2;
   const pts: string[] = [];
   for (let i = 0; i < 8; i++) {
@@ -308,7 +310,7 @@ export function hullSigilSvg(address: string, pose: Pick<Pose, 'primary' | 'tags
     })
     .join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="wallet sigil ${pose.primary ? TAG_LABEL[pose.primary] : NO_TYPE_LABEL}">
-<circle cx="${c}" cy="${c}" r="${c - 1}" fill="#05080C" stroke="#1F2937"/>
+<circle cx="${c}" cy="${c}" r="${c - 1}" fill="${PALETTE.field}" stroke="${PALETTE.hair}"/>
 <polygon points="${pts.join(' ')}" fill="${hollow ? 'none' : hexA(color, 0.18)}" stroke="${color}" stroke-width="${hollow ? 1.5 : 2}" ${hollow ? 'stroke-dasharray="3 3"' : ''}/>
 <circle cx="${c}" cy="${c}" r="${(size / 16).toFixed(1)}" fill="${color}"/>
 ${ticks}

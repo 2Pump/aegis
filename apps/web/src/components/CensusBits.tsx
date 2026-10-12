@@ -41,12 +41,12 @@ export function mixOf(ships: readonly CensusShip[]): Record<string, number> {
 
 export function MixBar({ mix, label }: { mix: Record<string, number>; label: string }) {
   const total = Object.values(mix).reduce((a, b) => a + b, 0);
-  const parts = MIX_ORDER.filter((k) => mix[k]).map((k) => ({ k, n: mix[k]!, color: k === 'NONE' ? '#6B7280' : tagColor(k as Tag) }));
+  const parts = MIX_ORDER.filter((k) => mix[k]).map((k) => ({ k, n: mix[k]!, color: tagColor(k === 'NONE' ? null : (k as Tag)) }));
   return (
     <div data-testid="mixbar">
       <div className="mixbar" role="img" aria-label={`Position types: ${parts.map((p) => `${primaryTypeLabel(p.k as Tag | 'NONE')} ${p.n}`).join(', ')}`}>
         {parts.map((p) => (
-          <span key={p.k} style={{ width: `${(p.n / Math.max(total, 1)) * 100}%`, background: p.k === 'DARK' ? 'repeating-linear-gradient(45deg,#374151 0 4px,#1f2937 4px 8px)' : p.color }} />
+          <span key={p.k} style={{ width: `${(p.n / Math.max(total, 1)) * 100}%`, background: p.k === 'DARK' ? 'repeating-linear-gradient(45deg,#A3A8AB 0 4px,#1f2937 4px 8px)' : p.color }} />
         ))}
       </div>
       <div className="mix-legend">

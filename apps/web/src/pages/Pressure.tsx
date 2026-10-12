@@ -50,7 +50,7 @@ const NARROW: Array<{ v: string; label: string }> = [
   ...[...PRIMARY_PRIORITY, 'WOUNDED' as const].map((t) => ({ v: `t:${t}`, label: `Type: ${TAG_LABEL[t]}` })),
 ];
 
-const LEVEL_TONE: Record<string, string> = { CALM: 'var(--cyan)', ELEVATED: 'var(--amber)', HIGH: '#fb923c', CRITICAL: 'var(--red)' };
+const LEVEL_TONE: Record<string, string> = { CALM: 'var(--cyan)', ELEVATED: 'var(--amber)', HIGH: '#B8612A', CRITICAL: 'var(--red)' };
 
 export function PressurePage() {
   const now = useNow(30_000);
@@ -361,16 +361,16 @@ function Curve({ s, q }: { s: PressureSnapshot; q: PressureQuery }) {
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="pm-chart" role="img" aria-label={`Wallets near liquidation as the move grows from 0 to ${s.maxPct}%. At ${sign}${q.pct}%: ${main[q.pct]?.near ?? 0}.`}>
         {yTicks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="rgba(160,175,190,0.12)" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="rgba(26,30,34,0.1)" />
             <text x={L - 6} y={y(t) + 3} textAnchor="end" className="pm-axis">{t.toLocaleString('en-US')}</text>
           </g>
         ))}
         {ticks.map((t) => (
           <text key={t} x={x(t)} y={H - 10} textAnchor="middle" className="pm-axis">{sign}{t}%</text>
         ))}
-        <path d={`${path(main.map((p) => ({ pct: p.pct, v: p.near })))} L${x(s.maxPct)},${y(0)} L${x(0)},${y(0)} Z`} fill="rgba(255,77,77,0.10)" />
+        <path d={`${path(main.map((p) => ({ pct: p.pct, v: p.near })))} L${x(s.maxPct)},${y(0)} L${x(0)},${y(0)} Z`} fill="rgba(180,47,53,0.10)" />
         <path d={path(main.map((p) => ({ pct: p.pct, v: p.near })))} fill="none" stroke="var(--red)" strokeWidth="2" />
-        <path d={path(main.map((p) => ({ pct: p.pct, v: p.liquidatable })))} fill="none" stroke="#a11d1d" strokeWidth="1.5" strokeDasharray="4 3" />
+        <path d={path(main.map((p) => ({ pct: p.pct, v: p.liquidatable })))} fill="none" stroke="#8E1F25" strokeWidth="1.5" strokeDasharray="4 3" />
         {tydro ? <path d={path(tydro.map((p) => ({ pct: p.pct, v: p.near })))} fill="none" stroke="var(--slate)" strokeWidth="1.2" /> : null}
         {nado ? <path d={path(nado.map((p) => ({ pct: p.pct, v: p.near })))} fill="none" stroke="var(--violet)" strokeWidth="1.2" /> : null}
         <line x1={x(q.pct)} x2={x(q.pct)} y1={T} y2={H - B} stroke="var(--ink)" strokeWidth="1" strokeDasharray="2 3" />
@@ -378,7 +378,7 @@ function Curve({ s, q }: { s: PressureSnapshot; q: PressureQuery }) {
       </svg>
       <div className="pm-legend mono">
         <span><i style={{ background: 'var(--red)' }} />near liquidation (or worse)</span>
-        <span><i style={{ background: '#a11d1d' }} />liquidatable</span>
+        <span><i style={{ background: '#8E1F25' }} />liquidatable</span>
         {tydro ? <span><i style={{ background: 'var(--slate)' }} />Tydro-only wallets</span> : null}
         {nado ? <span><i style={{ background: 'var(--violet)' }} />Nado-only wallets</span> : null}
       </div>

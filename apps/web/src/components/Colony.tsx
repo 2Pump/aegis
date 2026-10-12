@@ -19,7 +19,7 @@ import { fmtAge } from '../lib/fmt';
 
 const ORDER: Array<Tag | 'NONE'> = ['CARRY', 'EQUITY-MARGIN', 'NAKED', 'KBTC-CORE', 'LEVERED', 'HOLD', 'LOCKED', 'STABLE-BALLAST', 'WOUNDED', 'DARK', 'NONE'];
 const nameOf = (k: Tag | 'NONE') => primaryTypeLabel(k);
-const colorOf = (k: Tag | 'NONE') => (k === 'NONE' ? '#6B7280' : k === 'WOUNDED' ? '#9CA3AF' : tagColor(k));
+const colorOf = (k: Tag | 'NONE') => (k === 'NONE' ? tagColor(null) : k === 'WOUNDED' ? '#7E868B' : tagColor(k));
 
 // drawing space (SVG units): dish centre 200,200
 const CX = 200;
@@ -280,7 +280,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
               <svg className="colony-svg" viewBox={vb.join(' ')} role="img" aria-label={`Coverage: Tydro supplied ${sharePct(s?.tydroSupply ?? null)}, borrowed ${sharePct(s?.tydroDebt ?? null)}; Nado deposits ${sharePct(s?.nadoDeposits ?? null)}; Nado open longs ${sharePct(s?.nadoOpenInterestLongs ?? null)}, shorts ${sharePct(s?.nadoOpenInterestShorts ?? null)}. The not-seen arcs stay dark.`}>
                 <defs>
                   <pattern id="colony-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                    <line x1="0" y1="0" x2="0" y2="5" stroke="rgba(160,175,190,0.22)" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="0" y2="5" stroke="rgba(26,30,34,0.18)" strokeWidth="1" />
                   </pattern>
                 </defs>
                 <circle cx={CX} cy={CX} r={DISH_R} fill="none" stroke="var(--hair)" strokeWidth="1" />
@@ -319,7 +319,7 @@ export function Colony({ snap, now, changes }: { snap: CensusSnapshot; now: numb
                   <>
                     {callouts.map((c) => (
                       <g key={c.key}>
-                        <polyline points={`${c.px.toFixed(1)},${c.py.toFixed(1)} ${c.lx.toFixed(1)},${c.ly.toFixed(1)}`} fill="none" stroke="rgba(160,175,190,0.32)" strokeWidth="1" />
+                        <polyline points={`${c.px.toFixed(1)},${c.py.toFixed(1)} ${c.lx.toFixed(1)},${c.ly.toFixed(1)}`} fill="none" stroke="rgba(26,30,34,0.252)" strokeWidth="1" />
                         <Lines x={c.x} y={c.y + (compact ? 16 : 9.5)} anchor={c.anchor} cls={c.cls} testid={c.testid} lines={c.lines} />
                       </g>
                     ))}

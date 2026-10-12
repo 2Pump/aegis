@@ -17,7 +17,7 @@ import { RISK_LABEL, TAG_LABEL, TAG_MEANING, hullSigilSvg, tagColor } from '@aeg
 
 /** Fixed height of every level, top = first in rule priority. Near liquidation is an overlay: it sits last. */
 const LEVELS: readonly Tag[] = [...PRIMARY_PRIORITY, 'WOUNDED'];
-const NEUTRAL = '#9CA3AF';
+const NEUTRAL = '#7E868B';
 
 /** Main-type colour for the plate, never red (red is the rail's alone). */
 function typeColor(t: Tag | null): string {

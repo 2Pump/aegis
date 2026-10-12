@@ -12,15 +12,15 @@ import { useOracleWatch, usePrices, type Range } from '../lib/history';
 import { WELL_ON } from '../lib/census';
 
 export const STATUS_COLOR: Record<OracleStatus | 'RESOLVED', string> = {
-  OK: '#3b8f88',
+  OK: 'var(--cyan)',
   UNAVAILABLE: 'var(--slate)',
   WARN: 'var(--amber)',
-  JUMP: '#ff8a3d',
-  STALE: '#ff8a3d',
+  JUMP: '#B8612A',
+  STALE: '#B8612A',
   DIVERGENT: 'var(--red)',
   DEPEG: 'var(--red)',
   INVALID: 'var(--red)',
-  RESOLVED: '#3b8f88',
+  RESOLVED: 'var(--cyan)',
 };
 const STATUS_HELP: Record<OracleStatus, string> = {
   OK: 'every check that could run passed',
@@ -250,7 +250,7 @@ function PriceChart({ series, from, to, label }: { series: Array<{ name: string;
   return (
     <div>
       <svg className="hist-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={label} style={{ height: H }}>
-        <rect x="0" y="0" width={W} height={H} fill="#05080c" />
+        <rect x="0" y="0" width={W} height={H} fill="var(--field)" />
         {series.map((s) => (
           <path key={s.name} d={path(s.points)} fill="none" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} vectorEffect="non-scaling-stroke" />
         ))}

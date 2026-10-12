@@ -1,5 +1,6 @@
 import { HULL_RING, hash32, unit, type ShipLite } from './core.js';
 import { GLASS_BAND_R, SECTORS, SECTOR_COLORS, sectorOf, type SectorKey } from './glass.js';
+import { OTHER_COLOR, PALETTE } from './palette.js';
 
 /*
  * HULL SPHERE — the well as a glass world you can orbit.
@@ -16,9 +17,9 @@ export const SPHERE_LAT_LIMIT = 0.9;
 export const SPHERE_BAND_W: Readonly<Record<keyof typeof GLASS_BAND_R, number>> = { dust: 0.004, '<1k': 0.0055, '1–10k': 0.0075, '10–100k': 0.0105, '100k+': 0.014 };
 /** Nested glass shells (contour labels): same fractions as the 2D contour rings. */
 export const SPHERE_SHELLS = [
-  { r: 0.84, label: 'SAFE', color: '#4ce0d2' },
-  { r: 0.54, label: 'WATCH', color: '#f5c14a' },
-  { r: 0.32, label: 'NEAR LIQUIDATION', color: '#ff6b6b' },
+  { r: 0.84, label: 'SAFE', color: PALETTE.safe },
+  { r: 0.54, label: 'WATCH', color: PALETTE.watchText },
+  { r: 0.32, label: 'NEAR LIQUIDATION', color: PALETTE.near },
 ] as const;
 
 const BAND_IDX = { dust: 0, '<1k': 1, '1–10k': 2, '10–100k': 3, '100k+': 4 } as const;
@@ -74,7 +75,7 @@ export function seatSphere(s: ShipLite): SphereSeat {
     x: r * cosLat * Math.sin(lon),
     y: r * sinLat,
     z: r * cosLat * Math.cos(lon),
-    color: sector === 'OTHER' ? (hollow ? '#6B7280' : '#9CA3AF') : SECTOR_COLORS[sector],
+    color: sector === 'OTHER' ? OTHER_COLOR : SECTOR_COLORS[sector],
     wounded,
     hot,
     bandIdx,

@@ -60,7 +60,7 @@ export function IntelPage() {
   );
 }
 
-const STRESS_COLOR: Record<string, string> = { CALM: '#3b8f88', ELEVATED: 'var(--amber)', HIGH: '#ff8a3d', CRITICAL: 'var(--red)' };
+const STRESS_COLOR: Record<string, string> = { CALM: 'var(--cyan)', ELEVATED: 'var(--amber)', HIGH: '#B8612A', CRITICAL: 'var(--red)' };
 const MIX_KEYS = ['CARRY', 'EQUITY-MARGIN', 'NAKED', 'KBTC-CORE', 'LOCKED', 'STABLE-BALLAST', 'LEVERED', 'HOLD', 'WOUNDED', 'DARK', 'NONE'];
 const FLOOR_SHORT: Record<Material, string> = { '0': 'ALL', '1k': '≥ $1K', '10k': '≥ $10K', '100k': '≥ $100K' };
 

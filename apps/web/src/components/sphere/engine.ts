@@ -17,6 +17,8 @@ import {
   sphereLod,
   type SphereLod,
   type SphereSeat,
+  OTHER_COLOR,
+  PALETTE,
 } from '@aegis/glyphs';
 
 /*
@@ -110,7 +112,7 @@ function nodeMaterial(u: Uniforms): THREE.MeshStandardMaterial {
       .replace('#include <project_vertex>', '#include <project_vertex>\nvNF = uNear > 0.0 ? smoothstep(uNear * 0.55, uNear, -mvPosition.z) : 1.0;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uAlpha; uniform float uDim; varying float vNF;')
-      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= uAlpha * vNF; gl_FragColor.rgb *= uDim;');
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= uAlpha * vNF; gl_FragColor.rgb = mix(vec3(0.933, 0.922, 0.890), gl_FragColor.rgb, uDim);'); // dim toward the light background
   };
   return m;
 }
@@ -198,7 +200,7 @@ export class SphereEngine {
     private opts: { phone: boolean; reduceMotion: boolean },
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-    this.renderer.setClearColor(0x010203);
+    this.renderer.setClearColor(PALETTE.well);
     this.dprRest = Math.min(window.devicePixelRatio || 1, opts.phone ? PHONE_DPR_REST : 1.5);
     this.renderer.setPixelRatio(this.dprRest);
     this.renderer.domElement.className = 'hs-canvas';
@@ -280,25 +282,26 @@ export class SphereEngine {
   }
 
   private buildStatic() {
-    this.scene.add(new THREE.AmbientLight(0x8899aa, 0.55));
-    const key = new THREE.DirectionalLight(0xcfe8ff, 1.3);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
     key.position.set(3, 2.4, 2.2);
     this.scene.add(key);
 
     this.scene.add(
-      this.glass(1.0, '#6fa6b3', { base: 0.035, rim: 0.1, power: 2.0, spec: 0, side: THREE.BackSide }, 1),
-      (this.nearShell = this.glass(0.32, '#8a1c24', { base: 0.1, rim: 0.4, power: 2.2, spec: 0.25 }, 3)),
-      this.shell(0.54, this.glass(0.54, '#f5c14a', { base: 0, rim: 0.12, power: 3.0, spec: 0 }, 4)),
-      this.shell(0.84, this.glass(0.84, '#4ce0d2', { base: 0, rim: 0.1, power: 3.2, spec: 0 }, 5)),
-      this.shell(1.0, this.glass(1.0, '#78bfca', { base: 0.012, rim: 0.42, power: 3.0, spec: 0.55 }, 20)),
-      (this.nucleus = this.glass(0.11, '#3a0d12', { base: 0.55, rim: 0.35, power: 1.6, spec: 0.1, dark: 0.35 }, 2)), // the nucleus: a dim recessed well
+      // light glass on a light page: tinted rims, nearly clear bodies (a heavy fill reads as a coloured ball)
+      this.glass(1.0, '#B5AFA2', { base: 0.03, rim: 0.12, power: 2.0, spec: 0, side: THREE.BackSide }, 1),
+      (this.nearShell = this.glass(0.32, PALETTE.near, { base: 0.05, rim: 0.42, power: 2.2, spec: 0.2 }, 3)),
+      this.shell(0.54, this.glass(0.54, PALETTE.watch, { base: 0, rim: 0.2, power: 3.0, spec: 0 }, 4)),
+      this.shell(0.84, this.glass(0.84, PALETTE.safe, { base: 0, rim: 0.16, power: 3.2, spec: 0 }, 5)),
+      this.shell(1.0, this.glass(1.0, '#7E786B', { base: 0.01, rim: 0.45, power: 3.0, spec: 0.35 }, 20)),
+      (this.nucleus = this.glass(0.11, PALETTE.near, { base: 0.14, rim: 0.35, power: 1.6, spec: 0.1 }, 2)), // the nucleus
     );
     this.shells.push({ r: 0.11, mesh: this.nucleus! }, { r: 0.32, mesh: this.nearShell! });
     this.buildCore();
     // the falling ring: a thin circle that always faces the camera, centred on the core
     this.fallRing = new THREE.Mesh(
       new THREE.RingGeometry(0.975, 1, this.opts.phone ? 72 : 128),
-      new THREE.MeshBasicMaterial({ color: '#ff6b6b', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: PALETTE.near, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
     );
     this.fallRing.renderOrder = 3;
     this.fallRing.visible = false;
@@ -311,8 +314,8 @@ export class SphereEngine {
       pts.push(a.x, a.y, a.z, b.x, b.y, b.z);
       cols.push(c.r, c.g, c.b, c.r, c.g, c.b);
     };
-    const faint = new THREE.Color(0x2b3a44);
-    const tick = new THREE.Color(0x3d525e);
+    const faint = new THREE.Color('#CFC9BC');
+    const tick = new THREE.Color('#A39D90');
     for (const k of SECTOR_ORDER) {
       const lon = ((SECTORS[k][0] - SECTOR_GAP_DEG / 2) * Math.PI) / 180;
       for (let i = 0; i < 48; i++) seg(P(1, -Math.PI / 2 + (i * Math.PI) / 48, lon), P(1, -Math.PI / 2 + ((i + 1) * Math.PI) / 48, lon), faint);
@@ -325,7 +328,7 @@ export class SphereEngine {
     const bp: number[] = [];
     const bc: number[] = [];
     for (const k of SECTOR_ORDER) {
-      const c = new THREE.Color(SECTOR_COLORS[k] === '#6B7280' ? '#9CA3AF' : SECTOR_COLORS[k]);
+      const c = new THREE.Color(SECTOR_COLORS[k]);
       const [a0, a1] = SECTORS[k];
       for (let d = a0; d < a1; d += 1) {
         const A = P(1.03, 0, (d * Math.PI) / 180);
@@ -347,7 +350,7 @@ export class SphereEngine {
 
     for (const k of SECTOR_ORDER) {
       const mid = (((SECTORS[k][0] + SECTORS[k][1]) / 2) * Math.PI) / 180;
-      const s = this.textSprite(SECTOR_LABEL[k], k === 'OTHER' ? '#9CA3AF' : SECTOR_COLORS[k], 22, 0.22);
+      const s = this.textSprite(SECTOR_LABEL[k], k === 'OTHER' ? OTHER_COLOR : SECTOR_COLORS[k], 22, 0.22);
       s.position.set(1.12 * Math.sin(mid), 0, 1.12 * Math.cos(mid));
       this.scene.add(s);
       this.luneLabels.push(s);
@@ -376,7 +379,6 @@ export class SphereEngine {
       new THREE.ShaderMaterial({
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
         uniforms: { t: this.uCoreT, heat: this.uCoreHeat, reduce: { value: reduce } },
         vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV;
           void main(){ vP = position * 10.0; vec4 w = modelMatrix*vec4(position,1.); vN = normalize(mat3(modelMatrix)*normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
@@ -396,7 +398,7 @@ export class SphereEngine {
             vec3 deep = vec3(0.32, 0.03, 0.05), ember = vec3(1.0, 0.33, 0.28), hot = vec3(1.0, 0.72, 0.55);
             vec3 col = mix(deep, ember, v);
             col = mix(col, hot, smoothstep(0.62, 0.95, m) * body * heat);
-            gl_FragColor = vec4(col, (0.18 + 0.75 * v) * (0.55 + 0.6 * heat)); }`,
+            gl_FragColor = vec4(col, (0.05 + 0.6 * v) * (0.55 + 0.6 * heat)); }`,
       }),
     );
     this.core.renderOrder = 2;
@@ -405,14 +407,14 @@ export class SphereEngine {
     c.width = c.height = 128;
     const x = c.getContext('2d')!;
     const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, 'rgba(255,110,100,0.55)');
-    g.addColorStop(0.35, 'rgba(200,40,50,0.22)');
-    g.addColorStop(1, 'rgba(120,10,20,0)');
+    g.addColorStop(0, 'rgba(180,47,53,0.28)');
+    g.addColorStop(0.35, 'rgba(180,47,53,0.1)');
+    g.addColorStop(1, 'rgba(180,47,53,0)');
     x.fillStyle = g;
     x.fillRect(0, 0, 128, 128);
     const tex = new THREE.CanvasTexture(c);
     // drawn through the ships, like light from inside the sphere: it brightens what's in front, never hides it
-    this.coreHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0.4 }));
+    this.coreHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, opacity: 0.4 }));
     this.coreHalo.scale.setScalar(0.42);
     this.coreHalo.renderOrder = 25;
     this.scene.add(this.core, this.coreHalo);
@@ -421,15 +423,18 @@ export class SphereEngine {
   private textSprite(text: string, color: string, px: number, spacing: number): THREE.Sprite {
     const c = document.createElement('canvas');
     const x = c.getContext('2d')!;
-    const font = `600 ${px}px "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", monospace`;
+    const font = `700 ${px}px "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", monospace`;
     x.font = font;
     const chars = [...text];
     const cw = x.measureText('M').width * (1 + spacing);
     c.width = Math.ceil(chars.length * cw + 16);
     c.height = px + 14;
     x.font = font;
-    x.fillStyle = 'rgba(2,3,5,0.78)';
+    x.fillStyle = 'rgba(255,255,255,0.96)';
     x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = 'rgba(26,30,34,0.18)';
+    x.lineWidth = 2;
+    x.strokeRect(1, 1, c.width - 2, c.height - 2);
     x.fillStyle = color;
     x.textBaseline = 'middle';
     chars.forEach((ch, i) => x.fillText(ch, 8 + i * cw, c.height / 2 + 1));
@@ -553,7 +558,7 @@ export class SphereEngine {
           gl_PointSize = clamp(sz * gs * 3.4 * px / d, 7.0, maxPt) * (1.0 + 0.12*vB); gl_Position = projectionMatrix*mv; }`,
       fragmentShader: `uniform float strength; varying float vB; varying float vA;
         void main(){ float r = length(gl_PointCoord - 0.5); float ring = smoothstep(0.5,0.46,r) * smoothstep(0.38,0.42,r); if (ring < 0.01) discard;
-          gl_FragColor = vec4(1.0, 0.32, 0.32, ring * (0.7 + 0.3*vB) * vA * strength); }`,
+          gl_FragColor = vec4(0.706, 0.184, 0.208, ring * (0.7 + 0.3*vB) * vA * strength); }`,
     });
     const p = new THREE.Points(g, mat);
     p.renderOrder = 11;
@@ -761,7 +766,7 @@ export class SphereEngine {
       for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) bp.push(sx, sy, 0, sx * 0.55, sy, 0, sx, sy, 0, sx, sy * 0.55, 0);
       const bg = new THREE.BufferGeometry();
       bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3));
-      const br = new THREE.LineSegments(bg, new THREE.LineBasicMaterial({ color: 0x4ce0d2, transparent: true, opacity: 0.9, depthTest: false }));
+      const br = new THREE.LineSegments(bg, new THREE.LineBasicMaterial({ color: 0x1f5c4a, transparent: true, opacity: 0.9, depthTest: false }));
       br.position.set(s.x, s.y, s.z);
       br.userData.bracket = w;
       br.renderOrder = 40;
@@ -787,7 +792,7 @@ export class SphereEngine {
       depthWrite: false,
       uniforms: { k: { value: 0 }, px: this.uPx },
       vertexShader: `uniform float k, px; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); gl_PointSize = max(10.0, (0.02 + 0.03*k) * px / -mv.z); gl_Position = projectionMatrix*mv; }`,
-      fragmentShader: `uniform float k; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(1.0, 0.85, 0.7, (1.0 - k) * smoothstep(0.5, 0.2, r) * 0.8); }`,
+      fragmentShader: `uniform float k; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(0.12, 0.36, 0.29, (1.0 - k) * smoothstep(0.5, 0.2, r) * 0.8); }`,
     });
     this.emberPts = new THREE.Points(g, m);
     this.emberPts.renderOrder = 14;

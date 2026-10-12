@@ -11,7 +11,7 @@ import { when } from './HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useCarry } from '../lib/history';
 
-const RISK_COLOR: Record<CarryRisk, string> = { LOW: '#3b8f88', MEDIUM: 'var(--amber)', HIGH: 'var(--red)', UNKNOWN: 'var(--slate)' };
+const RISK_COLOR: Record<CarryRisk, string> = { LOW: 'var(--cyan)', MEDIUM: 'var(--amber)', HIGH: 'var(--red)', UNKNOWN: 'var(--slate)' };
 const RiskChip = ({ r }: { r: CarryRisk }) => (
   <span className="mono oracle-chip" style={{ borderColor: RISK_COLOR[r], color: RISK_COLOR[r] }}>{r}</span>
 );
@@ -131,7 +131,7 @@ function Spark({ d }: { d: CarryStructure['daily'] }) {
   const bw = W / d.length;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="carry-spark" role="img" aria-label={`Daily net rate over ${d.length} days, from ${apr(Math.min(...vals))} to ${apr(Math.max(...vals))}`}>
-      <line x1="0" x2={W} y1={y(0)} y2={y(0)} stroke="rgba(160,170,180,0.25)" />
+      <line x1="0" x2={W} y1={y(0)} y2={y(0)} stroke="rgba(26,30,34,0.2)" />
       {d.map((p, i) =>
         p.net === null ? null : (
           <rect key={p.at} x={i * bw + 1} width={Math.max(1, bw - 2)} y={Math.min(y(p.net), y(0))} height={Math.max(1, Math.abs(y(p.net) - y(0)))} fill={p.net < 0 ? 'var(--red)' : 'var(--cyan)'}>

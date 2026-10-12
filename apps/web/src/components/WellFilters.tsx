@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TAG_COLORS } from '@aegis/pose';
-import { NO_TYPE_LABEL, NO_TYPE_MEANING, RISK_LABEL, SIZE_LABEL, TAG_LABEL, TAG_MEANING, primaryTypeLabel, NEAR_STATE_LONG, NEAR_EXPLAIN, NEAR_SOLE_LABEL, NEAR_STATE_LABEL } from '@aegis/glyphs';
+
+import { OTHER_COLOR, typeColor, NO_TYPE_LABEL, NO_TYPE_MEANING, RISK_LABEL, SIZE_LABEL, TAG_LABEL, TAG_MEANING, primaryTypeLabel, NEAR_STATE_LONG, NEAR_EXPLAIN, NEAR_SOLE_LABEL, NEAR_STATE_LABEL } from '@aegis/glyphs';
 import { POSE_CHIPS, isFilterActive, type MinBand, type PoseKey, type VenueFilter, type WellFilter } from '../lib/wellFilter';
 import { TagChip } from './bits';
 import type { WellShip } from './Well';
@@ -59,7 +59,7 @@ export function WellFilters({
       <div className="chips" role="group" aria-label="Filter by position type">
         {POSE_CHIPS.map((p) => {
           const on = filter.poses.includes(p);
-          const color = p === 'NONE' ? '#6B7280' : TAG_COLORS[p] ?? '#9CA3AF';
+          const color = typeColor(p === 'NONE' ? null : p);
           return (
             <button
               key={p}
@@ -70,7 +70,7 @@ export function WellFilters({
               title={p === 'NONE' ? NO_TYPE_MEANING : TAG_MEANING[p]}
               style={{ ['--chip' as string]: color }}
             >
-              <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? '1px solid #9CA3AF' : undefined }} />
+              <i style={{ background: p === 'DARK' ? 'transparent' : color, border: p === 'DARK' ? `1px solid ${OTHER_COLOR}` : undefined }} />
               {primaryTypeLabel(p)}
               <span className="faint"> {(counts.get(p) ?? 0).toLocaleString('en-US')}</span>
             </button>

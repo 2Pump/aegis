@@ -7,7 +7,9 @@
  */
 import type { HullTemp, Tag } from '@aegis/pose';
 import { BRAND } from './brand.js';
-import { tagColor } from './core.js';
+import { TAG_COLORS } from '@aegis/pose';
+/** the share card keeps the original dark look (seen on X, away from the site): its own bright type colours */
+const tagColor = (t: string | null): string => (t ? (TAG_COLORS[t] ?? '#9CA3AF') : '#6B7280');
 import { HULL_COPY, NO_TYPE_LABEL, RISK_LABEL, TAG_LABEL } from './labels.js';
 
 export interface ShareFacts {

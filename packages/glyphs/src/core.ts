@@ -1,4 +1,5 @@
-import { TAG_COLORS, type HullTemp, type Tag } from '@aegis/pose';
+import type { HullTemp, Tag } from '@aegis/pose';
+import { typeColor } from './palette.js';
 
 /* Shared by the legacy well (index.ts) and WELL GLASS (glass.ts). */
 
@@ -23,8 +24,7 @@ export const unit = (h: number) => h / 0xffffffff;
 export type SizeBand = 'dust' | '<1k' | '1–10k' | '10–100k' | '100k+';
 
 export function tagColor(tag: Tag | null): string {
-  if (!tag) return '#6B7280';
-  return TAG_COLORS[tag] ?? '#9CA3AF';
+  return typeColor(tag);
 }
 
 /** What the well needs to draw a ship. Built from a live Pose or from a census row — never from balances. */

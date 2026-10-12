@@ -1,4 +1,5 @@
-import { TAG_COLORS, type HullTemp, type Tag } from '@aegis/pose';
+import type { HullTemp, Tag } from '@aegis/pose';
+import { OTHER_COLOR, PALETTE as P, TYPE_COLOR } from './palette.js';
 import { HULL_RING, hash32, hexA, unit, type ShipLite, type SizeBand } from './core.js';
 
 /*
@@ -36,15 +37,15 @@ export const SECTOR_MIN_ARC_DEG = 16;
 export const SECTOR_GAP_DEG = 2;
 
 export const SECTOR_COLORS: Readonly<Record<SectorKey, string>> = {
-  CARRY: TAG_COLORS.CARRY!,
-  'EQUITY-MARGIN': TAG_COLORS['EQUITY-MARGIN']!,
-  NAKED: TAG_COLORS.NAKED!,
-  'KBTC-CORE': TAG_COLORS['KBTC-CORE']!,
-  LEVERED: TAG_COLORS.LEVERED!,
-  HOLD: TAG_COLORS.HOLD!,
-  LOCKED: TAG_COLORS.LOCKED!,
-  'STABLE-BALLAST': TAG_COLORS['STABLE-BALLAST']!,
-  OTHER: '#6B7280',
+  CARRY: TYPE_COLOR.CARRY!,
+  'EQUITY-MARGIN': TYPE_COLOR['EQUITY-MARGIN']!,
+  NAKED: TYPE_COLOR.NAKED!,
+  'KBTC-CORE': TYPE_COLOR['KBTC-CORE']!,
+  LEVERED: TYPE_COLOR.LEVERED!,
+  HOLD: TYPE_COLOR.HOLD!,
+  LOCKED: TYPE_COLOR.LOCKED!,
+  'STABLE-BALLAST': TYPE_COLOR['STABLE-BALLAST']!,
+  OTHER: OTHER_COLOR,
 };
 /** Plain position-type names on the rim (same words as TAG_LABEL in labels.ts, upper-cased for the instrument). */
 export const SECTOR_LABEL: Readonly<Record<SectorKey, string>> = {
@@ -105,7 +106,7 @@ export const GLASS_BAND_R: Readonly<Record<SizeBand, number>> = { dust: 1.1, '<1
 export const GLASS_BANDS: readonly SizeBand[] = ['dust', '<1k', '1–10k', '10–100k', '100k+'];
 
 /** Fill for a ship with no pose sector color: WOUNDED-as-main stays neutral (red is the ring only). */
-const NEUTRAL = '#9CA3AF';
+const NEUTRAL = OTHER_COLOR;
 
 export interface GlassShip extends ShipLite {
   sector: SectorKey;
@@ -155,7 +156,7 @@ export function seatShip(s: ShipLite): GlassShip {
     r,
     ux: Math.sin(rad) * r,
     uy: -Math.cos(rad) * r,
-    color: sector === 'OTHER' ? (hollow ? '#9CA3AF' : NEUTRAL) : SECTOR_COLORS[sector],
+    color: sector === 'OTHER' ? NEUTRAL : SECTOR_COLORS[sector],
     hollow,
     wounded,
     bandIdx,
@@ -321,11 +322,13 @@ export function hitGlass(grid: GlassGrid, g: GlassGeom, c: GlassCamera, sx: numb
 /* ───────────────────────── paint ───────────────────────── */
 
 const MONO = '"IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace';
-const RED = TAG_COLORS.WOUNDED!;
+const RED = P.near;
+/** rgba() of a palette hex */
+const rgba = (hex: string, a: number) => hexA(hex, a);
 const CONTOURS: ReadonlyArray<{ f: number; label: string; stroke: string; text: string; dash: number[]; temp: HullTemp }> = [
-  { f: 0.84, label: 'S A F E', stroke: 'rgba(76,224,210,0.22)', text: 'rgba(76,224,210,0.85)', dash: [2, 6], temp: 'NOMINAL' },
-  { f: 0.54, label: 'W A T C H', stroke: 'rgba(245,193,74,0.32)', text: 'rgba(245,193,74,0.9)', dash: [2, 5], temp: 'ELEVATED' },
-  { f: 0.32, label: 'N E A R   L I Q U I D A T I O N', stroke: 'rgba(255,77,77,0.45)', text: 'rgba(255,77,77,0.95)', dash: [2, 4], temp: 'CRITICAL' },
+  { f: 0.84, label: 'S A F E', stroke: hexA(P.safe, 0.35), text: P.safe, dash: [2, 6], temp: 'NOMINAL' },
+  { f: 0.54, label: 'W A T C H', stroke: hexA(P.watch, 0.5), text: P.watchText, dash: [2, 5], temp: 'ELEVATED' },
+  { f: 0.32, label: 'N E A R   L I Q U I D A T I O N', stroke: hexA(P.near, 0.55), text: P.near, dash: [2, 4], temp: 'CRITICAL' },
 ];
 
 type CanvasFactory = (w: number, h: number) => HTMLCanvasElement;
@@ -371,7 +374,7 @@ export function buildHaze(ships: readonly GlassShip[], g: GlassGeom, make: Canva
   for (const s of ships) {
     const x = (s.ux + ext) * toPx;
     const y = (s.uy + ext) * toPx;
-    h.drawImage(sprite(s.hollow ? '#9CA3AF' : s.color), x - SP, y - SP);
+    h.drawImage(sprite(s.hollow ? OTHER_COLOR : s.color), x - SP, y - SP);
   }
   return { canvas: cv, ext };
 }
@@ -399,25 +402,24 @@ export function drawGlass(ctx: CanvasRenderingContext2D, g: GlassGeom, c: GlassC
   ctx.arc(g.cx, g.cy, R, 0, Math.PI * 2);
   ctx.clip();
 
-  // volume: darker at the bottom of the well; one lamp at ~2 o'clock; recessed edge
+  // volume: a little deeper toward the bottom of the well; one lamp at ~2 o'clock; recessed edge
   const vol = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, Z);
-  vol.addColorStop(0, '#000000');
-  vol.addColorStop(0.35, '#020406');
-  vol.addColorStop(0.8, '#070b10');
-  vol.addColorStop(1, '#0c1219');
+  vol.addColorStop(0, P.wellDeep);
+  vol.addColorStop(0.5, P.well);
+  vol.addColorStop(1, P.panel);
   ctx.fillStyle = vol;
   ctx.fillRect(0, 0, w, h);
   const lamp = ctx.createRadialGradient(g.cx + R * 0.55, g.cy - R * 0.45, 0, g.cx + R * 0.55, g.cy - R * 0.45, R * 0.9);
-  lamp.addColorStop(0, 'rgba(140,200,210,0.055)');
-  lamp.addColorStop(1, 'rgba(140,200,210,0)');
+  lamp.addColorStop(0, 'rgba(255,255,255,0.35)');
+  lamp.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = lamp;
   ctx.fillRect(0, 0, w, h);
 
   // LIQ ZONE basin
   const basin = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, 0.32 * Z);
-  basin.addColorStop(0, 'rgba(255,77,77,0)');
-  basin.addColorStop(0.55, 'rgba(255,77,77,0.035)');
-  basin.addColorStop(1, 'rgba(255,77,77,0.075)');
+  basin.addColorStop(0, rgba(P.near, 0));
+  basin.addColorStop(0.55, rgba(P.near, 0.04));
+  basin.addColorStop(1, rgba(P.near, 0.08));
   ctx.fillStyle = basin;
   ctx.beginPath();
   ctx.arc(ccx, ccy, 0.32 * Z, 0, Math.PI * 2);
@@ -444,7 +446,7 @@ export function drawGlass(ctx: CanvasRenderingContext2D, g: GlassGeom, c: GlassC
   }
   ctx.setLineDash([]);
   // sector spokes
-  ctx.strokeStyle = 'rgba(160,175,190,0.10)';
+  ctx.strokeStyle = rgba(P.ink, 0.08);
   ctx.beginPath();
   for (const k of SECTOR_ORDER) {
     const a = ((SECTORS[k][0] - SECTOR_GAP_DEG / 2) * Math.PI) / 180;
@@ -477,7 +479,7 @@ export function drawGlass(ctx: CanvasRenderingContext2D, g: GlassGeom, c: GlassC
     const y = ccy + (dirY / dl) * k.f * Z;
     if (Math.hypot(x - g.cx, y - g.cy) > R - 10) continue;
     const tw = ctx.measureText(k.label).width + 12;
-    ctx.fillStyle = '#020305';
+    ctx.fillStyle = P.panel;
     ctx.fillRect(x - tw / 2, y - 7, tw, 13);
     ctx.fillStyle = k.text;
     ctx.fillText(k.label, x, y + 3.5);
@@ -561,7 +563,7 @@ function drawGlyphs(ctx: CanvasRenderingContext2D, g: GlassGeom, c: GlassCamera,
   // hulls this viewer opened: a thin white ring
   if (focus.length) {
     ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = '#E5F9F7';
+    ctx.strokeStyle = P.ink;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < focus.length; i += 3) {
@@ -586,26 +588,26 @@ export function drawGlassFrame(ctx: CanvasRenderingContext2D, g: GlassGeom): voi
   const { w, h, cx, cy, R, phone } = g;
   ctx.clearRect(0, 0, w, h);
   const vg = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, Math.max(w, h) * 0.75);
-  vg.addColorStop(0, '#05080c');
-  vg.addColorStop(1, '#010203');
+  vg.addColorStop(0, P.panel);
+  vg.addColorStop(1, P.page);
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, w, h);
 
   // recessed lip
   const lip = ctx.createRadialGradient(cx, cy, R * 0.96, cx, cy, R + 6);
-  lip.addColorStop(0, 'rgba(0,0,0,0)');
-  lip.addColorStop(1, 'rgba(0,0,0,0.6)');
+  lip.addColorStop(0, rgba(P.ink, 0));
+  lip.addColorStop(1, rgba(P.ink, 0.06));
   ctx.fillStyle = lip;
   ctx.beginPath();
   ctx.arc(cx, cy, R + 6, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(120,190,200,0.35)';
+  ctx.strokeStyle = rgba(P.ink, 0.28);
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(120,190,200,0.14)';
+  ctx.strokeStyle = rgba(P.ink, 0.1);
   ctx.beginPath();
   ctx.arc(cx, cy, R + (phone ? 14 : 26), 0, Math.PI * 2);
   ctx.stroke();
@@ -618,13 +620,13 @@ export function drawGlassFrame(ctx: CanvasRenderingContext2D, g: GlassGeom): voi
     const big = d % 30 === 0;
     const r0 = R + 2;
     const r1 = R + (big ? 9 : major ? 6 : 3);
-    ctx.strokeStyle = big ? 'rgba(170,210,215,0.55)' : major ? 'rgba(150,170,180,0.32)' : 'rgba(150,170,180,0.18)';
+    ctx.strokeStyle = big ? rgba(P.ink, 0.5) : major ? rgba(P.ink, 0.28) : rgba(P.ink, 0.14);
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
     ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
     ctx.stroke();
     if (big && !phone) {
-      ctx.fillStyle = 'rgba(125,139,155,0.8)';
+      ctx.fillStyle = P.inkFaint;
       ctx.fillText(String(d).padStart(3, '0'), cx + Math.cos(a) * (R + 18), cy + Math.sin(a) * (R + 18) + 3);
     }
   }
@@ -639,7 +641,7 @@ export function drawGlassFrame(ctx: CanvasRenderingContext2D, g: GlassGeom): voi
     const arcPx = ((a1 - a0) * Math.PI * rimR) / 180;
     const full = SECTOR_LABEL[k];
     const label = full.length * cw + 10 <= arcPx ? full : SECTOR_ABBR[k];
-    const col = SECTOR_COLORS[k] === '#6B7280' ? '#9CA3AF' : SECTOR_COLORS[k];
+    const col = SECTOR_COLORS[k];
     ctx.save();
     ctx.fillStyle = col;
     ctx.globalAlpha = 0.9;
@@ -668,7 +670,7 @@ export function drawGlassFrame(ctx: CanvasRenderingContext2D, g: GlassGeom): voi
   }
 
   // corner brackets: a frame for the instrument, never pointed at a ship
-  ctx.strokeStyle = 'rgba(120,190,200,0.4)';
+  ctx.strokeStyle = rgba(P.ink, 0.3);
   ctx.lineWidth = 1;
   const m = phone ? 6 : 14;
   const L = phone ? 14 : 26;
@@ -712,7 +714,7 @@ export function drawGlassOverlay(ctx: CanvasRenderingContext2D, g: GlassGeom, c:
     const [x, y] = toScreen(g, c, s.ux, s.uy);
     const t = age / FLASH_MS;
     const rr = glyphRadius(g, c, s) + 3 + (st.reduceMotion ? 4 : t * 12);
-    ctx.strokeStyle = `rgba(229,249,247,${(0.8 * (1 - t)).toFixed(3)})`;
+    ctx.strokeStyle = rgba(P.accent, 0.8 * (1 - t));
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.arc(x, y, rr, 0, Math.PI * 2);
@@ -737,7 +739,7 @@ export function drawGlassOverlay(ctx: CanvasRenderingContext2D, g: GlassGeom, c:
       [7, 0.95],
       [13, 0.45],
     ] as const) {
-      ctx.strokeStyle = `rgba(229,249,247,${a})`;
+      ctx.strokeStyle = rgba(P.ink, a);
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(x, y, rr + pad, 0, Math.PI * 2);
@@ -746,7 +748,7 @@ export function drawGlassOverlay(ctx: CanvasRenderingContext2D, g: GlassGeom, c:
   }
   if (st.hover) {
     const [x, y] = toScreen(g, c, st.hover.ux, st.hover.uy);
-    ctx.strokeStyle = '#E5F9F7';
+    ctx.strokeStyle = P.ink;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(x, y, glyphRadius(g, c, st.hover) + 5, 0, Math.PI * 2);
@@ -779,7 +781,7 @@ export function drawGlassSnapshot(ctx: CanvasRenderingContext2D, g: GlassGeom, s
   ctx.beginPath();
   ctx.arc(g.cx, g.cy, g.R, 0, Math.PI * 2);
   ctx.clip();
-  ctx.fillStyle = '#05080c';
+  ctx.fillStyle = P.well;
   ctx.fillRect(0, 0, g.w, g.h);
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(snap, dx, dy, g.w * k, g.h * k);
