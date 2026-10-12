@@ -96,6 +96,8 @@ export interface Subscription {
   sentAt: number[];
   /** per watched wallet: the alerts engine's transition state */
   walletState: Record<string, unknown>;
+  /** the Desk account that created it (deliveries pause when its plan ends) */
+  owner?: string | null;
 }
 
 /* ───────────────────────── signing ───────────────────────── */
@@ -308,7 +310,7 @@ export function settle(sub0: Subscription, d: Delivery, r: SendResult, nowMs: nu
 /** Retryable = the endpoint may recover: network errors, timeouts, 408, 425, 429, 5xx. Other 4xx are final. */
 export const retryableStatus = (status: number | null) => status === null || status === 408 || status === 425 || status === 429 || status >= 500;
 
-export function newSubscription(o: { id: string; url: string; events: EventType[]; wallets: string[]; nowMs: number }): { sub: Subscription; secret: string; token: string } {
+export function newSubscription(o: { id: string; url: string; events: EventType[]; wallets: string[]; nowMs: number; owner?: string | null }): { sub: Subscription; secret: string; token: string } {
   const secret = newSecret();
   const token = newToken();
   return {
@@ -317,6 +319,7 @@ export function newSubscription(o: { id: string; url: string; events: EventType[
     sub: {
       v: 1,
       id: o.id,
+      owner: o.owner ?? null,
       url: o.url,
       events: o.events,
       wallets: o.wallets,

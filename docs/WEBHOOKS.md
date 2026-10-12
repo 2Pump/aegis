@@ -1,4 +1,4 @@
-# Webhooks (`webhooks-1.0.0`): built and tested, OFF
+# Webhooks (`webhooks-1.0.0`): Desk only — built and tested, OFF until switched on
 
 Webhooks are signed HTTPS POSTs of Phrourax events to an endpoint you control. They use the **same transition engine as Telegram alerts** for wallet events (`alerts/engine.ts`) and the **same Ink-wide event feed** (`events.ts`).
 
@@ -102,19 +102,30 @@ POST   /api/v1/webhooks/{id}/test    → a webhook.test delivery on the next run
 - **Signing secrets** are stored sealed, because they're needed to sign.
 - **Logs** carry counts only: never URLs, secrets or addresses.
 
+## Desk only
+
+- **Creating** a webhook needs a Desk API key (`Authorization: Bearer phx_…`) or a signed-in Desk session; anything
+  else answers 401 / 402. Each account may have **5**. The creating account is stored with the subscription.
+- **Managing** one (GET / PATCH / DELETE / rotate / test) uses its own token `whtok_…`, as before.
+- **Plan ends:** a daily Vercel cron (`/api/v1/cron/webhooks`, 15:23 UTC, `CRON_SECRET`) pauses every webhook of an
+  account that is no longer on Desk, with the reason. After renewing, `PATCH {"status":"active"}` restarts it; while
+  the plan is off that PATCH answers 402. Deleting frees a slot.
+- Pricing and the Developers page show webhooks as INCLUDED for Desk only while they're switched on.
+
 ## Turning it on (owner's decision)
 
-1. Generate a key:
+1. Make a key in PowerShell (it goes to the clipboard, not the screen):
    ```
-   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b) | Set-Clipboard
    ```
-2. **Vercel** → Settings → Environment Variables:
+2. **Vercel** → Settings → Environment Variables (Secret, Production):
    - `WEBHOOKS_STORE_KEY` = that key
-   - `WEBHOOKS_ENABLED` = `1`
-   - `BLOB_READ_WRITE_TOKEN` (the census token)
+   - `WEBHOOKS_ENABLED` = `1` (Config)
+   - `BLOB_READ_WRITE_TOKEN` = the census Blob token, if it isn't there already
 3. **GitHub** → Settings → Secrets → Actions: `WEBHOOKS_STORE_KEY` = **the same key**.
 4. **GitHub** → Variables: `WEBHOOKS_ENABLED` = `true`.
-5. Redeploy. Then create a webhook against an endpoint you own, watch it verify, and send a test.
+5. Redeploy. Then make an API key on the Account page, create a webhook against an endpoint you own that answers
+   the verification event with its `data.challenge`, run the `webhooks` workflow, and watch it verify.
 
 To turn it off again, remove `WEBHOOKS_ENABLED` from both places.
 

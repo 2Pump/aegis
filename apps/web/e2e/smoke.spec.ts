@@ -899,3 +899,58 @@ test('Alerts live, no plan: the page explains the plans and offers no Connect bu
   await page.getByTestId('alerts-choose-plan').click();
   await expect(page).toHaveURL(/\/pricing$/);
 });
+
+/* ── Desk API keys (docs/API.md) ── */
+test('Account, Desk: make an API key (shown once, copyable), see it listed by its last 4, revoke it', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: true, email: 'd@b.co', access: 'desk', plan: 'desk', paidUntil: '2099-01-01T00:00:00Z' });
+  const KEY = 'phx_' + 'A'.repeat(28) + 'wXyZ';
+  let keys: Array<Record<string, unknown>> = [];
+  await page.route('**/api/v1/keys**', async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname;
+    const json = (status: number, b: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(b) });
+    if (req.method() === 'GET') return json(200, { desk: true, max: 5, keys });
+    if (path.endsWith('/revoke')) {
+      keys = [];
+      return json(200, { keys });
+    }
+    keys = [{ id: 'key_1', name: (req.postDataJSON() as { name: string }).name, hint: 'wXyZ', createdAt: new Date().toISOString(), lastUsedAt: null }];
+    return json(201, { key: KEY, keys });
+  });
+  await page.goto('/account');
+  const p = page.getByTestId('api-keys');
+  await expect(p).toContainText('0 / 5');
+  await page.getByTestId('api-key-name').fill('trading-bot');
+  await page.getByTestId('api-key-create').click();
+  await expect(page.getByTestId('api-key-value')).toHaveText(KEY);
+  await expect(page.getByTestId('api-key-fresh')).toContainText('SHOWN ONCE');
+  await expect(page.getByTestId('api-key-name')).toHaveCount(0); // no new key while one is on screen
+  await page.getByTestId('api-key-done').click();
+  await expect(page.getByTestId('api-key-value')).toHaveCount(0);
+  await expect(page.getByTestId('api-keys-table')).toContainText('phx_…wXyZ');
+  await expect(page.getByTestId('api-keys-table')).toContainText('trading-bot');
+  await expect(page.getByTestId('api-keys-table')).not.toContainText(KEY);
+  await page.getByTestId('api-key-revoke').click();
+  await expect(page.getByTestId('api-keys-table')).toHaveCount(0);
+});
+
+test('Account, Pro: API keys say they come with Desk; no create form', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, signedIn: true, email: 'p@b.co', access: 'pro', plan: 'pro', paidUntil: '2099-01-01T00:00:00Z' });
+  await page.route('**/api/v1/keys', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ desk: false, max: 5, keys: [] }) }));
+  await page.goto('/account');
+  await expect(page.getByTestId('api-keys-locked')).toContainText('Desk plan');
+  await expect(page.getByTestId('api-key-create')).toHaveCount(0);
+});
+
+test('Developers with webhooks on: how to create one with a key; Pricing says webhooks and keys are included for Desk', async ({ page }) => {
+  await serveMe(page, { configured: true, paywall: true, billing: true, webhooks: true, signedIn: false, access: 'free' });
+  await page.goto('/developers');
+  await expect(page.getByTestId('webhooks-live')).toContainText('Authorization: Bearer phx_');
+  await expect(page.getByTestId('webhooks-not-live')).toHaveCount(0);
+  await expect(page.getByTestId('dev-paid')).toContainText('API key');
+  await page.goto('/pricing');
+  const c = page.getByTestId('plan-compare');
+  await expect(c.getByRole('row', { name: /^Webhooks/ })).toContainText('INCLUDED · up to 5 endpoints');
+  await expect(c.getByRole('row', { name: /every other endpoint/ })).toContainText('API keys');
+  await expect(page.getByTestId('plan-desk')).not.toContainText('when they open');
+});

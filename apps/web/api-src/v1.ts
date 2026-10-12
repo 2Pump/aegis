@@ -18,10 +18,10 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { API, DISCLAIMER, RateLimiter, handle, makeDataHandler, makeShareHandler, type ApiDeps } from '@aegis/census/api';
-import { ALERTS_SITE, apiUnlocked, isFreeApiPath, PAYMENT_REQUIRED } from '@aegis/census/accounts';
+import { ALERTS_SITE, apiUnlocked, bearerKey, isFreeApiPath, PAYMENT_REQUIRED } from '@aegis/census/accounts';
 import { decodeShip, type CensusSnapshot } from '@aegis/census';
 import { INK_PUBLIC_RPCS, makeInkClient, readBook, splitRpcList } from '@aegis/ink-io';
-import { makeWebhookHandler } from './webhooks';
+import { makeWebhooks } from './webhooks';
 import { makeAlertsReader, privateCensusReader } from '@aegis/census/node';
 import { makeAccounts } from './accounts';
 
@@ -90,7 +90,6 @@ const deps: ApiDeps = {
     });
     return r.book ?? null;
   },
-  webhooks: makeWebhookHandler(),
 };
 
 /* ── share card renderer: resvg + the bundled IBM Plex TTFs (apps/web/api-assets/fonts, OFL) ── */
@@ -107,6 +106,8 @@ const accounts = makeAccounts(process.env, {
   // the bot's /watch and /status replies: the same reader the alerts runner uses (Tydro + every known Nado subaccount)
   read: async (address, scenarios) => makeAlertsReader(client, await get('census.json').catch(() => null))(address, scenarios),
 });
+const webhooks = makeWebhooks(accounts);
+deps.webhooks = webhooks.handler;
 const share = makeShareHandler({ readWallet: (a) => deps.readWallet!(a), render: renderPng, now: () => Date.now(), fixtures });
 
 function clientIp(req: IncomingMessage): string {
@@ -190,19 +191,40 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.end(JSON.stringify(out.body));
     return;
   }
-  const query: Record<string, string> = {};
-  for (const [k, v] of url.searchParams) if (!(k in query)) query[k] = v;
-  // the paid API (Desk) while PAYWALL=1: free paths stay open; webhooks keep their own auth
-  const paid = accounts.paywall && !isFreeApiPath(path) && !path.startsWith('/webhooks') && req.method !== 'OPTIONS';
-  if (paid && !apiUnlocked((await accounts.who(cookie)).access)) {
-    res.statusCode = 402;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    res.end(JSON.stringify({ schema: API.SCHEMA, error: { code: 'PAYMENT_REQUIRED', status: 402, message: PAYMENT_REQUIRED.api }, disclaimer: DISCLAIMER }));
+  // Desk API keys: create / list / revoke (signed-in, same-origin)
+  if (path === '/keys' || path === '/keys/revoke') {
+    const out = await accounts.keys({ method: req.method ?? 'GET', path, headers: req.headers, ip: clientIp(req), body: await readBody(req) });
+    res.statusCode = out.status;
+    for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
+    res.end(JSON.stringify(out.body));
     return;
   }
+  // daily (vercel.json): pause webhooks whose account is no longer on Desk
+  if (path === '/cron/webhooks') {
+    const ok = !!process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.statusCode = ok ? 200 : 401;
+    res.end(JSON.stringify(ok ? { ok: true, ...(await webhooks.pauseEnded()) } : { error: { code: 'UNAUTHORIZED', message: 'Cron only.' } }));
+    return;
+  }
+  const query: Record<string, string> = {};
+  for (const [k, v] of url.searchParams) if (!(k in query)) query[k] = v;
+  // an API key (Authorization: Bearer phx_…) stands for its account; rate limits then apply per key, not per IP
+  const apiKey = bearerKey(req.headers.authorization);
+  const keyed = apiKey && accounts.on ? await accounts.byKey(apiKey) : null;
+  const deny = (status: number, code: string, message: string) => {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ schema: API.SCHEMA, error: { code, status, message }, disclaimer: DISCLAIMER }));
+  };
+  if (apiKey && accounts.on && !keyed && !path.startsWith('/webhooks')) return deny(401, 'INVALID_API_KEY', 'unknown or revoked API key');
+  // the paid API (Desk) while PAYWALL=1: free paths stay open; webhooks check Desk themselves (creation) or use their own token
+  const paid = accounts.paywall && !isFreeApiPath(path) && !path.startsWith('/webhooks') && req.method !== 'OPTIONS';
+  if (paid && !apiUnlocked(keyed ? keyed.access : (await accounts.who(cookie)).access)) return deny(402, 'PAYMENT_REQUIRED', PAYMENT_REQUIRED.api);
   const out = await handle(
-    { method: req.method === 'HEAD' ? 'GET' : (req.method ?? 'GET'), path, query, ip: clientIp(req), headers: req.headers as Record<string, string>, body: await readBody(req) },
+    { method: req.method === 'HEAD' ? 'GET' : (req.method ?? 'GET'), path, query, ip: keyed && !path.startsWith('/webhooks') ? `key:${keyed.keyId}` : clientIp(req), headers: req.headers as Record<string, string>, body: await readBody(req) },
     deps,
   );
   // a paid answer is for this subscriber only: never cached by the CDN

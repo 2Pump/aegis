@@ -1,2 +1,2 @@
 export * from './core.js';
-export { makeWebhookApi, type WebhookStore } from './api.js';
+export { makeWebhookApi, type WebhookOwners, type WebhookStore } from './api.js';

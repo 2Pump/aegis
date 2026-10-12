@@ -4,6 +4,28 @@ A read-only JSON API over the same readings as the site. It's one Vercel functio
 
 The machine-readable description is at **`/api/v1/openapi.json`** (OpenAPI 3.1). There's also a page for people at **`/developers`**.
 
+## Access and API keys (`keys-1.0.0`)
+
+With the paywall on, `/`, `/openapi.json`, `/status`, `/wallets/{address}`, `/performance` and `/verification` are free;
+everything else needs the **Desk** plan. Two ways to prove it:
+
+- **API key (servers, scripts):** `Authorization: Bearer phx_…`. Made on the Account page (Desk only), at most **5 per
+  account**, shown **once**, stored only as a SHA-256 fingerprint. The list shows name, last 4 characters, created and
+  last used (updated at most hourly).
+- **Signed-in session** (the website itself).
+
+| Situation | Answer |
+|---|---|
+| unknown or revoked key | `401 INVALID_API_KEY` |
+| key whose account isn't on Desk (any more) | `402 PAYMENT_REQUIRED` |
+| revoked key | stops within ~30 s (each server instance remembers a key for 30 s) |
+
+Rate limits (below) count **per key** when a key is sent, otherwise per IP. Paid answers are `Cache-Control: private,
+no-store`. Keep keys server-side: never in a web page, an app bundle or public code.
+
+Endpoints: `GET /api/v1/keys`, `POST /api/v1/keys {name}`, `POST /api/v1/keys/revoke {id}` — signed-in, same-origin
+only (the Account page uses them; keys can't create keys).
+
 ## Endpoints (GET only)
 
 | Path | What |

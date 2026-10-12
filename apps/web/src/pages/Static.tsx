@@ -67,11 +67,12 @@ export function DevelopersPage() {
         {paywall ? (
           <div className="banner" data-testid="dev-paid">
             Paid plans are on: <span className="mono">/status</span>, <span className="mono">/wallets/&#123;address&#125;</span>, <span className="mono">/performance</span> and{' '}
-            <span className="mono">/verification</span> stay free; the rest need the <Link to="/pricing">Desk plan</Link> (signed in for now — API keys are coming).
+            <span className="mono">/verification</span> stay free; the rest need the <Link to="/pricing">Desk plan</Link>. Make an API key on your <Link to="/account">Account</Link> page and send it as{' '}
+            <span className="mono">Authorization: Bearer phx_…</span>.
           </div>
         ) : null}
         <pre className="mono dev-pre" data-testid="dev-example">{`# example (values change every scan)
-curl https://phrourax.com/api/v1/stress
+curl -H "Authorization: Bearer phx_…" https://phrourax.com/api/v1/stress
 
 { "schema": "phrourax-api-1",
   "data": { "level": "CALM", "confidence": "NORMAL", … },
@@ -88,7 +89,8 @@ curl https://phrourax.com/api/v1/stress
       </Panel>
       <Panel title="Rules of use" rail="var(--slate)">
         <ul className="dim">
-          <li>Rate limits per IP, per minute: aggregates 120 · one wallet 30 · live wallet scenario 6. Responses carry RateLimit headers; 429 carries Retry-After. Aggregates are cached for 60 s.</li>
+          <li>Rate limits per minute — per API key when you send one, otherwise per IP: aggregates 120 · one wallet 30 · live wallet scenario 6. Responses carry RateLimit headers; 429 carries Retry-After. Aggregates are cached for 60 s.</li>
+          <li>API keys (Desk): up to 5 per account, made and revoked on the Account page, shown once. A revoked key stops working within about 30 seconds; an unknown or revoked key answers 401, a key whose Desk plan has ended answers 402. Keep keys server-side — never in a web page or public code.</li>
           <li>Errors: <span className="mono">{'{ "error": { "code", "status", "message" } }'}</span> — codes are listed in the OpenAPI file.</li>
           <li>Privacy: no endpoint lists wallets or ranks them by closeness to liquidation; no balances, health factors or liquidation prices; small counts are suppressed. Ranges are bounded (90 days) and paged (100 per page).</li>
           <li>Versioning: fields are only added within v1. A breaking change becomes /api/v2, and v1 keeps working for at least 90 days after notice.</li>
@@ -96,7 +98,24 @@ curl https://phrourax.com/api/v1/stress
         </ul>
       </Panel>
       <Panel title="Webhooks" rail="var(--slate)">
-        <div className="banner" data-testid="webhooks-not-live">NOT LIVE YET — built and tested (signed, timestamped, retried, verified endpoints), but not switched on. Creating one answers NOT_ENABLED.</div>
+        {me.status === 'ok' && me.me.webhooks ? (
+          <div className="stack" style={{ gap: 8 }} data-testid="webhooks-live">
+            <p className="dim" style={{ margin: 0 }}>
+              Signed HTTPS POSTs of Phrourax events to an endpoint you own — wallet risk changes for up to 10 wallets per endpoint, liquidations, oracle problems, parameter changes, Ink Stress Level, cascades, failed checks. Desk: up to 5 endpoints per account. Delivered every ~10 minutes, retried with backoff, never balances.
+            </p>
+            <pre className="mono dev-pre">{`curl -X POST https://phrourax.com/api/v1/webhooks \
+  -H "Authorization: Bearer phx_…" -H "Content-Type: application/json" \
+  -d '{"url":"https://you.example/hook","events":["wallet.risk_changed","oracle.depeg"],"wallets":["0x…"]}'
+
+→ 201 { "id": "wh_…", "secret": "whsec_…", "token": "whtok_…" }   # shown once`}</pre>
+            <p className="dim" style={{ margin: 0 }}>
+              Verify every delivery with the <span className="mono">Phrourax-Signature</span> header (HMAC-SHA256 of <span className="mono">t.body</span> with your secret). Manage it with its token:{' '}
+              <span className="mono">GET / PATCH / DELETE /webhooks/&#123;id&#125;</span>, <span className="mono">POST …/rotate</span>, <span className="mono">POST …/test</span>. If the Desk plan ends, its webhooks pause; renew, then PATCH <span className="mono">{'{"status":"active"}'}</span>.
+            </p>
+          </div>
+        ) : (
+          <div className="banner" data-testid="webhooks-not-live">NOT LIVE YET — built and tested (signed, timestamped, retried, verified endpoints), but not switched on. Creating one answers NOT_ENABLED.</div>
+        )}
       </Panel>
     </div>
   );

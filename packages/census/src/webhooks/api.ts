@@ -54,7 +54,19 @@ function validWallets(x: unknown, fixtures: ReadonlySet<string>): string[] | { c
   return [...new Set(out)];
 }
 
-export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixtures?: ReadonlySet<string> }): WebhookHandler {
+/** Who may create webhooks, and how many each account has (Desk, docs/WEBHOOKS.md). Absent = anyone (tests, local). */
+export interface WebhookOwners {
+  /** the creating request's account: ok when it is on Desk (API key or signed-in session) */
+  authorize(req: ApiRequest): Promise<{ ok: true; owner: string } | { ok: false; code: 'UNAUTHORIZED' | 'PAYMENT_REQUIRED'; message: string }>;
+  /** may this owner's webhook be (re)activated — is the plan still Desk? */
+  active(owner: string): Promise<boolean>;
+  count(owner: string): Promise<number>;
+  add(owner: string, id: string): Promise<void>;
+  remove(owner: string, id: string): Promise<void>;
+  max: number;
+}
+
+export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixtures?: ReadonlySet<string>; owners?: WebhookOwners }): WebhookHandler {
   const fixtures = o.fixtures ?? new Set<string>();
   return async (req, sub) => {
     const [id, action] = sub;
@@ -70,9 +82,17 @@ export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixt
       const wallets = validWallets(b.wallets, fixtures);
       if (!Array.isArray(wallets)) return fail(400, wallets.code, wallets.msg);
       if (events.some((e) => e.startsWith('wallet.')) && !wallets.length) return fail(400, 'INVALID_PARAMETER', 'wallet.* events need at least one wallet');
+      let owner: string | null = null;
+      if (o.owners) {
+        const a = await o.owners.authorize(req);
+        if (!a.ok) return fail(a.code === 'UNAUTHORIZED' ? 401 : 402, a.code, a.message);
+        owner = a.owner;
+        if ((await o.owners.count(owner)) >= o.owners.max) return fail(400, 'INVALID_PARAMETER', `at most ${o.owners.max} webhooks per account — delete one first`);
+      }
       if ((await o.store.count()) >= WEBHOOKS.MAX_SUBSCRIPTIONS) return fail(503, 'NOT_ENABLED', 'no new webhooks can be created right now (capacity)');
-      const created = newSubscription({ id: `wh_${randomBytes(12).toString('base64url')}`, url: String(b.url), events, wallets, nowMs: now });
+      const created = newSubscription({ id: `wh_${randomBytes(12).toString('base64url')}`, url: String(b.url), events, wallets, nowMs: now, owner });
       await o.store.put(created.sub);
+      if (o.owners && owner) await o.owners.add(owner, created.sub.id);
       return json(201, {
         schema: API.SCHEMA,
         data: {
@@ -92,6 +112,7 @@ export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixt
       if (req.method === 'GET') return json(200, { schema: API.SCHEMA, data: publicView(s) });
       if (req.method === 'DELETE') {
         await o.store.del(id);
+        if (o.owners && s.owner) await o.owners.remove(s.owner, id);
         return json(200, { schema: API.SCHEMA, data: { id, deleted: true } });
       }
       if (req.method === 'PATCH') {
@@ -100,7 +121,10 @@ export function makeWebhookApi(o: { store: WebhookStore; now: () => number; fixt
         const next: Subscription = { ...s };
         if (b.status !== undefined) {
           if (b.status === 'paused') next.status = 'paused';
-          else if (b.status === 'active') next.status = s.verifiedAt ? 'active' : 'pending-verification';
+          else if (b.status === 'active') {
+            if (o.owners && s.owner && !(await o.owners.active(s.owner))) return fail(402, 'PAYMENT_REQUIRED', 'webhooks need an active Desk plan on the account that created this one');
+            next.status = s.verifiedAt ? 'active' : 'pending-verification';
+          }
           else return fail(400, 'INVALID_PARAMETER', "status must be 'paused' or 'active'");
           next.pausedReason = next.status === 'paused' ? 'paused by its owner' : null;
           if (next.status !== 'paused') next.deadInARow = 0;

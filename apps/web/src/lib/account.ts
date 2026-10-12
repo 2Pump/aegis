@@ -22,6 +22,8 @@ export interface Me {
   billing?: boolean;
   /** Telegram alerts are open to this visitor (live for everyone, or the owner testing before going live) */
   alerts?: boolean;
+  /** webhooks are switched on (Desk) */
+  webhooks?: boolean;
   payments?: Array<{ at: string; plan: 'pro' | 'desk'; usd: number; paidUntil: string }>;
 }
 export type MeState = { status: 'loading' } | { status: 'ok'; me: Me };
@@ -64,7 +66,7 @@ export function useMe(): MeState {
 
 export async function authPost<T>(path: string, body: unknown, base = 'auth'): Promise<{ ok: true; data: T } | { ok: false; status: number; message: string }> {
   try {
-    const r = await fetch(`/api/v1/${base}/${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(base ? `/api/v1/${base}/${path}` : `/api/v1/${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = (await r.json().catch(() => null)) as (T & { error?: { message?: string } }) | null;
     if (!r.ok) return { ok: false, status: r.status, message: j?.error?.message ?? `Something went wrong (HTTP ${r.status}).` };
     return { ok: true, data: j as T };

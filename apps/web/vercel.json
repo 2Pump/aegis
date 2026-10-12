@@ -53,6 +53,10 @@
     {
       "path": "/api/v1/billing/remind",
       "schedule": "7 15 * * *"
+    },
+    {
+      "path": "/api/v1/cron/webhooks",
+      "schedule": "23 15 * * *"
     }
   ]
 }

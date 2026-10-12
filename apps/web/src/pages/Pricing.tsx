@@ -28,7 +28,7 @@ const COMPARE: Array<[string, Cell, Cell, Cell]> = [
   ['Wallet stress test', 'no', 'yes', 'yes'],
   ['Telegram alerts', 'no', 'soon:up to 10 wallets', 'soon:up to 100 wallets'],
   ['API — free endpoints (/status, /wallets/{address}, /performance, /verification)', 'yes', 'yes', 'yes'],
-  ['API — every other endpoint', 'no', 'no', 'yes:signed-in session now; API keys coming soon'],
+  ['API — every other endpoint', 'no', 'no', 'yes:with your API keys (up to 5)'],
   ['Webhooks', 'no', 'no', 'soon'],
 ];
 
@@ -98,7 +98,7 @@ export function PricingPage() {
           <div className="dim" style={{ fontSize: 13 }}>{p.blurb}</div>
           <div className="plan-for" data-testid={`for-${k}`}>For: {FOR[k]}</div>
           <ul className="plan-list">
-            {p.features.map((f) => <li key={f}>{f}</li>)}
+            {p.features.map((f) => (m?.webhooks ? f.replace(' (when they open)', '') : f)).map((f) => <li key={f}>{f}</li>)}
           </ul>
           {action(k)}
         </div>
@@ -124,7 +124,7 @@ export function PricingPage() {
                 <tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Pro · ${PLANS.pro.usd}</th><th scope="col">Desk · ${PLANS.desk.usd}</th></tr>
               </thead>
               <tbody>
-                {(m?.alerts ? COMPARE.map((r): typeof r => (r[0] === 'Telegram alerts' ? [r[0], 'no', 'yes:up to 10 wallets', 'yes:up to 100 wallets'] : r)) : COMPARE).map(([what, f, p, d]) => (
+                {COMPARE.map((r): typeof r => (m?.alerts && r[0] === 'Telegram alerts' ? [r[0], 'no', 'yes:up to 10 wallets', 'yes:up to 100 wallets'] : m?.webhooks && r[0] === 'Webhooks' ? [r[0], 'no', 'no', 'yes:up to 5 endpoints'] : r)).map(([what, f, p, d]) => (
                   <tr key={what}>
                     <th scope="row">{what}</th>
                     <td><CellView c={f} /></td>

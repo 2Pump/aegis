@@ -30,6 +30,9 @@ import {
   TELEGRAM_TOKEN_SHAPE,
   effectiveAccess,
   makeAccountsHandler,
+  makeKeyResolver,
+  makeKeysHandler,
+  loadUser,
   parseAuthSecret,
   parseComp,
   resendMailer,
@@ -38,6 +41,7 @@ import {
   type Access,
   type AlertsDeps,
   type AuthHandler,
+  type Kv,
 } from '@aegis/census/accounts';
 
 export interface AccountsRuntime {
@@ -46,6 +50,15 @@ export interface AccountsRuntime {
   billing: AuthHandler;
   /** /alerts/* and /telegram/hook */
   alerts: AuthHandler;
+  /** /keys — Desk API keys (create, list, revoke) */
+  keys: AuthHandler;
+  /** an API key's account and plan (null = not a live key) */
+  byKey: (key: string) => Promise<{ uid: string; keyId: string; access: Access } | null>;
+  /** the signed-in account behind a cookie (uncached; for rare actions like creating a webhook) */
+  sessionOf: (cookieHeader: string | undefined) => Promise<{ uid: string; access: Access } | null>;
+  /** an account's plan now */
+  accessOf: (uid: string) => Promise<Access>;
+  kv: Kv | null;
   on: boolean;
   paywall: boolean;
   /** the visitor's plan from their cookie ('free' when signed out, or when accounts are off) */
@@ -62,7 +75,7 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env, extra: Pick<A
   const resend = env.RESEND_API_KEY;
   if (!secret || !url || !token || !resend) {
     if (env.PAYWALL === '1') console.error('PAYWALL=1 ignored: accounts are not fully set up (docs/ACCOUNTS.md)');
-    return { handler: accountsOff, billing: billingOff, alerts: alertsOff, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
+    return { handler: accountsOff, billing: billingOff, alerts: alertsOff, keys: accountsOff, byKey: async () => null, sessionOf: async () => null, accessOf: async () => 'free', kv: null, on: false, paywall: false, who: async () => ({ signedIn: false, access: 'free' }) };
   }
   const kv = upstashKv({ url, token });
   const mail = resendMailer({ apiKey: resend, from: env.MAIL_FROM || `${BRAND.display} <signin@phrourax.com>` });
@@ -77,8 +90,17 @@ export function makeAccounts(env: NodeJS.ProcessEnv = process.env, extra: Pick<A
   const alertsOn = Boolean(botToken && TELEGRAM_TOKEN_SHAPE.test(botToken));
   if (botToken && !alertsOn) console.error('TELEGRAM_BOT_TOKEN ignored: it does not look like a bot token (docs/ALERTS.md)');
   const alertsLive = alertsOn && env.ALERTS_LIVE === '1';
+  const site = BRAND.siteUrl.replace(/\/+$/, '');
   return {
-    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, billing: billingOn, alerts: alertsOn ? (alertsLive ? 'live' : 'owner') : 'off', log }),
+    keys: makeKeysHandler({ kv, secret, now, comp, site, log }),
+    byKey: makeKeyResolver({ kv, now, comp, log }),
+    sessionOf: async (cookie) => {
+      const u = await sessionUser({ kv, secret, now }, cookie);
+      return u ? { uid: u.id, access: effectiveAccess(u, now(), comp) } : null;
+    },
+    accessOf: async (uid) => effectiveAccess(await loadUser(kv, uid), now(), comp),
+    kv,
+    handler: makeAccountsHandler({ kv, mail, secret, now, comp, paywall, billing: billingOn, alerts: alertsOn ? (alertsLive ? 'live' : 'owner') : 'off', webhooks: env.WEBHOOKS_ENABLED === '1' && !!env.WEBHOOKS_STORE_KEY && !!env.BLOB_READ_WRITE_TOKEN, log }),
     alerts: alertsOn ? makeAlertsHandler({ kv, secret, now, comp, botToken: botToken!, live: alertsLive, fixtures: extra.fixtures, read: extra.read, log }) : alertsOff,
     billing: billingOn
       ? makeBillingHandler({ kv, mail, secret, now, apiKey: npKey!, ipnSecret: npIpn!, cronSecret: env.CRON_SECRET, sandbox: env.NOWPAYMENTS_SANDBOX === '1', log })

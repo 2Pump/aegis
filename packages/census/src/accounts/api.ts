@@ -47,6 +47,8 @@ export interface AccountsDeps {
   billing?: boolean;
   /** Telegram alerts: off, owner-only (testing before going live), or live for every paying account */
   alerts?: 'off' | 'owner' | 'live';
+  /** webhooks are switched on (Desk) */
+  webhooks?: boolean;
 }
 
 export interface AuthRequest {
@@ -94,13 +96,14 @@ export async function sessionUser(d: Pick<AccountsDeps, 'kv' | 'secret' | 'now'>
   return u && u.sv === claims.v ? u : null;
 }
 
-export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<string>; paywall?: boolean; billing?: boolean; alerts?: 'off' | 'owner' | 'live' } = {}) =>
+export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<string>; paywall?: boolean; billing?: boolean; alerts?: 'off' | 'owner' | 'live'; webhooks?: boolean } = {}) =>
   u
     ? {
         configured: true,
         paywall: o.paywall === true,
         billing: o.billing === true,
         alerts: o.alerts === 'live' || (o.alerts === 'owner' && o.comp?.has(u.email) === true),
+        webhooks: o.webhooks === true,
         signedIn: true,
         email: u.email,
         access: effectiveAccess(u, nowMs, o.comp),
@@ -110,7 +113,7 @@ export const meBody = (u: User | null, nowMs: number, o: { comp?: ReadonlySet<st
         since: u.createdAt,
         payments: (u.payments ?? []).slice(0, 6).map((p) => ({ at: p.at, plan: p.plan, usd: p.usd, paidUntil: p.paidUntil })),
       }
-    : { configured: true, paywall: o.paywall === true, billing: o.billing === true, alerts: o.alerts === 'live', signedIn: false, access: 'free' as const };
+    : { configured: true, paywall: o.paywall === true, billing: o.billing === true, alerts: o.alerts === 'live', webhooks: o.webhooks === true, signedIn: false, access: 'free' as const };
 
 /** For when accounts aren't set up (no secret / store / mail key): the site works exactly as before. */
 export const accountsOff: AuthHandler = async (req) =>

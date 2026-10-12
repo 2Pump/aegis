@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BRAND } from '@aegis/glyphs';
 import { Panel } from '../components/bits';
+import { ApiKeys } from '../components/ApiKeys';
 import { PLAN_LABEL, authPost, fmtDay, refreshMe, useMe } from '../lib/account';
 
 function NotOn() {
@@ -189,6 +190,7 @@ export function AccountPage() {
           <button className="pill-btn" onClick={() => void signOut(true)} disabled={busy} data-testid="signout-everywhere">Sign out on every device</button>
         </div>
       </Panel>
+      <ApiKeys />
       <div className="faint mono" style={{ fontSize: 11 }}>
         <Link to="/pricing">See plans</Link> · {BRAND.display} is read-only and never connects to your wallet.
       </div>

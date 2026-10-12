@@ -745,3 +745,7 @@ a.pill-btn { display: inline-block; }
 .mini-t .tag { max-width: 100%; white-space: normal; text-align: left; }
 .mini-t td { overflow-wrap: anywhere; }
 @media (max-width: 520px) { .mini-t { table-layout: fixed; width: 100%; } .mini-t th:first-child, .mini-t td:first-child { width: 28%; } .mini-t th:last-child, .mini-t td:last-child { width: 26%; } }
+
+/* ───────── Account → API keys ───────── */
+.key-fresh { display: grid; gap: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--cyan); background: var(--hull-2); }
+.key-value { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; user-select: all; padding: 8px 10px; background: #020406; border: 1px solid var(--hair); }

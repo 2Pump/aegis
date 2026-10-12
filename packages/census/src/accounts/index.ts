@@ -5,3 +5,4 @@ export * from './api.js';
 export * from './paywall.js';
 export * from './billing.js';
 export * from './alerts.js';
+export * from './keys.js';
