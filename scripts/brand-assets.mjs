@@ -19,7 +19,7 @@ const PUB = path.join(root, 'apps/web/public');
 const BR = path.join(root, 'brand');
 fs.mkdirSync(BR, { recursive: true });
 
-const C = { page: '#F5F3EE', panel: '#FBFAF7', ink: '#1A1E22', dim: '#4E555C', faint: '#6B7279', accent: '#1F5C4A', hair: 'rgba(26,30,34,0.10)', hair2: 'rgba(26,30,34,0.28)' };
+const C = { page: '#F5F3EE', panel: '#FBFAF7', ink: '#1A1E22', dim: '#434A50', faint: '#5B6268', accent: '#1F5C4A', hair: 'rgba(26,30,34,0.14)', hair2: 'rgba(26,30,34,0.34)' };
 const mark = (cx, cy, d, color, sw = 2) => {
   const s = d / 32;
   return `<g transform="translate(${cx - d / 2} ${cy - d / 2}) scale(${s})" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round">

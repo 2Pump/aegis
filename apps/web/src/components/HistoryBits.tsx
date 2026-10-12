@@ -97,7 +97,7 @@ export function CountChart({
       <svg className="hist-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={label} style={{ height: H }}>
         <rect x="0" y="0" width={W} height={H} fill="var(--field)" />
         {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="rgba(26,30,34,0.08)" />
+          <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="rgba(26,30,34,0.11)" />
         ))}
         {gaps.map((g, i) => (
           <rect key={i} x={x(g.from)} y="0" width={Math.max(1, x(g.to) - x(g.from))} height={H} fill="rgba(26,30,34,0.07)">

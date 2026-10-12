@@ -26,12 +26,12 @@ export function signInMail(to: string, link: string, minutes: number): Mail {
     `${BRAND.display} never asks for your wallet, keys or seed phrase. ${BRAND.siteUrl}`,
   ].join('\n');
   const html = `<!doctype html><html><body style="margin:0;background:#F5F3EE;padding:32px 16px;font-family:'IBM Plex Mono',Menlo,monospace;color:#1A1E22">
-<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;border:1px solid #D9D4C8;background:#FBFAF7"><tr><td style="padding:28px">
+<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;border:1px solid #C6C0B2;background:#FBFAF7"><tr><td style="padding:28px">
 <div style="font-weight:600;letter-spacing:6px;font-size:16px">${BRAND.name}</div>
 <p style="font-size:14px;line-height:1.6;color:#1A1E22;margin:22px 0 18px">Sign in to ${esc(BRAND.display)}.</p>
 <a href="${esc(link)}" style="display:inline-block;background:#1F5C4A;color:#FFFFFF;text-decoration:none;font-weight:600;letter-spacing:2px;font-size:12px;padding:12px 18px">SIGN IN</a>
-<p style="font-size:12px;line-height:1.6;color:#6B7279;margin:20px 0 0">The link works once and expires in ${minutes} minutes. If you didn't ask to sign in, ignore this email.</p>
-<p style="font-size:12px;line-height:1.6;color:#6B7279;margin:12px 0 0">${esc(BRAND.display)} never asks for your wallet, keys or seed phrase.</p>
+<p style="font-size:12px;line-height:1.6;color:#5B6268;margin:20px 0 0">The link works once and expires in ${minutes} minutes. If you didn't ask to sign in, ignore this email.</p>
+<p style="font-size:12px;line-height:1.6;color:#5B6268;margin:12px 0 0">${esc(BRAND.display)} never asks for your wallet, keys or seed phrase.</p>
 </td></tr></table></body></html>`;
   return { to, subject: `Sign in to ${BRAND.display}`, text, html };
 }
@@ -55,11 +55,11 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'n
 function simpleMail(to: string, subject: string, lines: string[], button?: { label: string; href: string }): Mail {
   const text = [...lines, ...(button ? ['', `${button.label}: ${button.href}`] : []), '', `${BRAND.display} is read-only and never asks for your wallet, keys or seed phrase. ${BRAND.siteUrl}`].join('\n');
   const html = `<!doctype html><html><body style="margin:0;background:#F5F3EE;padding:32px 16px;font-family:'IBM Plex Mono',Menlo,monospace;color:#1A1E22">
-<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;border:1px solid #D9D4C8;background:#FBFAF7"><tr><td style="padding:28px">
+<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;border:1px solid #C6C0B2;background:#FBFAF7"><tr><td style="padding:28px">
 <div style="font-weight:600;letter-spacing:6px;font-size:16px">${BRAND.name}</div>
 ${lines.map((l) => `<p style="font-size:14px;line-height:1.6;color:#1A1E22;margin:16px 0 0">${esc(l)}</p>`).join('')}
 ${button ? `<p style="margin:22px 0 0"><a href="${esc(button.href)}" style="display:inline-block;background:#1F5C4A;color:#FFFFFF;text-decoration:none;font-weight:600;letter-spacing:2px;font-size:12px;padding:12px 18px">${esc(button.label.toUpperCase())}</a></p>` : ''}
-<p style="font-size:12px;line-height:1.6;color:#6B7279;margin:22px 0 0">${esc(BRAND.display)} is read-only and never asks for your wallet, keys or seed phrase.</p>
+<p style="font-size:12px;line-height:1.6;color:#5B6268;margin:22px 0 0">${esc(BRAND.display)} is read-only and never asks for your wallet, keys or seed phrase.</p>
 </td></tr></table></body></html>`;
   return { to, subject, text, html };
 }

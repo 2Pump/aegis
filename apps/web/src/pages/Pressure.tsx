@@ -361,7 +361,7 @@ function Curve({ s, q }: { s: PressureSnapshot; q: PressureQuery }) {
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="pm-chart" role="img" aria-label={`Wallets near liquidation as the move grows from 0 to ${s.maxPct}%. At ${sign}${q.pct}%: ${main[q.pct]?.near ?? 0}.`}>
         {yTicks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="rgba(26,30,34,0.1)" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="rgba(26,30,34,0.13)" />
             <text x={L - 6} y={y(t) + 3} textAnchor="end" className="pm-axis">{t.toLocaleString('en-US')}</text>
           </g>
         ))}

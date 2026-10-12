@@ -10,19 +10,19 @@
   --hull-2: #F8F6F1;
   --hull-3: #EFECE5;
   --field: #FFFFFF;
-  --hair: #D9D4C8;
-  --hair-2: #E3DED3;
-  --hair-3: #ECE8DF;
-  --rule: #D9D4C8;
+  --hair: #C6C0B2;
+  --hair-2: #D3CDC0;
+  --hair-3: #E0DBD0;
+  --rule: #C6C0B2;
   --ink: #1A1E22;
-  --ink-dim: #4E555C;
-  --ink-faint: #6B7279;
+  --ink-dim: #434A50;
+  --ink-faint: #5B6268;
   --cyan: #1F5C4A;
   --amber: #8A6A12;
   --red: #B42F35;
   --violet: #45508F;
   --iron: #2E343A;
-  --slate: #6B7279;
+  --slate: #5B6268;
   --sans: 'IBM Plex Sans', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'DejaVu Sans Mono', Menlo, monospace;
   color-scheme: light;
@@ -451,7 +451,7 @@ ul.tape li .when { color: var(--ink-faint); min-width: 64px; font-variant-numeri
 button.pm-bar:hover { border-color: var(--hair); }
 .pm-bar.on { border-color: rgba(180, 47, 53, 0.45); background: rgba(180, 47, 53, 0.06); }
 .pm-bar-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pm-bar-t { height: 6px; background: rgba(26, 30, 34, 0.06); position: relative; }
+.pm-bar-t { height: 6px; background: rgba(26, 30, 34, 0.08); position: relative; }
 .pm-bar-t i { position: absolute; inset: 0 auto 0 0; background: var(--red); opacity: 0.75; }
 .pm-bar b { text-align: right; }
 .pm-of { font-size: 11px; text-align: right; }

@@ -355,7 +355,7 @@ function NadoTable({ n }: { n: NadoBook }) {
       {!n.spots.length && !n.perps.length ? <div className="dim">No Nado balances.</div> : null}
       {n.funding.length ? (
         <div className="mono dim" style={{ fontSize: 12 }}>
-          funding side: {n.funding.map((f) => `${f.symbol} ${f.side}`).join(' · ')} <span className="faint">(rates not wired in V1)</span>
+          funding side: {n.funding.map((f) => `${f.symbol} ${f.side}`).join(' · ')}
         </div>
       ) : null}
       {n.notes.map((x, i) => (
