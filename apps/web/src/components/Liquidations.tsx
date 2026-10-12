@@ -300,7 +300,7 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
   const recovered = before ? agg?.find((p) => Date.parse(p.at) > c.end && p.risk['0'][2] <= before.risk['0'][2]) ?? null : null;
   const stressChanges = (agg ?? []).filter((p) => p.stress).map((p) => `${when(Date.parse(p.at))}: ${p.stress!.level}`);
   const steps: Array<[string, string]> = [
-    ['1 · Price or oracle move', prices === null ? 'loading…' : priceStepText(priceStep(prices, c.start, c.end, nadoNames), when)],
+    ['1 · Price or oracle move', prices === null ? 'loading…' : priceStepText(priceStep(prices, c.start, c.end, nadoNames, c.centredOn), when)],
     ['2 · First wallet Phrourax had in danger', firstNear !== null ? `${when(firstNear)} — the earliest NEAR warning among these wallets` : agg && agg.length ? 'No member was recorded as NEAR beforehand.' : 'Not recorded (before Phrourax began recording).'],
     ['3 · Phrourax stress', agg === null ? 'loading…' : agg.length ? `${before ? `${before.risk['0'][2]} wallets near liquidation before` : 'no point before'} → ${peakNear ? `${peakNear.risk['0'][2]} at the busiest recorded hour` : 'no point during'}${stressChanges.length ? ` · Ink Stress Level: ${stressChanges.join(', ')}` : ''}` : 'Not recorded (before Phrourax began recording).'],
     ['4 · First liquidation', `${when(members[0]!.at)} · ${members[0]!.venue} · ${short(members[0]!.wallet)}`],

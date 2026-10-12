@@ -20,6 +20,14 @@ describe('cascade replay — oracle price step', () => {
     expect(text).not.toContain('USDC');
     expect(text).not.toContain('ETH +'); // the external reference isn't a protocol price
   });
+  it('a cascade centred on one family shows that family\'s prices first (even small moves), then the largest elsewhere', () => {
+    const s = priceStep(
+      [pt(T - H, { 'tydro:WETH': 2500, 'nado:4': 2501, 'nado:30': 10 }), pt(T + H, { 'tydro:WETH': 2470, 'nado:4': 2468, 'nado:30': 10.5 })],
+      T, T, new Map([[4, 'ETH-PERP'], [30, 'ZEC-PERP']]), { family: 'ETH', share: 0.75 },
+    );
+    const text = priceStepText(s, when);
+    expect(text).toMatch(/^ETH family \(75% of these liquidations\), .*: ETH-PERP −1\.3% · WETH −1\.2%\. Largest moves elsewhere: ZEC-PERP \+5\.0%$/);
+  });
   it('no reading near enough: says so instead of guessing; flat: says nothing moved', () => {
     expect(priceStep([pt(T - 5 * H, { 'tydro:WETH': 1 }), pt(T + 5 * H, { 'tydro:WETH': 2 })], T, T, names).kind).toBe('no-readings');
     expect(priceStep([pt(T - H, { 'tydro:WETH': 2500 }), pt(T + H, { 'tydro:WETH': 2500.5 })], T, T, names).kind).toBe('flat');
