@@ -209,6 +209,12 @@ test('INTEL: in the nav between Pressure and Scan; every section is built and no
 
 /* Release 3 with recorded (synthetic) files served in place of the census store */
 const R3 = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), 'utf8');
+/** the recorded-prices fixture moved so its last point is an hour ago (the 7-day chart must not depend on today's date) */
+function recentPrices(): string {
+  const f = JSON.parse(R3('prices.json')) as { month: string; points: Array<{ at: number }> };
+  const shift = Date.now() - 3_600_000 - Math.max(...f.points.map((p) => p.at));
+  return JSON.stringify({ ...f, month: new Date().toISOString().slice(0, 7), points: f.points.map((p) => ({ ...p, at: p.at + shift })) });
+}
 async function serveRelease3(page: Page) {
   const month = new Date().toISOString().slice(0, 7);
   const json = (body: string) => ({ status: 200, contentType: 'application/json', body });
@@ -216,7 +222,7 @@ async function serveRelease3(page: Page) {
     const u = new URL(route.request().url()).pathname;
     if (u.endsWith('/history/index.json')) return route.fulfill(json(JSON.stringify({ v: 1, kind: 'aegis-history-index', version: 'hist-1.0.0', shards: 64, months: [], baselined: [], compacted: [], firstAt: null, firstBlock: null, changeMonths: [month] })));
     if (u.endsWith('/history/oracle/latest.json')) return route.fulfill(json(R3('oracle-latest.json')));
-    if (u.endsWith(`/history/prices/${month}.json`)) return route.fulfill(json(R3('prices.json')));
+    if (u.endsWith(`/history/prices/${month}.json`)) return route.fulfill(json(recentPrices()));
     if (u.endsWith('/history/params/latest.json')) return route.fulfill(json(R3('params-latest.json')));
     if (u.endsWith(`/history/changes/${month}.json`)) return route.fulfill(json(R3('changes.json')));
     if (u.endsWith('/history/forecast-score.json')) return route.fulfill(json(R3('forecast-score.json')));

@@ -62,6 +62,7 @@ A divergence is modelled with the Pressure engine as the protocol price convergi
 
 - `history/oracle/latest.json`: the current watch, rewritten every run. A failed read keeps the last good watch, and its age shows; the page labels it STALE after 3 h.
 - `history/prices/<YYYY-MM>.json`: one price point per run. Keys are `tydro:SYMBOL`, `nado:<productId>` and `pyth:KEY`. These are public oracle prices only, with no wallet data. Recording begins with this release, and nothing earlier is reconstructed.
+- A Pyth price is recorded only while that feed is being pushed (last push within 24 h). A dormant feed repeats one old number every hour; recorded, it would draw as a flat "price" line, so it is left out, and the Price History chart says why. Points recorded before 2026-10-12 may include such old numbers; the chart doesn't draw Pyth while the feed is dormant.
 
 ## Protocol Change Monitor (`changes-1.0.0`)
 

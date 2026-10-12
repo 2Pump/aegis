@@ -264,6 +264,9 @@ function PriceChart({ series, from, to, label }: { series: Array<{ name: string;
   );
 }
 
+/** not pushed on Ink for over a day (or never): not a reference (the same rule as the watch itself) */
+const pythDormant = (e: NonNullable<AssetRow['external']>, at: number) => e.publishTime === null || at - e.publishTime > ORACLE.REF_DORMANT_H * 3_600_000;
+
 function PriceHistory({ w }: { w: OracleWatch }) {
   const [range, setRange] = useState<Range>('7d');
   const [sym, setSym] = useState(w.rows.find((r) => r.symbol === 'WETH')?.symbol ?? w.rows[0]?.symbol ?? '');
@@ -275,7 +278,8 @@ function PriceHistory({ w }: { w: OracleWatch }) {
     const tk = `tydro:${row.symbol === 'USDT0' ? 'USDT' : row.symbol}`;
     // drawn back to front: the protocol price last, so it stays visible where the sources agree
     const out: Array<{ name: string; color: string; dash?: string; points: Array<{ t: number; v: number }> }> = [];
-    if (row.external) out.push({ name: `Pyth ${row.external.key}/USD (when pushed)`, color: 'var(--amber)', dash: '6 5', points: key(h.points, `pyth:${row.external.key}`) });
+    // a dormant Pyth feed repeats one old number every hour — drawn, it would read as a live price line; it's left out
+    if (row.external && !pythDormant(row.external, w.at)) out.push({ name: `Pyth ${row.external.key}/USD (when pushed)`, color: 'var(--amber)', dash: '6 5', points: key(h.points, `pyth:${row.external.key}`) });
     if (row.nado) out.push({ name: `Nado product ${row.nado.productId}`, color: 'var(--violet)', points: key(h.points, `nado:${row.nado.productId}`) });
     out.push({ name: 'Tydro (protocol price)', color: 'var(--cyan)', points: key(h.points, tk) });
     return out.filter((s) => s.points.length);
@@ -297,7 +301,8 @@ function PriceHistory({ w }: { w: OracleWatch }) {
         {h.status === 'none' ? <div className="dim">No prices recorded in this range yet — recording began with Oracle Watch. Nothing earlier is reconstructed.</div> : null}
         {h.status === 'ok' && series.length ? <PriceChart series={series} from={h.from} to={h.to} label={`${sym} prices over time from ${series.map((s) => s.name).join(', ')}`} /> : null}
         {h.status === 'ok' && !series.length ? <div className="dim">No recorded prices for {sym} in this range.</div> : null}
-        <div className="note-text">Hourly readings only — anything that happened between two scans isn&apos;t in this chart. Pyth is a pull oracle: its points are whatever was last pushed on Ink.</div>
+        {row?.external && pythDormant(row.external, w.at) ? <div className="note-text" data-testid="oracles-pyth-dormant">Pyth {row.external.key}/USD isn&apos;t drawn: it&apos;s dormant on Ink (not pushed for over {ORACLE.REF_DORMANT_H} h), so its number is old, not a price reading.</div> : null}
+        <div className="note-text">Hourly readings only — anything that happened between two scans isn&apos;t in this chart. Pyth is a pull oracle: it&apos;s drawn only while someone keeps pushing it on Ink.</div>
       </div>
     </Panel>
   );

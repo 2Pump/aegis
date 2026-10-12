@@ -348,7 +348,8 @@ export function pricePoint(snap: OracleSnapshot): PricePoint {
   const p: Record<string, number> = {};
   for (const t of snap.tydro) if (t.priceUsd !== null && t.priceUsd > 0) p[`tydro:${t.symbol}`] = t.priceUsd;
   for (const n of snap.nado) if (n.priceUsd !== null && n.priceUsd > 0) p[`nado:${n.productId}`] = n.priceUsd;
-  for (const y of snap.pyth) if (y.price !== null && y.price > 0) p[`pyth:${y.key}`] = y.price;
+  // a dormant Pyth feed (not pushed on Ink for over a day) is the same old number every run — not a price reading
+  for (const y of snap.pyth) if (y.price !== null && y.price > 0 && y.publishTime !== null && snap.at - y.publishTime <= ORACLE.REF_DORMANT_H * 3_600_000) p[`pyth:${y.key}`] = y.price;
   return { block: snap.block, at: snap.at, p };
 }
 

@@ -6,6 +6,7 @@ import type { PublicClient } from 'viem';
 import { NADO_CONTRACTS, PYTH, TYDRO, TYDRO_RESERVES, readOracleSnapshot, type OracleSnapshot } from '@aegis/ink-io';
 import { classify, familyOf, type Book } from '@aegis/pose';
 import {
+  pricePoint,
   type LedgerRecord,
   ORACLE,
   PARAMS_LATEST,
@@ -138,6 +139,14 @@ describe('Oracle Watch · checks', () => {
     expect(row(w, 'WETH').status).toBe('OK');
     expect(row(w, 'GHO').status).toBe('OK');
     expect(row(w, 'GHO').checks.find((c) => c.kind === 'source-age')!.text).toMatch(/fixed-price source.*market depeg would not show/);
+  });
+
+  it('price history records a Pyth price only while the feed is pushed (a dormant one would draw an old number as a line)', () => {
+    const live = pricePoint(snap({ pyth: [{ key: 'ETH', id: 'x', price: 1975, conf: 1, publishTime: T0 - H, error: null }] }));
+    expect(live.p['pyth:ETH']).toBe(1975);
+    const dormant = pricePoint(snap({ pyth: [{ key: 'ETH', id: 'x', price: 1500, conf: 1, publishTime: T0 - 160 * 24 * H, error: null }] }));
+    expect(dormant.p['pyth:ETH']).toBeUndefined();
+    expect(dormant.p['tydro:WETH']).toBeGreaterThan(0);
   });
 
   it('a sudden jump against the previous run', () => {
