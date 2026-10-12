@@ -6,11 +6,12 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { INK_EXPLORER } from '@aegis/ink-io';
-import { LEDGER, cascades, leadHours, ledgerSummary, type AggPoint, type Cascade, type LedgerRecord } from '@aegis/census';
+import { LEDGER, cascades, leadHours, ledgerSummary, type AggPoint, type Cascade, type LedgerRecord, type PricePoint } from '@aegis/census';
 import { SIZE_LABEL, brandText } from '@aegis/glyphs';
 import { Panel } from './bits';
 import { CountChart, RangePicker, when } from './HistoryBits';
-import { aggAround, useHistoryIndex, useLedger, type Range } from '../lib/history';
+import { aggAround, pricesAround, useHistoryIndex, useLedger, useOracleWatch, type Range } from '../lib/history';
+import { priceStep, priceStepText } from '../lib/replay';
 import type { HistoryIndex } from '@aegis/census';
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -271,6 +272,27 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
       alive = false;
     };
   }, [c, index]);
+  // oracle prices around it, from the hourly readings (the cascade's month, and the one before if it starts near the edge)
+  const [prices, setPrices] = useState<PricePoint[] | null>(null);
+  const watch = useOracleWatch();
+  const nadoNames = useMemo(() => {
+    const m = new Map<number, string>();
+    if (watch.status === 'ok') {
+      for (const r of watch.v.rows) if (r.nado) m.set(r.nado.productId, r.symbol);
+      for (const n of watch.v.nadoOther) if (n.symbol) m.set(n.productId, n.symbol);
+    }
+    return m;
+  }, [watch]);
+  useEffect(() => {
+    let alive = true;
+    setPrices(null);
+    pricesAround(c.start - 3 * 3_600_000, c.end + 3 * 3_600_000)
+      .then((p) => alive && setPrices(p))
+      .catch(() => alive && setPrices([]));
+    return () => {
+      alive = false;
+    };
+  }, [c]);
   const firstNear = members.map((r) => r.aegis.nearSince).filter((x): x is number => x !== null).sort((a, b) => a - b)[0] ?? null;
   const before = agg?.filter((p) => Date.parse(p.at) <= c.start).at(-1) ?? null;
   const during = agg?.filter((p) => Date.parse(p.at) >= c.start && Date.parse(p.at) <= c.end + 3_600_000) ?? [];
@@ -278,7 +300,7 @@ function Replay({ c, records, index }: { c: Cascade; records: LedgerRecord[]; in
   const recovered = before ? agg?.find((p) => Date.parse(p.at) > c.end && p.risk['0'][2] <= before.risk['0'][2]) ?? null : null;
   const stressChanges = (agg ?? []).filter((p) => p.stress).map((p) => `${when(Date.parse(p.at))}: ${p.stress!.level}`);
   const steps: Array<[string, string]> = [
-    ['1 · Price or oracle move', 'Not recorded yet — Phrourax starts recording oracle prices with Oracle Watch (Release 3).'],
+    ['1 · Price or oracle move', prices === null ? 'loading…' : priceStepText(priceStep(prices, c.start, c.end, nadoNames), when)],
     ['2 · First wallet Phrourax had in danger', firstNear !== null ? `${when(firstNear)} — the earliest NEAR warning among these wallets` : agg && agg.length ? 'No member was recorded as NEAR beforehand.' : 'Not recorded (before Phrourax began recording).'],
     ['3 · Phrourax stress', agg === null ? 'loading…' : agg.length ? `${before ? `${before.risk['0'][2]} wallets near liquidation before` : 'no point before'} → ${peakNear ? `${peakNear.risk['0'][2]} at the busiest recorded hour` : 'no point during'}${stressChanges.length ? ` · Ink Stress Level: ${stressChanges.join(', ')}` : ''}` : 'Not recorded (before Phrourax began recording).'],
     ['4 · First liquidation', `${when(members[0]!.at)} · ${members[0]!.venue} · ${short(members[0]!.wallet)}`],

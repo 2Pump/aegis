@@ -119,7 +119,7 @@ export function scoreForecasts(o: { forecasts: readonly ForecastRecord[]; prices
       'A scenario is "reached" when its move actually happened within 24 hours of the forecast (Tydro protocol prices; CRYPTO = average of ETH and BTC; USD = the worst stablecoin).',
       'Unreached scenarios are neither hits nor misses — the forecast was conditional on a move that did not happen.',
       'When reached, the forecast counted wallets near-or-worse at the full move; the observed figure is the most wallets the hourly scan recorded near liquidation in that day. Prices rarely move by exactly the scenario, so this is a rough check, not a score.',
-      'Forecasts made before prices were recorded (before Release 3) cannot be judged.',
+      'Forecasts made before Phrourax started recording oracle prices cannot be judged.',
     ],
   };
 }

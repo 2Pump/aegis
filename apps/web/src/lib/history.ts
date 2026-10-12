@@ -253,7 +253,14 @@ export const useForecastScore = () => useLatest(FORECAST_SCORE_PATH, isScore);
 const isCarry = (j: unknown): j is CarryFile => (j as CarryFile)?.kind === 'aegis-carry' && Array.isArray((j as CarryFile).structures);
 export const useCarry = () => useLatest(CARRY_LATEST, isCarry);
 
-/** Recorded oracle prices (one point per census run) within the range — recording began with Release 3. */
+/** Recorded oracle prices between two times (the months they span; no file = nothing recorded then). */
+export async function pricesAround(from: number, to: number): Promise<PricePoint[]> {
+  const files = await Promise.all(monthsBetween(from, to, 3).map((m) => getJson(pricePath(m), m === thisMonth()).catch(() => null)));
+  // the earliest recorded point overall decides "before recording": keep every point of these months, the caller filters
+  return files.flatMap((f) => ((f as PriceFile)?.kind === 'aegis-prices' ? (f as PriceFile).points : [])).sort((a, b) => a.at - b.at);
+}
+
+/** Recorded oracle prices (one point per census run) within the range — recording began when Oracle Watch went live. */
 export function usePrices(range: Range): Loaded<{ points: PricePoint[]; from: number; to: number }> {
   type S = Loaded<{ points: PricePoint[]; from: number; to: number }>;
   const [s, set] = useState<S>({ status: 'loading' });
