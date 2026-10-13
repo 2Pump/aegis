@@ -22,6 +22,7 @@
     "census": "tsx scripts/census.ts",
     "verify:auto": "tsx scripts/verify-auto.ts",
     "alerts": "tsx scripts/alerts.ts",
+    "depth": "tsx scripts/depth.ts",
     "webhooks": "tsx scripts/webhooks.ts",
     "firewall": "node scripts/firewall.mjs",
     "census:delete-public": "tsx scripts/census-delete-public.ts"

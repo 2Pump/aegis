@@ -110,7 +110,7 @@ export interface HealthTriple {
 
 export interface FundingSide {
   symbol: string;
-  /** which side of the book this position is on — the rate itself is not wired in V1 */
+  /** which side of the book this position is on (the wallet page adds the observed rate from the Carry recorder) */
   side: 'LONG' | 'SHORT';
   rateHourly: number | null;
 }

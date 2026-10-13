@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
  * pressure.json (Pressure Map aggregates, written by full sweeps only).
  */
 /** history/… = the Flight Recorder (history.ts); everything else is one fixed file */
-export type StoreName = 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json' | `history/${string}.json`;
+export type StoreName = 'census.json' | 'known.json' | 'pressure.json' | 'verification-log.json' | `history/${string}.json` | `depth/${string}.json`;
 
 export interface CensusStore {
   describe: string;

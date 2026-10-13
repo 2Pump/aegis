@@ -49,3 +49,13 @@ jobs:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           CENSUS_BLOB_TOKEN: ${{ vars.CENSUS_STORE == 'private' && secrets.CENSUS_BLOB_TOKEN || '' }}
           INK_RPC: ${{ secrets.INK_RPC }}
+      - name: Market depth (Nado order books)
+        # its own step: whatever happens here, alerts above have already run
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 3
+        run: pnpm depth --store blob
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          CENSUS_BLOB_TOKEN: ${{ vars.CENSUS_STORE == 'private' && secrets.CENSUS_BLOB_TOKEN || '' }}
+          INK_RPC: ${{ secrets.INK_RPC }}

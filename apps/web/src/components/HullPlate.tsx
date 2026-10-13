@@ -12,6 +12,8 @@ import { VENUE_VERIFIED, VERIFIED, verificationText } from '../lib/verification'
 import { setMyWallet, useMyWallet } from '../lib/myWallet';
 import { usePlanGate } from '../lib/account';
 import { Locked } from './Paywall';
+import { apr } from './Carry';
+import { useCarry } from '../lib/history';
 
 export interface HullPlateProps {
   book: Book;
@@ -294,6 +296,38 @@ function Locker({ t, fixture }: { t: TydroBook; fixture: boolean }) {
   );
 }
 
+/**
+ * Funding for each open perp side, from the Carry recorder: what that side actually received or paid over the last
+ * 24 h (Nado's cumulative funding, on-chain), annualised. No reading yet (or no access to it) → the side alone.
+ */
+function FundingLine({ sides }: { sides: NadoBook['funding'] }) {
+  const carry = useCarry();
+  const rows = carry.status === 'ok' ? carry.v.markets.funding : null;
+  const seen = new Set<string>();
+  const parts = sides
+    .filter((f) => (seen.has(f.symbol + f.side) ? false : (seen.add(f.symbol + f.side), true)))
+    .map((f) => {
+      const m = rows?.find((r) => r.symbol === f.symbol);
+      // a short receives short1 (negative = pays); a long pays longPays1 (negative = receives)
+      const got = !m ? null : f.side === 'SHORT' ? m.short1 : m.longPays1 === null ? null : -m.longPays1;
+      const rate = got === null || !Number.isFinite(got) ? null : got;
+      return { key: f.symbol + f.side, text: `${f.symbol} ${f.side.toLowerCase()}`, rate };
+    });
+  const any = parts.some((p) => p.rate !== null);
+  return (
+    <div className="mono dim" style={{ fontSize: 12 }} data-testid="funding-line">
+      funding{any ? ' (last 24 h, annualised)' : ' side'}:{' '}
+      {parts.map((p, i) => (
+        <span key={p.key}>
+          {i ? ' · ' : ''}
+          {p.text}
+          {p.rate === null ? (any ? ' — no reading yet' : '') : ` ${p.rate >= 0 ? 'receiving' : 'paying'} ${apr(Math.abs(p.rate))}`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function NadoTable({ n }: { n: NadoBook }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
@@ -353,11 +387,7 @@ function NadoTable({ n }: { n: NadoBook }) {
         </div>
       ) : null}
       {!n.spots.length && !n.perps.length ? <div className="dim">No Nado balances.</div> : null}
-      {n.funding.length ? (
-        <div className="mono dim" style={{ fontSize: 12 }}>
-          funding side: {n.funding.map((f) => `${f.symbol} ${f.side}`).join(' · ')}
-        </div>
-      ) : null}
+      {n.funding.length ? <FundingLine sides={n.funding} /> : null}
       {n.notes.map((x, i) => (
         <div key={i} className={x.includes('OK') ? 'banner cyan' : 'banner'}>{x}</div>
       ))}
