@@ -206,7 +206,9 @@ export function updateLatest(prev: unknown, run: DepthRun, status: DepthStatus):
   for (const m of run.markets) {
     const cur = byId.get(m.p) ?? { p: m.p, s: m.s, at: null, now: null, hist: [] };
     // a book that failed its units check is kept as answered, but its sizes are never used
-    const pt: DepthPoint = [t, m.spreadBps, m.unitsOk ? m.bidUsd[BAND50] ?? null : null, m.unitsOk ? m.askUsd[BAND50] ?? null : null, m.markOracleBps];
+    // an empty book has no mid: its depth is unknown, not zero
+    const use = m.unitsOk && m.mid !== null;
+    const pt: DepthPoint = [t, m.spreadBps, use ? m.bidUsd[BAND50] ?? null : null, use ? m.askUsd[BAND50] ?? null : null, m.markOracleBps];
     byId.set(m.p, { p: m.p, s: m.s, at: run.at, now: m, hist: [...cur.hist, pt] });
   }
   const runs = [...(p?.runs ?? []).filter((r) => r[0] > from), [t, run.asked, run.answered, run.refused, run.failed] as [number, number, number, number, number]];
@@ -250,6 +252,8 @@ export interface MarketSummary {
   /** largest |mid − oracle| in the window, keeping its sign */
   markMax: number | null;
   stale: boolean;
+  /** the latest book had no orders on one or both sides (no mid) */
+  empty: boolean;
 }
 
 /** What the panel shows per market — medians and lows over the window, never a projection. */
@@ -257,7 +261,7 @@ export function summarizeMarket(m: DepthLatest['markets'][number], latestRunAt: 
   const thin = nums(m.hist.map((h) => (h[2] === null || h[3] === null ? null : Math.min(h[2], h[3]))));
   const marks = nums(m.hist.map((h) => h[4]));
   const markMax = marks.length ? marks.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a)) : null;
-  const ok = m.now?.unitsOk === true;
+  const ok = m.now?.unitsOk === true && m.now.mid !== null;
   return {
     p: m.p,
     s: m.s,
@@ -271,5 +275,6 @@ export function summarizeMarket(m: DepthLatest['markets'][number], latestRunAt: 
     markNow: m.now?.markOracleBps ?? null,
     markMax,
     stale: m.at !== latestRunAt,
+    empty: !!m.now && m.now.mid === null,
   };
 }

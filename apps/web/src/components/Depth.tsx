@@ -88,12 +88,18 @@ export function DepthPanel() {
                           {sym(r.s)}
                           {r.stale ? <span className="faint" title="Nado didn't answer for this book on the latest run; the figures are its last good reading"> · last read {hhmm(d.v.markets.find((m) => m.p === r.p)?.at ?? null)}</span> : null}
                         </td>
+                        {r.empty ? (
+                          <td colSpan={4} className="r dim" data-testid="depth-empty">empty book — no orders resting on one or both sides</td>
+                        ) : (
+                          <>
                         <td className="r num">{bps(r.spreadNow)} · <span className="dim">{bps(r.spreadMed)}</span></td>
                         <td className="r num">{usd(r.bidNow)} · {usd(r.askNow)}</td>
                         <td className="r num">{usd(r.thinMed)} · <span className="dim">{usd(r.thinLow)}</span></td>
                         <td className="r num" style={warn ? { color: 'var(--amber)' } : undefined}>
                           {bps(r.markNow, true)} · <span className={warn ? undefined : 'dim'}>{bps(r.markMax, true)}</span>
                         </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}

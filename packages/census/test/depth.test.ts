@@ -105,3 +105,15 @@ describe('the 24 h window (depth/latest.json)', () => {
     expect(depthRunPath('2026-10-16T06:10:03.120Z')).toBe('depth/runs/2026-10-16/061003.json');
   });
 });
+
+describe('an empty order book', () => {
+  it('has unknown depth, never $0, and says so', async () => {
+    const { summarizeBook, updateLatest, updateStatus, summarizeMarket } = await import('../src/depth.js');
+    const empty = summarizeBook({ productId: 50, symbol: 'ADA-PERP', oracle: 0.5, sizeIncrement: 10n ** 15n, bids: [], asks: [] });
+    const run = { at: '2026-10-16T05:00:00Z', block: 1, asked: 1, answered: 1, refused: 0, failed: 0, reason: null, markets: [empty] };
+    const l = updateLatest(null, run, updateStatus(null, run));
+    const s = summarizeMarket(l.markets[0]!, run.at);
+    expect(s.empty).toBe(true);
+    expect([s.bidNow, s.askNow, s.thinMed, s.thinLow]).toEqual([null, null, null, null]);
+  });
+});
