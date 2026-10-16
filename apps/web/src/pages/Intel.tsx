@@ -5,6 +5,7 @@
  *   ORACLES       Oracle Watch (Release 3)
  *   CHANGES       Protocol Change Monitor (Release 3)
  *   CARRY         Yield and Carry (Release 4) — analysis only
+ *   DEPTH         Nado order books: spread, depth near the price, Nado vs oracle (depth-1.0.0)
  */
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -16,6 +17,7 @@ import { LiquidationsPanel } from '../components/Liquidations';
 import { OraclesPanel } from '../components/Oracles';
 import { ChangesPanel } from '../components/Changes';
 import { CarryPanel } from '../components/Carry';
+import { DepthPanel } from '../components/Depth';
 import { CountChart, RangePicker, RiskStrip, ScanGaps, when } from '../components/HistoryBits';
 import { WELL_ON } from '../lib/census';
 import { useAggHistory, useHistoryIndex, type Range } from '../lib/history';
@@ -26,6 +28,7 @@ const TABS = [
   ['oracles', 'ORACLES'],
   ['changes', 'CHANGES'],
   ['carry', 'CARRY'],
+  ['depth', 'DEPTH'],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -56,6 +59,7 @@ export function IntelPage() {
       {tab === 'oracles' ? <OraclesPanel /> : null}
       {tab === 'changes' ? <ChangesPanel /> : null}
       {tab === 'carry' ? <CarryPanel /> : null}
+      {tab === 'depth' ? <DepthPanel /> : null}
     </div>
   );
 }

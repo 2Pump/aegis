@@ -361,4 +361,4 @@ export {
   type EventData,
   type FeedInput,
 } from './events.js';
-export { DEPTH, DEPTH_STATUS_PATH, appendRun, dayOf, depthDayPath, runLine, summarizeBook, updateStatus, type DepthDay, type DepthRun, type DepthStatus, type MarketDepth } from './depth.js';
+export { DEPTH, DEPTH_LATEST_PATH, DEPTH_STATUS_PATH, appendRun, dayOf, depthDayPath, depthRunPath, isDepthLatest, runLine, summarizeBook, summarizeMarket, updateLatest, updateStatus, type DepthDay, type DepthLatest, type DepthPoint, type DepthRun, type DepthStatus, type MarketDepth, type MarketSummary } from './depth.js';

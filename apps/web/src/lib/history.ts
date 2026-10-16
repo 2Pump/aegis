@@ -21,6 +21,9 @@ import {
   type ForecastScore,
   CARRY_LATEST,
   type CarryFile,
+  DEPTH_LATEST_PATH,
+  isDepthLatest,
+  type DepthLatest,
   isLedgerFile,
   ledgerPath,
   type Accountability,
@@ -252,6 +255,7 @@ export const useParams = () => useLatest(PARAMS_LATEST, isParamsLatest as (j: un
 export const useForecastScore = () => useLatest(FORECAST_SCORE_PATH, isScore);
 const isCarry = (j: unknown): j is CarryFile => (j as CarryFile)?.kind === 'aegis-carry' && Array.isArray((j as CarryFile).structures);
 export const useCarry = () => useLatest(CARRY_LATEST, isCarry);
+export const useDepth = () => useLatest(DEPTH_LATEST_PATH, isDepthLatest as (j: unknown) => j is DepthLatest);
 
 /** Recorded oracle prices between two times (the months they span; no file = nothing recorded then). */
 export async function pricesAround(from: number, to: number): Promise<PricePoint[]> {

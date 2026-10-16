@@ -232,6 +232,21 @@ async function serveRelease3(page: Page) {
   });
 }
 
+test('DEPTH: Nado order books — reachability, every market, sorting; a missed book says so', async ({ page }) => {
+  await page.route('**/api/v1/data/depth/latest.json*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: R3('depth-latest.json') }));
+  await page.goto('/intel?tab=depth');
+  await expect(page.getByTestId('depth-reach')).toContainText('17 of 18 books answered');
+  await expect(page.getByTestId('depth-reach')).toContainText('1 refused by Nado');
+  const rows = page.getByTestId('depth-table').locator('tbody tr');
+  await expect(rows).toHaveCount(3);
+  await expect(page.getByTestId('depth-row-THIN')).toContainText('last read');
+  await page.getByTestId('depth-sort-thin').click();
+  await expect(rows.first()).toHaveAttribute('data-testid', 'depth-row-THIN');
+  await page.getByTestId('depth-sort-mark').click();
+  await expect(rows.first()).toHaveAttribute('data-testid', 'depth-row-THIN');
+  await expect(page.getByTestId('intel-depth').locator('a[href^="http"]')).toHaveCount(0);
+});
+
 test('ORACLES: every asset with its status; a depeg is an event; details show checks and modelled impact', async ({ page }) => {
   await serveRelease3(page);
   await page.goto('/intel?tab=oracles');

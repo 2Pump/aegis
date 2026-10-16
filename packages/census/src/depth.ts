@@ -22,6 +22,10 @@ export const DEPTH = {
   STATUS_DAYS: 30,
   /** pause between book requests, ms — polite to Nado's API */
   GAP_MS: 150,
+  /** the rolling window kept in depth/latest.json (what the Intel panel draws) */
+  WINDOW_H: 24,
+  /** Nado's mid this far from the on-chain oracle is worth noting — the same 0.3% Oracle Watch uses */
+  MARK_WARN_BPS: 30,
 } as const;
 
 export interface Level {
@@ -127,7 +131,11 @@ export function summarizeBook(o: { productId: number; symbol: string; oracle: nu
 }
 
 export const dayOf = (iso: string) => iso.slice(0, 10);
+/** 2026-10-13 → 2026-10-15: one file per day, read-modify-written each run (grew to MBs). Kept, never deleted. */
 export const depthDayPath = (day: string) => `depth/${day}.json` as const;
+/** since 2026-10-16: one small file per run, written once, never rewritten */
+export const depthRunPath = (iso: string) => `depth/runs/${dayOf(iso)}/${iso.slice(11, 19).replace(/:/g, '')}.json` as const;
+export const DEPTH_LATEST_PATH = 'depth/latest.json' as const;
 export const DEPTH_STATUS_PATH = 'depth/status.json' as const;
 
 /** Add a run to its day's file (creating it); never drops an earlier run. */
@@ -160,4 +168,108 @@ export function runLine(run: DepthRun): string {
   const pct = run.asked ? Math.round((run.answered / run.asked) * 100) : 0;
   const units = run.markets.filter((m) => !m.unitsOk).length;
   return `depth: ${run.answered}/${run.asked} books answered (${pct}%)` + (run.refused ? ` · ${run.refused} refused by Nado` : '') + (run.failed ? ` · ${run.failed} failed` : '') + (run.reason ? ` · first reason: ${run.reason}` : '') + (units ? ` · ${units} books failed the units check` : '');
+}
+
+/* ───────────── depth/latest.json — the last 24 h, compact, for the Intel panel ───────────── */
+
+/** one run for one market: [minutes since epoch, spreadBps, USD within 50 bps (bid), (ask), mid vs oracle bps] */
+export type DepthPoint = [number, number | null, number | null, number | null, number | null];
+
+export interface DepthLatest {
+  kind: 'aegis-depth';
+  v: 1;
+  version: string;
+  updated: string;
+  block: number | null;
+  /** books asked / answered per day (from status), and the last 24 h */
+  reach: { last24: { runs: number; asked: number; answered: number; refused: number; failed: number }; days: DepthStatus['days']; firstDay: string | null };
+  /** per market: the latest answered book, and every run in the window */
+  markets: Array<{ p: number; s: string; at: string | null; now: MarketDepth | null; hist: DepthPoint[] }>;
+  /** every run in the window: [minutes, asked, answered, refused, failed] */
+  runs: Array<[number, number, number, number, number]>;
+}
+
+const BAND50 = DEPTH.BANDS_BPS.indexOf(50);
+const mins = (iso: string) => Math.floor(Date.parse(iso) / 60_000);
+
+export function isDepthLatest(j: unknown): j is DepthLatest {
+  const x = j as DepthLatest | null;
+  return !!x && x.kind === 'aegis-depth' && x.v === 1 && Array.isArray(x.markets) && Array.isArray(x.runs) && !!x.reach;
+}
+
+/** Fold one run into the 24 h window. A market that didn't answer keeps its history and its last good book. */
+export function updateLatest(prev: unknown, run: DepthRun, status: DepthStatus): DepthLatest {
+  const p = isDepthLatest(prev) ? prev : null;
+  const t = mins(run.at);
+  const from = t - DEPTH.WINDOW_H * 60;
+  const byId = new Map((p?.markets ?? []).map((m) => [m.p, { ...m, hist: m.hist.filter((h) => h[0] > from) }]));
+  for (const m of run.markets) {
+    const cur = byId.get(m.p) ?? { p: m.p, s: m.s, at: null, now: null, hist: [] };
+    // a book that failed its units check is kept as answered, but its sizes are never used
+    const pt: DepthPoint = [t, m.spreadBps, m.unitsOk ? m.bidUsd[BAND50] ?? null : null, m.unitsOk ? m.askUsd[BAND50] ?? null : null, m.markOracleBps];
+    byId.set(m.p, { p: m.p, s: m.s, at: run.at, now: m, hist: [...cur.hist, pt] });
+  }
+  const runs = [...(p?.runs ?? []).filter((r) => r[0] > from), [t, run.asked, run.answered, run.refused, run.failed] as [number, number, number, number, number]];
+  const last24 = runs.reduce((a, r) => ({ runs: a.runs + 1, asked: a.asked + r[1], answered: a.answered + r[2], refused: a.refused + r[3], failed: a.failed + r[4] }), { runs: 0, asked: 0, answered: 0, refused: 0, failed: 0 });
+  const days = Object.keys(status.days).sort();
+  return {
+    kind: 'aegis-depth',
+    v: 1,
+    version: DEPTH.VERSION,
+    updated: run.at,
+    block: run.block,
+    reach: { last24, days: status.days, firstDay: days[0] ?? null },
+    // a market with no answer in the whole window is dropped (delisted, or long gone)
+    markets: [...byId.values()].filter((m) => m.hist.length > 0).sort((a, b) => a.p - b.p),
+    runs,
+  };
+}
+
+const median = (xs: number[]): number | null => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+const nums = (xs: Array<number | null>) => xs.filter((x): x is number => x !== null && Number.isFinite(x));
+
+export interface MarketSummary {
+  p: number;
+  s: string;
+  /** readings in the window */
+  n: number;
+  spreadNow: number | null;
+  spreadMed: number | null;
+  /** USD within 0.5% of the mid, now */
+  bidNow: number | null;
+  askNow: number | null;
+  /** the thinner side, its 24 h median and its 24 h low */
+  thinMed: number | null;
+  thinLow: number | null;
+  markNow: number | null;
+  /** largest |mid − oracle| in the window, keeping its sign */
+  markMax: number | null;
+  stale: boolean;
+}
+
+/** What the panel shows per market — medians and lows over the window, never a projection. */
+export function summarizeMarket(m: DepthLatest['markets'][number], latestRunAt: string): MarketSummary {
+  const thin = nums(m.hist.map((h) => (h[2] === null || h[3] === null ? null : Math.min(h[2], h[3]))));
+  const marks = nums(m.hist.map((h) => h[4]));
+  const markMax = marks.length ? marks.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a)) : null;
+  const ok = m.now?.unitsOk === true;
+  return {
+    p: m.p,
+    s: m.s,
+    n: m.hist.length,
+    spreadNow: m.now?.spreadBps ?? null,
+    spreadMed: median(nums(m.hist.map((h) => h[1]))),
+    bidNow: ok ? m.now!.bidUsd[BAND50] ?? null : null,
+    askNow: ok ? m.now!.askUsd[BAND50] ?? null : null,
+    thinMed: median(thin),
+    thinLow: thin.length ? Math.min(...thin) : null,
+    markNow: m.now?.markOracleBps ?? null,
+    markMax,
+    stale: m.at !== latestRunAt,
+  };
 }

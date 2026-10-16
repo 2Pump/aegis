@@ -66,3 +66,42 @@ describe('depth history files', () => {
     expect(Object.keys(m).sort()).toEqual(['ask', 'askUsd', 'bid', 'bidUsd', 'clipped', 'markOracleBps', 'mid', 'n', 'oracle', 'p', 's', 'spreadBps', 'unitsOk']);
   });
 });
+
+describe('the 24 h window (depth/latest.json)', () => {
+  const E = 10n ** 18n;
+  const L = (price: number, size: number) => ({ price, size, raw: BigInt(Math.round(size * 1000)) * (E / 1000n) });
+  const book = (bid: number, ask: number, size: number, oracle = (bid + ask) / 2) =>
+    summarizeBook({ productId: 2, symbol: 'BTC-PERP', oracle, sizeIncrement: E / 1000n, bids: [L(bid, size)], asks: [L(ask, size)] });
+  const mkRun = (at: string, markets: ReturnType<typeof book>[], asked = 1): DepthRun => ({ at, block: 1, asked, answered: markets.length, refused: asked - markets.length, failed: 0, reason: null, markets });
+  const status = updateStatus(null, mkRun('2026-10-16T00:00:00Z', []));
+
+  it('keeps every run of the last 24 h and drops older ones; a missed book keeps its last good reading', async () => {
+    const { updateLatest, summarizeMarket } = await import('../src/depth.js');
+    let l = updateLatest(null, mkRun('2026-10-15T00:00:00Z', [book(99.99, 100.01, 10)]), status);
+    l = updateLatest(l, mkRun('2026-10-15T12:00:00Z', [book(99.9, 100.1, 2)]), status);
+    l = updateLatest(l, mkRun('2026-10-16T06:00:00Z', [book(99.95, 100.05, 5, 100.5)]), status);
+    expect(l.markets[0]!.hist).toHaveLength(2); // the 15 Oct 00:00 run is over 24 h old
+    l = updateLatest(l, mkRun('2026-10-16T06:10:00Z', [], 1), status);
+    expect(l.reach.last24).toEqual({ runs: 3, asked: 3, answered: 2, refused: 1, failed: 0 });
+    const s = summarizeMarket(l.markets[0]!, '2026-10-16T06:10:00Z');
+    expect(s.stale).toBe(true);
+    expect(s.spreadNow).toBe(10);
+    expect(s.spreadMed).toBe(15); // median of 20 and 10 bps
+    expect(s.thinLow).toBe(200); // 99.9 × 2, in whole dollars
+    expect(s.markMax).toBeCloseTo(-50, 0); // mid 100 vs oracle 100.5
+  });
+
+  it('a book that failed its units check is never used for depth', async () => {
+    const { updateLatest, summarizeMarket } = await import('../src/depth.js');
+    const bad = { ...book(99, 101, 1), unitsOk: false };
+    const l = updateLatest(null, mkRun('2026-10-16T00:00:00Z', [bad]), status);
+    const s = summarizeMarket(l.markets[0]!, '2026-10-16T00:00:00Z');
+    expect([s.bidNow, s.askNow, s.thinMed, s.thinLow]).toEqual([null, null, null, null]);
+    expect(s.spreadNow).toBe(200);
+  });
+
+  it('per-run files are small and named by time', async () => {
+    const { depthRunPath } = await import('../src/depth.js');
+    expect(depthRunPath('2026-10-16T06:10:03.120Z')).toBe('depth/runs/2026-10-16/061003.json');
+  });
+});
