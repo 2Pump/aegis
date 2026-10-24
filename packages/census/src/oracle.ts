@@ -30,6 +30,8 @@ export const ORACLE = {
   PEG_BREAK_PCT: 2,
   /** move between two consecutive runs (about an hour) */
   JUMP_PCT: 5,
+  /** a jump is only measured against a reading this recent: after an outage, days of normal movement aren't a jump */
+  JUMP_MAX_GAP_H: 2,
   /** an event for the same asset and kind is not repeated within this long */
   COOLDOWN_H: 6,
   /** a problem must be gone on this many runs in a row before "resolved" is said (no flapping) */
@@ -214,7 +216,10 @@ export function buildOracleWatch(o: { snap: OracleSnapshot; prev?: OracleWatch |
     }
     // sudden jump since the previous run
     const before = prevRows.get(t.asset)?.tydro?.price ?? null;
-    if (before && t.priceUsd) {
+    const gapH = o.prev ? (snap.at - o.prev.at) / 3_600_000 : null;
+    if (before && t.priceUsd && gapH !== null && gapH > ORACLE.JUMP_MAX_GAP_H) {
+      checks.push({ kind: 'jump', status: 'OK', text: `not checked this run: the previous reading is ${Math.round(gapH)} h old (a jump is measured over at most ${ORACLE.JUMP_MAX_GAP_H} h)`, pct: null });
+    } else if (before && t.priceUsd) {
       const d = pctDiff(t.priceUsd, before);
       if (Math.abs(d) >= ORACLE.JUMP_PCT) checks.push({ kind: 'jump', status: 'JUMP', text: `Tydro price moved ${d >= 0 ? '+' : ''}${d.toFixed(1)}% since the previous run`, pct: d });
     }

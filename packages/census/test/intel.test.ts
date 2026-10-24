@@ -155,6 +155,14 @@ describe('Oracle Watch · checks', () => {
     expect(kinds(w, 'WETH').jump).toBe('JUMP');
   });
 
+  it('after an outage, days of normal movement are not a jump (the previous reading must be recent)', () => {
+    const prev = buildOracleWatch({ snap: snap() });
+    const w = buildOracleWatch({ snap: snap({ tydro: { WETH: { priceUsd: 1800 } }, at: T0 + 91 * H, block: 9000 }), prev });
+    expect(kinds(w, 'WETH').jump).toBe('OK');
+    expect(row(w, 'WETH').checks.find((c) => c.kind === 'jump')!.text).toMatch(/not checked this run: the previous reading is 91 h old/);
+    expect(w.events.some((e) => e.kind === 'jump')).toBe(false);
+  });
+
   it('invalid or missing protocol price is never shown as a number', () => {
     const w = buildOracleWatch({ snap: snap({ tydro: { GHO: { priceUsd: null } } }) });
     expect(row(w, 'GHO').status).toBe('INVALID');
