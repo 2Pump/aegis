@@ -26,6 +26,7 @@ const COMPARE: Array<[string, Cell, Cell, Cell]> = [
   ['Full wallet positions and exposure', 'no', 'yes', 'yes'],
   ['Wallet history', 'no', 'yes', 'yes'],
   ['Wallet stress test', 'no', 'yes', 'yes'],
+  ['Exit risk on Nado perps (estimate, from recorded order books)', 'no', 'yes', 'yes'],
   ['Telegram alerts', 'no', 'soon:up to 10 wallets', 'soon:up to 100 wallets'],
   ['API — free endpoints (/status, /wallets/{address}, /performance, /verification)', 'yes', 'yes', 'yes'],
   ['API — every other endpoint', 'no', 'no', 'yes:with your API keys (up to 5)'],

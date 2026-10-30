@@ -751,3 +751,6 @@ a.pill-btn { display: inline-block; }
 /* ───────── Account → API keys ───────── */
 .key-fresh { display: grid; gap: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--cyan); background: var(--hull-2); }
 .key-value { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; user-select: all; padding: 8px 10px; background: var(--field); border: 1px solid var(--hair); }
+
+/* wallet page: exit risk (estimate) under the Nado perps */
+.exit-risk { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--hair); background: var(--field); margin-top: 8px; }

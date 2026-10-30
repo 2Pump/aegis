@@ -232,6 +232,24 @@ async function serveRelease3(page: Page) {
   });
 }
 
+test('EXIT RISK: an estimate per open Nado perp from the recorded book; a stale book is unavailable, never guessed', async ({ page }) => {
+  const fresh = JSON.parse(R3('depth-latest.json')) as { markets: Array<{ p: number; at: string | null }> };
+  const at = new Date(Date.now() - 5 * 60_000).toISOString();
+  for (const m of fresh.markets) m.at = at;
+  let body = JSON.stringify(fresh);
+  await page.route('**/api/v1/data/depth/latest.json*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body }));
+  await page.goto('/fixture/naked');
+  const row = page.getByTestId('exit-BTC-PERP');
+  await expect(row).toContainText('BTC-PERP long');
+  await expect(row).toContainText('LOW'); // a $10k long against millions of bids
+  await expect(page.getByTestId('exit-risk')).toContainText('not a quote');
+  // the same book, 2 hours old: no estimate
+  for (const m of fresh.markets) m.at = new Date(Date.now() - 2 * 3_600_000).toISOString();
+  body = JSON.stringify(fresh);
+  await page.reload();
+  await expect(page.getByTestId('exit-BTC-PERP')).toContainText('unavailable');
+});
+
 test('DEPTH: Nado order books — reachability, every market, sorting; a missed book says so', async ({ page }) => {
   await page.route('**/api/v1/data/depth/latest.json*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: R3('depth-latest.json') }));
   await page.goto('/intel?tab=depth');

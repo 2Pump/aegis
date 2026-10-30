@@ -13,7 +13,8 @@ import { setMyWallet, useMyWallet } from '../lib/myWallet';
 import { usePlanGate } from '../lib/account';
 import { Locked } from './Paywall';
 import { apr } from './Carry';
-import { useCarry } from '../lib/history';
+import { useCarry, useDepth } from '../lib/history';
+import { EXIT, exitEstimate, type ExitLevel } from '@aegis/census';
 
 export interface HullPlateProps {
   book: Book;
@@ -328,6 +329,52 @@ function FundingLine({ sides }: { sides: NadoBook['funding'] }) {
   );
 }
 
+const EXIT_COLOR: Record<ExitLevel, string> = { LOW: 'var(--cyan)', MEDIUM: 'var(--ink-dim)', HIGH: 'var(--amber)' };
+const usdShort = (x: number) => (x >= 1e6 ? `$${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `$${Math.round(x / 1e3)}k` : `$${Math.round(x)}`);
+const pctOf = (x: number) => (x < 0.001 ? 'under 0.1%' : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`);
+const fromPrice = (bps: number | null) => (bps === null ? 'more than 2% from the price' : bps < 1 ? 'within 0.01% of the price' : `about ${(bps / 100).toFixed(bps < 10 ? 2 : 1)}% from the price`);
+
+/**
+ * Exit risk (estimate) for each open perp: could you close it yourself without moving the price much? From the order book
+ * Phrourax records every ~10 minutes (Intel → DEPTH). Computed here in the browser; a position's size never leaves the page.
+ * Only paid visitors can load the depth file; anyone else sees nothing here.
+ */
+function ExitRisk({ perps }: { perps: NadoBook['perps'] }) {
+  const d = useDepth();
+  if (d.status !== 'ok') return null;
+  const at = Date.now();
+  return (
+    <div className="exit-risk" data-testid="exit-risk">
+      <div className="faint mono" style={{ fontSize: 11, letterSpacing: '0.1em' }}>EXIT RISK — ESTIMATE · {EXIT.VERSION}</div>
+      {perps.map((p) => {
+        const long = p.sizeBase > 0;
+        const e = exitEstimate({ notionalUsd: p.notionalUsd, long, market: d.v.markets.find((m) => m.p === p.productId), nowMs: at });
+        const head = `${p.symbol} ${long ? 'long' : 'short'} · ${usdShort(Math.abs(p.notionalUsd))}`;
+        return (
+          <div key={p.subaccount + p.productId} className="mono" style={{ fontSize: 12.5 }} data-testid={`exit-${p.symbol}`}>
+            {!e.ok ? (
+              <span className="dim">{head} · unavailable: {e.reason}</span>
+            ) : (
+              <>
+                <b>{head}</b> · <b style={{ color: EXIT_COLOR[e.level] }}>{e.level}</b>
+                <span className="dim">
+                  {' '}· the {e.side} within 0.5% of the price hold {e.atLeast ? 'at least ' : ''}{usdShort(e.bookUsd[1] ?? 0)} ({pctOf(e.shareNow)} would be used)
+                  {e.low24Usd !== null ? `, ${usdShort(e.low24Usd)} at their thinnest in 24 h` : ''} · a full close would reach {fromPrice(e.reachBps)} · book read {e.readAt.slice(11, 16)} UTC
+                </span>
+              </>
+            )}
+          </div>
+        );
+      })}
+      <div className="faint" style={{ fontSize: 12 }}>
+        An estimate from the last recorded order book, not a quote: books refill and empty quickly. It&apos;s about closing a position yourself. Nado liquidates through its own
+        liquidators, not this book, and this never changes Safe / Watch / Near liquidation. LOW: the position is at most a quarter of the book within 0.5% and no more than its
+        24 h thinnest. HIGH: the whole book within 2% is smaller than the position.
+      </div>
+    </div>
+  );
+}
+
 function NadoTable({ n }: { n: NadoBook }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
@@ -388,6 +435,7 @@ function NadoTable({ n }: { n: NadoBook }) {
       ) : null}
       {!n.spots.length && !n.perps.length ? <div className="dim">No Nado balances.</div> : null}
       {n.funding.length ? <FundingLine sides={n.funding} /> : null}
+      {n.perps.some((p) => p.sizeBase !== 0) ? <ExitRisk perps={n.perps.filter((p) => p.sizeBase !== 0)} /> : null}
       {n.notes.map((x, i) => (
         <div key={i} className={x.includes('OK') ? 'banner cyan' : 'banner'}>{x}</div>
       ))}
