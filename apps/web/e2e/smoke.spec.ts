@@ -1,10 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
-test('home boots gated: no well, no fixture stars, read-only footer', async ({ page }) => {
+/** The site reads verification/status.json at build time; these tests follow it, so they hold before and after a venue is proven. */
+const STATUS = JSON.parse(readFileSync(new URL('../../../verification/status.json', import.meta.url), 'utf8')) as { verified?: boolean; venues?: { tydro?: boolean; nado?: boolean } };
+const VERIFIED = (STATUS.venues?.tydro === true || STATUS.verified === true) && (STATUS.venues?.nado === true || STATUS.verified === true);
+
+test('home: gated until verified (then no unverified banner), no fixture stars, read-only footer', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('unverified-banner')).toBeVisible();
-  await expect(page.getByTestId('well-canvas')).toHaveCount(0);
+  if (VERIFIED) {
+    await expect(page.getByTestId('footer')).toBeVisible();
+    await expect(page.getByTestId('unverified-banner')).toHaveCount(0);
+  } else {
+    await expect(page.getByTestId('unverified-banner')).toBeVisible();
+    await expect(page.getByTestId('well-canvas')).toHaveCount(0);
+  }
   await expect(page.getByText('EX1 CARRY')).toHaveCount(0);
   await expect(page.getByTestId('footer')).toContainText('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
   await expect(page.getByTestId('footer')).toContainText('chain 57073');
@@ -64,15 +73,21 @@ test('rules live in one drawer: the button opens it, old /rules links open it, E
   await expect(page.getByRole('link', { name: 'Rules', exact: true })).toHaveCount(0);
 });
 
-test('calibration page lists fixtures and shows not-yet-checked status', async ({ page }) => {
+test('calibration page lists fixtures and states the check status as it is', async ({ page }) => {
   await page.goto('/calibration');
-  await expect(page.getByTestId('proof-panel')).toContainText('NOT YET CHECKED');
+  await expect(page.getByTestId('proof-panel')).toContainText(VERIFIED ? 'CHECKED' : 'NOT YET CHECKED');
+  if (VERIFIED) await expect(page.getByTestId('proof-panel')).not.toContainText('NOT YET CHECKED');
   await expect(page.getByTestId('fixture-list')).toContainText('EX1 CARRY');
 });
 
-test('live hull plate carries the unverified banner', async ({ page }) => {
+test('live hull plate carries the unverified banner only until verified', async ({ page }) => {
   await page.goto('/hull/0x8d7d64d6cf1d4f018dd101482ac71ad49e30c560');
-  await expect(page.getByTestId('unverified-plate')).toBeVisible({ timeout: 30_000 });
+  if (VERIFIED) {
+    await expect(page.getByTestId('hull-plate')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('unverified-plate')).toHaveCount(0);
+  } else {
+    await expect(page.getByTestId('unverified-plate')).toBeVisible({ timeout: 30_000 });
+  }
 });
 
 test('"My wallet" is remembered from a wallet page — and no wallet extension is ever asked for anything', async ({ page }) => {
@@ -140,7 +155,8 @@ test('Pressure Map: in the nav after Well (then Intel); locked with the well unt
   expect(links.map((l) => l.trim().toUpperCase()).slice(0, 4)).toEqual(['WELL', 'PRESSURE', 'INTEL', 'SCAN']);
   await page.getByRole('link', { name: 'Pressure' }).click();
   await expect(page).toHaveURL(/\/pressure$/);
-  await expect(page.getByTestId('pressure-locked')).toBeVisible();
+  if (VERIFIED) await expect(page.getByTestId('pressure-locked')).toHaveCount(0);
+  else await expect(page.getByTestId('pressure-locked')).toBeVisible();
   await expect(page.locator('footer, .footer').first()).toContainText('Phrourax is read-only. It never connects to your wallet and cannot move funds. Classifications may be incomplete or incorrect. Not financial advice.');
 });
 

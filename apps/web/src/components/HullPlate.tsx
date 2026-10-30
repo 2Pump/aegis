@@ -143,7 +143,7 @@ export function HullPlate({ book, pose, lastOk, firstSeen, now, loading, nextInM
 
         {/* 5 NADO */}
         <Panel idx="05" title="Nado account" rail="var(--violet)">
-          {book.nado.status === 'OK' ? <NadoTable n={book.nado.data} /> : <Dark code={book.nado.code} msg={book.nado.message} />}
+          {book.nado.status === 'OK' ? <NadoTable n={book.nado.data} paid={gate === 'open'} /> : <Dark code={book.nado.code} msg={book.nado.message} />}
         </Panel>
       </div>
 
@@ -297,6 +297,17 @@ function Locker({ t, fixture }: { t: TydroBook; fixture: boolean }) {
   );
 }
 
+/** Without a plan: which side each open perp is on, nothing that needs a paid file. */
+function FundingSides({ sides }: { sides: NadoBook['funding'] }) {
+  const seen = new Set<string>();
+  const parts = sides.filter((f) => (seen.has(f.symbol + f.side) ? false : (seen.add(f.symbol + f.side), true)));
+  return (
+    <div className="mono dim" style={{ fontSize: 12 }} data-testid="funding-line">
+      funding side: {parts.map((f) => `${f.symbol} ${f.side.toLowerCase()}`).join(' · ')}
+    </div>
+  );
+}
+
 /**
  * Funding for each open perp side, from the Carry recorder: what that side actually received or paid over the last
  * 24 h (Nado's cumulative funding, on-chain), annualised. No reading yet (or no access to it) → the side alone.
@@ -375,7 +386,7 @@ function ExitRisk({ perps }: { perps: NadoBook['perps'] }) {
   );
 }
 
-function NadoTable({ n }: { n: NadoBook }) {
+function NadoTable({ n, paid }: { n: NadoBook; paid: boolean }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
       <dl className="kv">
@@ -434,8 +445,9 @@ function NadoTable({ n }: { n: NadoBook }) {
         </div>
       ) : null}
       {!n.spots.length && !n.perps.length ? <div className="dim">No Nado balances.</div> : null}
-      {n.funding.length ? <FundingLine sides={n.funding} /> : null}
-      {n.perps.some((p) => p.sizeBase !== 0) ? <ExitRisk perps={n.perps.filter((p) => p.sizeBase !== 0)} /> : null}
+      {/* funding rates and exit risk read paid files: a visitor without a plan never requests them (test wallets included) */}
+      {n.funding.length ? (paid ? <FundingLine sides={n.funding} /> : <FundingSides sides={n.funding} />) : null}
+      {paid && n.perps.some((p) => p.sizeBase !== 0) ? <ExitRisk perps={n.perps.filter((p) => p.sizeBase !== 0)} /> : null}
       {n.notes.map((x, i) => (
         <div key={i} className={x.includes('OK') ? 'banner cyan' : 'banner'}>{x}</div>
       ))}
